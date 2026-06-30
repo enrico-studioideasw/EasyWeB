@@ -1,0 +1,32 @@
+'editor di codice easyweb  on-line 
+'risponde ad  una serie di comandi dal sito.
+table utenti=user, pass;
+table files=user, filename; 
+var pars;
+'devo fare una correzione alla  pop.  
+
+template=load "pages/left.html";
+pars=split [&], getquerystring();
+
+var cmd, b, inf;
+
+user=getelem(pars,0);
+pass=getelem(pars,1);
+
+if (!login(utenti))
+{ show "Login non valido.  Contattare l'amministratore"; 
+  end; 
+};
+var a; a=user;
+var res; 
+res="";
+inall (files, (user eq a))
+{  var fn;
+   ' fn=mid(filename, 0, len(filename)-4); 
+   res=res.[
+<a href=editor.cgi?view&].user.[&].pass.[&].filename.[&end target=right>
+].filename.[</a><br><br>];
+}; 
+if (res eq "")
+{ res="No file"; };
+show res; 

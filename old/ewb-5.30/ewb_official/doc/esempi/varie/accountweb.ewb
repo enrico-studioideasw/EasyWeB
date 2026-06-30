@@ -1,0 +1,118 @@
+'gestione di accounts web. 
+'li visualizza poi permette inserimento, modifica e cancellazione. 
+
+#include "tabelle.inc"
+
+format="25:5:h";
+var v;
+while (1)
+{ 
+  v="";
+  in (risorsaweb)
+  { v=v.url.";";
+  };
+  url=v;
+  var b;
+  b="aggiungi;modifica;cancella";
+  v="Gestione di risorse web.";
+  ask v:info, url:radio("  "), b:submit; 
+
+  if (b eq "aggiungi") 
+  { ' show "inserimento risorsa web";
+    v="";
+    inall (referenti)
+    { v=v.nomecogn.";";
+    };
+    nomecogn=v;
+    var passw1;
+    b="ok";
+    var reqip; 
+    url=""; reqip=""; user=""; password=""; user1=""; passw1=""; vnome=""; 
+    ask nomecogn:option("referente"), url:text("cartella"), reqip:text("ip server web"), user, 
+        password:password, user1:text("login area"),
+        passw1:password("pass area"), vnome:text("virtualhost"), b:submit;  
+    if (nomecogn eq "") 
+      { show "va indicato un referente"; end; };
+    if ((len user)<2)
+      { show "manca lo username"; }; 
+    if ((len password)<2)
+      { show "manca la password"; };
+    in (host, reqip eq ip)
+    { lock(risorsaweb);
+      lock(accessi); 
+      add (risorsaweb);
+      add(accessi); 
+      user=user1;
+      password=passw1; 
+      add(accessi); 
+      unlock(accessi); 
+      unlock(risorsaweb);
+      b="trovato";
+    };
+    if (b ne "trovato")
+    { show "Host non trovato"; 
+      end ; 
+    };
+  };
+  if (b eq "modifica")
+  {   
+    v="";
+    exist(risorsaweb);
+    print url.nomecogn.chiaveprog.user;
+    var passw1;
+    b="ok";
+    var reqip; 
+    exist(accessi); 
+    var u, p;
+    u=user; p=password; 
+    user=user1; 
+    exist(accessi); 
+    user1=user;
+    passw1=password; 
+    user=u;
+    password=p;
+    exist(host);
+    reqip=ip;
+    ask nomecogn:info, url:info, reqip:text("ip server web"), user, 
+        password:password, user1:text("login area"),
+        passw1:password("pass area"), vnome:text("virtualhost"), b:submit;  
+    if (nomecogn eq "") 
+      { show "va indicato un referente"; end; };
+    if ((len user)<2)
+      { show "manca lo username"; }; 
+    if ((len password)<2)
+      { show "manca la password"; };
+    in (host, reqip eq ip)
+    { lock(risorsaweb);
+      lock(accessi); 
+      add (risorsaweb);
+      add(accessi); 
+      user=user1;
+      password=passw1; 
+      add(accessi); 
+      unlock(accessi); 
+      unlock(risorsaweb);
+      b="trovato";
+    };
+    if (b ne "trovato")
+    { show "Host non trovato"; 
+      end ; 
+    };
+  };
+  if (b eq "cancella")
+  { v= "eliminazione risorsa:".url;
+    if ( ! exist(risorsaweb)) 
+    { show "oggetto inesistente"; end; 
+    };
+    exist(host); 
+    v=v."<br>host: ".ip."<br> Ref:".nomecogn;
+    var k; 
+    k="e' corretto? "; 
+    b="si;no";
+    ask v: info, k:info, b:submit; 
+    if (b eq "si") 
+    { remove(risorsaweb); 
+    };  
+  };
+};
+

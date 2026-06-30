@@ -1,0 +1,68 @@
+Alla base una macchina virtuale, che puo' eseguire metacodice e che puo'
+essere scritta con qualunque linguaggio.
+Il metacodice puo' essere generato on the fly
+La macchina virtuale deve fornire:
+-Accesso a files e directory, apertura esclusiva 
+-Accesso a dbase e query sql
+-Lettura del form in post e query string 
+-Stringhe lunghe
+-Socket
+
+Il metacodice deve essere compresso per esecuzione veloce. 
+La stringa puo' essere rappresentata come "dati". Una virgoletta interna va gestita in escape. 
+Una istruzione e' composta da codice istruzione (1 char) seguito da i parametri
+Un parametro e' (aperte virgolette) seguito da caratteri e da chiuse virgolette o un nome di variabile. 
+Un nome di variabile e' un carattere.
+Il risultato e' in accumulatore. L' acc. e' una stringa.  
+I salti sono tutti ad indirizzi assoluti, rispetto all'inizio programma. 
+
+All' interno ci possono essere delle virgolette in escape.
+Tipi: stringa 
+
+Tabella delle istruzioni
+I input (read) 	P print
+O fopen 	E excl.open 	W fwrite 	R fread 	C fclose
+D opendir	R read direlem	c closedir
+B Open db       Q Query         R 1 row reply   b close db
+G read get el 	P read post el	
+S open sock     w write sock 	r read sock 	x close sock
+
+Funzioni su stringhe
+M mid		A add		I index		s set
+
+Flusso
+[J] jump	I if 		{ openblock	} closeblock
+> call		< ret	   	[n] jump if>z	z jump if <=0  
+[e] jump if ""
+[.] nop 
+
+MetaAsm
+y push		Y pop		[V] sta var	[q] lda var
+		
+Metainterpretazione e esecuzione
+e exec	   	X shell
+
+Operatori elementari, binari precedenti i parametri
++ sum		- sub		* mul		/ div 		% mod
+1 sin		2 cos		3 int		
+
+Devo vedere e con queste e' possibile tradurre un programma amethyst. In caso 
+inizio un compilatore, poi la VM per perl e C. 
+
+Nota: tutti gli indirizzi di salto sono assoluti e little endian. 
+
+
+Esempi di programma:
+print "** ciao mondo **"
+"** ciao mondo **"P
+
+var a,b; b="ok"; ask a, b:submit; print a+b;
+V"ok"q1>"ask"0""""1"submit"""+01P
+
+Va bene a patto che sia definita la funzione ask in termini di elementari.
+La ask puo' essere scritta in amethyst.
+
+*Compilatore ewb->metacodice (fando)
+*Libreria funzioni elementari e dbase
+*macchina virtuale
+

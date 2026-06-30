@@ -1,0 +1,19 @@
+table prova=a,b,c;
+a="uno"; b="due"; c="tre";
+add prova;
+a="qua"; b="cin"; c="sei";
+add prova;
+
+in(prova)
+{ print a." ".b." ".c."\n";
+};
+print "\n";
+
+b="carciofo";
+update prova;
+
+in(prova)
+{ print a." ".b." ".c."\n";
+};
+print "\n";
+

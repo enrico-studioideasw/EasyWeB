@@ -1,0 +1,66 @@
+'aggiunta di un host su rete. 
+#include "tabelle.inc"
+table idnum=id; 
+var h,b,v ;
+
+while (1) 
+{ 
+h="";
+in (host)
+{ h=h.ip.";"; };
+
+b="aggiungi;cancella;info"; 
+ask b:submit, h:radio; 
+
+  if (b eq "aggiungi")
+  {
+  b="invia"; 
+  ip=""; nomehost=""; sistop=""; proprietario=""; 
+  ask ip, hostname, nomehost:text("descrizione"), sistop, proprietario, b:submit; 
+
+  if (len(ip)<12) {show "ip non valido"; end;  };
+
+
+  lock(idnum); 
+  id=load "id.dat"; 
+  id=id +1; 
+  save "id.dat", id; 
+  unlock(idnum); 
+  chiaveprog=id; 
+
+  add(host); 
+  show "Host : inserito 
+  &nbsp;".ip." 
+  &nbsp;".hostname."
+  &nbsp;".sistop."
+  <br>"; 
+  };
+  if (b eq "info")
+  { 
+    v="";
+    in (host, h eq ip) 
+    {  v= "nomehost: ".nomehost."<br>sist.operativo:".sistop.
+		"<br>proprietario:".proprietario.
+ 		"<br>hostname:".hostname;   
+     
+    };
+    b="ok";
+    ask v: info, b:submit;   
+  };
+  if (b eq "cancella")
+  { var vip; vip=ip;
+    v="";
+    in (host, h eq ip) 
+    { v= "nomehost: ".nomehost."<br>sist.operativo:".sistop.
+		"<br>proprietario:".proprietario.
+ 		"<br>hostname:".hostname;   
+    };
+    v=v."<br>Procedo ?";
+    b="si;no";
+    ask v: info, b:submit;
+    if (b eq "si")
+    { remove(host); 
+    };   
+  };
+
+};

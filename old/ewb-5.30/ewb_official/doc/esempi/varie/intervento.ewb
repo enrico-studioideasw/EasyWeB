@@ -1,0 +1,53 @@
+'aggiunta di un utente per posta. 
+#include "tabelle.inc"
+
+'visualizzo gli interventi pendenti. 
+var a,i,b;
+i=1;
+b="Intervento svolto";
+a="Interventi pendenti<br></b><table border>";
+
+var v;
+v="";
+in(referenti)
+{ v=v.nomecogn.";";
+};
+
+var nomepers, data1, ora1;
+in(interventi, nomecogn eq "")
+{ ora1=pop intv;
+  data1=pop intv;
+  nomepers=pop intv;
+  a=a."<tr><td>".i."</td><td>".nomepers."</td><td>".data1.", ".ora1."</td><td>".tipo."</td><td>".memo."</td><td>";
+  exist(host);
+  a=a.ip.", ".proprietario."</td></tr>";
+  i=i+1;
+};
+
+a=a."</table><br>";
+var n;
+n="";
+esito="";
+ask a:info, n:text("numero"), v:option("referente"),esito:text,b:submit;
+if ((n<0) || (n>=i))
+{ show "Numero non in elenco";
+  end; 
+};
+if (v eq "") { show "Referente nullo."; end; };
+
+i=1;
+in(interventi)
+{ 
+  if (i==n)
+  { 'e' quello indicato. 
+    print "trovato intervento."; 
+    nomecogn=v; 
+    data2=date;
+    ora2=time;
+    add(interventi); 
+    show "Esito inserito.";
+    end; 
+  };
+  i=i+1;
+};
+

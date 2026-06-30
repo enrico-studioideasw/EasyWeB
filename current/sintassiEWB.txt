@@ -1,0 +1,403 @@
+easyweb versione 7.0 - prima definizione della sintassi
+ { blocco opzionale
+ [ 0 o più volte
+ | or, sono piu possibilità per la stessa sintassi
+ "{" graffa
+ "[" quadra 
+
+_______________________________________________________
+
+programma= [blocco; { blocco ; }]
+blocco= codice | "{" codice "}" 
+codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | whileblock  | downwhile  | foreachblock  | forblock | asmline | calcexp  | fundecl ]
+  commento= "'" [*] \n       'gestito da delperc
+
+  datasetdecl= dataset name "=" campidataset
+  campidataset= "{" [campodataset [, campodataset] ] "}" 
+  campodataset = [id|idz|ut|pw|idm|idmz _ ] singlevar ["=" campidataset]
+
+
+  taskdecl= task name([varname [,varname] ])  "{" [codice] "}"
+
+  targetdecl= target name { "=" campitarget }
+  campitarget= "{" [campotarget [, campotarget] ] "}" 
+  campotarget = singlevar ["=" campitarget]
+
+  vardecl= var singlevar [, singlevar] 
+  singlevar = name [ "=" inexp ]
+  ifblock= if calcexp blocco [elseif calcexp blocco] { else blocco } 
+  forblock= for (calcexp; calcexp; calcexp) { [codice] }
+
+  
+  whileblock= while calcexp { [codice] };
+  downwhile= do { [codice] } while calcexp;
+  fundecl= sub name([varname [,varname] ]) [ { [codice] } ]
+
+//Sezione di sub-linguaggio assembler per la machina virtuale
+        asmline = alabel | ainstr
+        alabel  = .name: 
+        ainstr  = .opcode [aaddress | aparam] [aparam] 
+        aaddress = name
+        aparam   = varname | strvalue
+
+//Utile soprattutto per scrivere le funzioni predefinite e includerle.  
+'qui devo ricordare se sono prima o dopo cfr. lo faccio con un flag di stato.
+
+  calcexp= assign\= inexp | inexp         //    (no ll1 ! attento) 
+  assign=variabile  [ "[" pos "]" ]     //Notare che ci sono gli array multidimensionali
+  inexp=exp  cfr inexp | exp
+  cfr = \= | == | != | <= | >= | > | < | eq | gt | ge | lt | le
+  'nota: se uno dei due el. e' una stringa e' un confronto di stringhe.
+  exp=e . exp | e
+  e = t+e | t-e | t
+  t = f*t | f/t | f%t | f
+  f= b\|f | b\|\|f | b
+  b= k & b | k && b | k
+  k= variabile [ "[" calcexp "]" ] | ! inexp | numvalue | strvalue | (calcexp) | identifier 
+  identifier = variabile | funzione
+  funzione = predef | fname calcexp [,calcexp]
+'qui mi complico la vita, ma almeno posso definire i numeri in qualunque base e dimensione.. 
+  numvalue = [+/-] ( bin | hex | oct | dec ) 
+  bin = 0b [0..1] [. {0..1} ]                                         // [ E [+/-] { 0..1 } ] 
+  oct = 0o [0..7] [. {0..7} ]                                         // [ E [+/-] { 0..7 } ] 
+  hex = 0x ([0..1]|[A..F]|[a..f])  [. {([0..1]|[A..F]|[a..f])} ]      // [ E [+/-] { ([0..1]|[A..F]|[a..f]) } ] 
+  dec = [0..9] [. {0..9} ]                                            // [ E [+/-] { 0..9 } ] 
+  strvalue = \" carattere \"
+  variable =a..z|A..Z | _  [a..z | A..Z | 1..9 | _ ] 
+  fname =variabile
+
+_________________________________________________________________________________
+funzioni predefinite
+
+  return calcexp  //Return è una predefinita di linguaggio
+
+  print variable    scrive su stdout    //standard di I/O per debugging (allo stderr)
+  eprint variable   scrive su stderr
+  input             legge da stdin      //ancha da web?  forse..  
+
+  load variabile                        //Variabile e' il nome del file
+  save variable,variable
+  loaddir variable                      //carica nella variabile la lista di contenuto della dir.
+
+                                          //di elaborazione numeri
+  int variable 
+  abs variable 
+  cos variable    nota: seno e coseno sono in gradi. 
+  sin variable    
+  hex variable 
+  sqr variable 
+  random
+  //un numero e' una stringa che sontiene un numero.
+  //miscellanee - dal perl
+  asc variable
+  char variable
+
+  //di elaborazione stringhe
+  mid variable, variable, variable
+  mid variable, variable
+  len variable
+  uc variable   'up case  (Per ora fa parte della VM, poi semmai la tolgo)
+______________________________________
+  index str, substr  ' index di perl. posizione della sottostringa nella stringa.
+  change   seconda, prima, origine   'torna origine scambiando prima con seconda.
+  split  variable, variable_tosplit  'analoga alla split del linguaggio perl.
+  join   variable, lista             'analoga alla join del perl.
+  date
+  lessdate  variable, variable 
+
+per accesso ai database - le variabili sono di ambiente
+  login  variabile[.variabile] 
+  add    variabile[.variabile]
+  exist  variabile[.variabile]
+  remove variabile[.variabile]
+  lock   variabile[.variabile] 
+  unlock  variabile[.variabile]
+  inblock = in ( variabile[.variabile] [, condizione] ) blocco | inall ( variabile[.variabile] ) blocco | delete ( variabile[.variabile] [, condizione] )
+  condizione = calcexp 
+
+per accesso all' interfaccia web
+  ask field [,field]
+  askto url,  field [,field] ' il risultato va ad un altra interfaccia.
+                             ' in questo caso riporto solo le var. della ask.
+  field= variable 
+  // no, mettiamo delle classi e id univoci e si può fare css style= text, password, submit, textarea, links, option, checkbox, radio, hidden
+  ' la richiesta dipende dal valore definito delle variabili prima della ask.
+  ' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
+  ' crescere. Semplicemente la ask puo' portarsi dietro in post tutte le var. di ambiente.
+
+  form  field[, field]
+  showform  variable 
+  'crea un form come per la ask ma anziche' mostrarlo con il template lo torna.
+  'serve a creare pagine con piu' forms, ciascuno dei quali porta ad un risultato diverso.
+  show variabile
+  ' mostra il testo contornato dal template.
+
+//per accesso al motore inferenziale SLDNF
+  assert dataset, variable
+  retract dataset, variable
+primo parametro: gruppo di clausole, secondo: clausola
+  goal  datset, variabile blocco
+parametro: il goal. Svolge un ciclo con le var. del goal definite.
+
+________________
+per l' uso di stringhe come liste. Sono gli stessi dati che avrei se nella stringa metto un array. 
+ho il problema di ripetere la cosa a piu' dimensioni.. bah, ho anche le parentesi quadre annidabili.. quindi array stile php. 
+mangia ram ma funge.
+
+	push stack, exp
+'trasformo exp nel suo codice ascii, accodo "exp a var
+
+	pop stack
+'recupero da var l' ultimo pezzo con split di " ", trasformo da codice ascii a valore.
+
+	//getelem stack,n
+	//setelem stack,n ,exp //Non servono ho variabile[n] = X, anche miltidimensionale.
+	numel var
+'torno il numero di elementi in una lista
+
+________________
+Per l' uso di sock stream
+
+Ho la necessita' di comunicare con altri programmi con sock stream o a pacchetto...
+Cerco di fare la cosa nel modo piu' spiccio possibile.
+Le sock sono numeri.
+
+	int socket host, port  //crea una client socket ipv4
+	int server port        //trasforma il programma in un server sulla porta.
+	int accept port        //accept.
+	sread socket [size]    //legge una riga dalla porta [fino a size]
+	swrite socket,data     //scrive una riga sulla porta
+    read port              //legge (se c'e') un pacchetto da una porta
+    write host, port       //scrive
+________________
+Per i tasks
+    schedule varname varname varname  //task interval (hourly,daily,monthly,weekly)  when ("12", "12:00", "monday", "monday 12:00")
+    stato del task: inall(_tasks.runtime, name='miotask' && stato=="ready") { ... } 
+
+Per completamento tramite ia (una tantum):
+    ia "richiesta" 
+diventa: 
+    '(gestita) ia "richiesta"
+    /* 
+      blocco di codice 
+    */
+
+_______________________________________________________________________________
+
+*******************************************************************************
+_______________________________________________________________________________
+
+Qui sotto ancora sono solo ragionamenti..
+________________
+Per uso di minmax e euristiche ? 
+
+Formato base, vicino al vecchio motore:
+
+  dataset pianificazione = 
+  { [ nomeregola/nomefatto {= regola} ] 
+    fatto(...),
+    fatto(...),
+    regola(...) :- condizioni(...)
+  }
+  
+  Estensione euristica minima:
+
+  goal pianificazione, soluzione max score {
+    ...
+  }
+
+  Dove score può essere:
+
+  - una variabile prodotta dalla regola;
+  - una funzione;
+  - una calcexp valutata sulle variabili del goal.
+
+  Esempio più semplice:
+
+  dataset assegnazioni = {
+    tecnico("Marco","VR","radio",3),
+    tecnico("Luca","VI","radio",1),
+    tecnico("Anna","VR","radio",2),
+
+    adatto(Nome,Zona,Skill,Carico) :-
+      tecnico(Nome,Zona,Skill,Carico),
+      Zona == "VR",
+      Skill == "radio"
+  }
+
+  goal assegnazioni, adatto(Nome,Zona,Skill,Carico) min Carico {
+    print Nome
+  }
+
+Target: unità logica di presentazione, indipendente dal renderer. Potenziale base per aggiornamenti AJAX, rendering parziale e future interfacce non HTML.
+target pagina
+{
+    target menu
+    {
+        ...
+    }
+
+    target elenco
+    {
+        ...
+    }
+
+    target dettaglio
+    {
+        ...
+    }
+}
+
+Ipotesi:
+Task e Target sono la stessa cosa.
+
+Problema:
+Si confondono esecuzione e presentazione.
+
+Decisione:
+Il Target estende il Task, ma i due concetti restano distinti.
+
+Io la vedrei quasi così (in termini OO, anche se poi la VM non sarà OO):
+
+              Executable
+                  │
+        ┌─────────┴─────────┐
+        │                   │
+      Task              Target
+
+Dove Executable definisce:
+
+contesto
+parametri
+stato
+trigger
+logging
+timeout
+lock
+gestione errori
+
+Il Task aggiunge:
+
+cron
+unique
+ready/error
+result
+
+Il Target aggiunge:
+
+renderer
+id/class
+ajax
+refresh
+eventi UI
+
+Quindi il runtime vede sempre un oggetto eseguibile.
+
+Per esempio.
+
+task generaStatistiche
+{
+    ...
+}
+
+e
+
+target statistiche ajax every "30s"
+{
+    ...
+}
+
+internamente sono quasi identici.
+
+Il secondo diventa:
+
+Task
+    |
+    +-- Renderer HTML
+    +-- Trigger AJAX
+    +-- Target ID
+
+Questo porta ad una conseguenza interessante.
+
+Un target potrebbe essere lanciato anche senza browser.
+
+Ad esempio:
+
+render(statistiche,"pdf");
+
+oppure
+
+render(statistiche,"json");
+
+Perché il target non è HTML.
+
+È una funzione che produce una vista.
+
+HTML è solo uno dei renderer.
+
+Ed ecco una cosa che mi è venuta in mente adesso.
+
+Se i target sono "task con renderer", allora potrebbero avere cache.
+
+target dashboard
+cache 30s
+{
+    ...
+}
+
+Il runtime dice:
+
+"L'ho già calcolato 12 secondi fa."
+
+e restituisce direttamente il rendering.
+
+Oppure:
+
+target mappa
+invalidate on comuni
+{
+    ...
+}
+
+----------------
+dataset unificato;
+context;
+task;
+target;
+_tasks.runtime;
+target come estensione di task;
+stato firmato;
+idea dei renderer.
+
+_______________________________
+Qui i prossimi costrutti:
+1. È un nuovo concetto? Oppure è un caso particolare di qualcosa che esiste già? Come è successo con i Target.
+
+2. È sintassi o libreria? Molte cose sembrano da linguaggio. Poi scopri che bastano cinque funzioni ben fatte.
+
+3. È generale?
+
+
+dataset
+
+serve a condividere i dati.
+
+task
+
+serve a condividere il lavoro.
+
+target
+
+serve a condividere la presentazione.
+
+context
+
+serve a condividere il mondo in cui tutto vive.
+
+Non sono quattro idee separate.
+
+Sono quattro modi di dire:
+
+"Questa cosa non appartiene a un singolo pezzo di codice."
+
+

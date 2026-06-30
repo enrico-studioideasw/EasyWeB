@@ -1,0 +1,9 @@
+var a, b, c, d; 
+c="ok";
+b="uno;*due;tre";
+a="alfa;beta;*gamma;*delta";
+format="12:5:v";
+ask a:options, b:options, c:submit;
+
+show "A: [".a."]<br>
+B: [".b."]<br>";

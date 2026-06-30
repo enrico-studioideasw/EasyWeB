@@ -1,0 +1,184 @@
+var a;
+var b;
+var c;
+
+var aa;
+var bb;
+var cc;
+
+var stack;
+
+' funziona
+a="a";
+b="b";
+c="c";
+aa=a;
+bb=b;
+cc=c;
+
+show "Test funzionante sempre<br>";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+
+' test 1
+a="a";
+b="";
+c="c";
+aa=a;
+bb=b;
+cc=c;
+
+show "<hr>Test numero 1 (b vuoto)";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+if ((a ne aa) || (b ne bb) || (c ne cc))
+{
+  show "Errore nella pop !!!!";
+}else
+{
+  show "Test eseguito correttamente.";
+};
+
+' test 2
+a="aa";
+b="bb";
+c="";
+aa=a;
+bb=b;
+cc=c;
+
+show "<hr>Test numero 2 (c vuoto)";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+if ((a ne aa) || (b ne bb) || (c ne cc))
+{
+  show "Errore nella pop !!!!";
+}else
+{
+  show "Test eseguito correttamente.";
+};
+
+' test 3
+a="";
+b="bb";
+c="cc";
+aa=a;
+bb=b;
+cc=c;
+
+show "<hr>Test numero 3 (a vuoto)";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+if ((a ne aa) || (b ne bb) || (c ne cc))
+{
+  show "Errore nella pop !!!!";
+}else
+{
+  show "Test eseguito correttamente.";
+};
+
+' test 4
+a="";
+b="";
+c="";
+aa=a;
+bb=b;
+cc=c;
+
+show "<hr>Test numero 4 (tutti vuoti)";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+if ((a ne aa) || (b ne bb) || (c ne cc))
+{
+  show "Errore nella pop !!!!";
+}else
+{
+  show "Test eseguito correttamente.";
+};
+
+' test 5
+a="aa aa";
+b="bb bb";
+c="";
+aa=a;
+bb=b;
+cc=c;
+
+show "<hr>Test numero 5 (stringhe con spazi)";
+show "Push dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+
+push stack, a;
+push stack, b;
+push stack, c;
+
+show "stack=".stack."<br>\n";
+
+c = pop stack;
+b = pop stack;
+a = pop stack;
+
+show "Pop dei valori a=[".a."]-b=[".b."]-c=[".c."]<br>\n";
+if ((a ne aa) || (b ne bb) || (c ne cc))
+{
+  show "Errore nella pop !!!!";
+}else
+{
+  show "Test eseguito correttamente.";
+};
+

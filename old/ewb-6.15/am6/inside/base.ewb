@@ -1,0 +1,132 @@
+' core functions, scritte in assembler per essere piu' veloce
+sub hex(a)
+{ var b, t; 
+.hex_while:
+  .LDA a
+  .JZN hex_endw                 ' while (a>0)
+  .MOD [16]                     ' { t=a%16;
+  '.PUSH .PRNT [1]
+  '.LDA [\n] .PRNT [1] .POP 
+  .STA t 
+  .SUB [10] .JZ  hex_if0 .JP hex_if0
+                                '   if (t<10) { b=b.t; };
+  .LDA t .SCAT b .STA b  
+.hex_if0: 
+  .LDA t .SUB [10]
+  .JP hex_if1 .JN hex_if1       '   if (t==10) { b=b.[A]; };
+  .LDA [A] .SCAT b .STA b  
+.hex_if1:
+  .LDA t .SUB [11] 
+  .JP hex_if2 .JN hex_if2       '   if (t==11) { b=b.[B]; };
+  .LDA [B] .SCAT b .STA b  
+.hex_if2:
+  .LDA t .SUB [12] 
+  .JP hex_if3 .JN hex_if3       '   if (t==12) { b=b.[C]; };
+  .LDA [C] .SCAT b .STA b  
+.hex_if3:
+  .LDA t .SUB [13] 
+  .JP hex_if4 .JN hex_if4       '   if (t==13) { b=b.[D]; };
+  .LDA [D] .SCAT b .STA b  
+.hex_if4:
+  .LDA t .SUB [14] 
+  .JP hex_if5 .JN hex_if5       '   if (t==14) { b=b.[E]; };
+  .LDA [E] .SCAT b .STA b 
+.hex_if5:
+  .LDA t .SUB [15] 
+  .JP hex_if6 .JN hex_if6       '   if (t==15) { b=b.[F]; };
+  .LDA [F] .SCAT b .STA b 
+.hex_if6:
+  .LDA a .DIV [16] .STA a       '   a=int a/16;
+  .SUB [1] .JP hex_while .JZ hex_while
+.hex_endw:
+  return b;
+};
+
+sub len(a)     'questa e' in assembler cosi' si semplifica
+{ var res=0;
+print "len (".a.")\n"; 
+.len_start: 
+  .LDA a .JES len_end                    ' while (a ne "")
+  .LFT a [1]                             ' { a=mid a,1; res++; 
+  .LDA res .SUM [1] .STA res             ' }; 
+  .JMP len_start
+.len_end: 
+  return res; 
+};
+
+sub uc(a)
+{ var b, c=0, ch, t;
+.uc_start:                           ' do 
+  .LFT a [1]                         ' { ch=mid a, 0, 1; a=mid(a, 1);
+  .JLT [a] uc_notletter              '   if ((ch ge "a") && (ch le "z"))
+  .JLE [z] uc_letter
+  .JMP uc_notletter
+.uc_letter:                   
+  .ASC .SUB [32] .CHR                '      ch=asc(ch+32); 
+.uc_notletter:
+  .STA ch .LDA b .SCAT ch .STA b     '   b=b.ch; 
+  .LDA ch .JES uc_end .JMP uc_start  ' } while (ch) ne "";
+.uc_end:
+  return b; 
+};
+
+sub index(s, sb)
+{ 
+  var res=-1, cnt=0, k=len sb, tmp; 
+.index_whl:  
+  .LDA res .NEG .JZN index_endw ' while ((s ne "") && (res <0))
+  .LDA s   .JES index_endw 
+  .STA tmp .LFT tmp k 
+  .JEQ sb ind_if .JMP ind_endif ' { if ((mid s, 0, k) eq sb)
+.ind_if: 
+  .LDA cnt .STA res             '   { res=cnt; }; 
+.ind_endif: 
+  .SUM [1] .STA cnt             '   cnt=cnt+1; 
+  .JMP index_whl                ' };
+.index_endw:
+  return res; 
+};
+
+sub split(a, b) 'funzioni di perl.. mi interessa accelerare solo la split. 
+{ 
+'print "(".a.",".b.")\n";
+  var c; var r;  var t; 
+  var l=len a;
+'print "len of [".a."] is ".l."\n"; 
+
+.split_w:
+  .LDA b .JES split_endw 'while (b ne "")
+ '{ 
+    if ((mid b, 0, l) ne a)
+    { .LFT b [1] 
+      .STA t .LDA c .SCAT t .STA c 'c=c.mid(b,0,1); b=mid(b, 1); 
+    } else 
+    { .LDA [] .APSH c .STA t .LDA r  .SCAT t .STA r .LDA [] .STA c ' r=push(r, c); c="";  
+      .LFT b l 'taglio il separatore di split 
+    };
+ '}; 
+  .JMP split_w
+.split_endw:
+  .LDA [] .APSH c .STA t .LDA r  .SCAT t .STA r
+  return r; 
+};
+
+sub join(a, b)
+{ var s, r; 
+  foreach s(b)
+  { .LDA r .SCAT s .STA r 'r=r.s;
+    .LDA b .JES join_endif .LDA r .SCAT a .STA r ' if (b ne "") { r=r.a; }; 
+.join_endif:
+  }; return r; 
+};
+
+sub change(b, a, s)
+{ return join b, split a, s; 
+};
+
+print "Integrated functions tests:\n"; 
+print "Hex di 2748:".(hex 2748)."\n"; 
+print "Len di ciao:".(len "ciao")."\n";
+print "Uc di Townet 123 ..:".(uc "Townet 123 ..")."\n"; 
+print "split 192.168.1.59 con . [".(split ".", "192.168.1.59")."]\n"; 
+ 

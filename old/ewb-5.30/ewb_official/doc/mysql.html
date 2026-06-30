@@ -1,0 +1,130 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title></title>
+</head>
+
+<body style="color: rgb(255, 255, 255); background-color: rgb(0, 0, 0);"
+ link="#ccccff" vlink="#990099" alink="#ccccff">
+   <font face="Arial"> <img src="am2.jpg" height=63 width=60>
+ <b><ita>Supporto per MYSQLe DBI-sql</ita><eng>MYSQL and DBI-sql support</eng> </b>
+</font>&nbsp; <hr style="width: 100%; height: 2px;">
+
+
+<ita>
+E' finalmente completa e testata la libreria per il supporto di database
+su un server mysql, anche su un altra macchina.
+</ita>
+<eng>
+Finally I completed the library for mysql databases connections, also for a remote database server.
+</eng>
+<br>
+<ita>
+(a dire il vero e' presente da un paio di versioni, ma non avevo trovato
+il tempo di documentarla.. scusate)
+</ita>
+<eng>
+The lib is ready from some time, but i never found time to wrote on.
+</eng>
+<br>
+<p><ita>Installazione: </ita><eng>Installation:</eng><br>
+</p>
+<ul>
+  <li><ita>Installate sulla vostra macchina mysql, come lo potete ottenere da
+http://www.mysql.org . Assicuratevi di aver lanciato il demone, e controllate
+che l' utility "mysql", cioe' il client testuale, giri. Se usate un server su
+un altra macchina, vi basta il client testuale.
+</ita>
+<eng>
+You have to install mysql on tour system. You can obtain it from http://www.mysql.org. 
+You need to launch the daemon, and you need to check wether the utility "mysql" (mysql text-based client)
+runs. If you use a remote server, you need only the text-based client working.</eng>
+</li>
+  <li>
+<ita>
+Se siete sotto linux, dovete permettere all' utente di apache di accedere
+al database: lanciate mysql e scrivete:&nbsp;
+</ita>
+<eng>
+If you work on Linux, you need to grant some privilege on database for the apache user. 
+Launch mysql and wrote: 
+</eng></li>
+</ul>
+<blockquote><b>Mysql&gt; create database easyweb_db; </b><br>
+  <b>Mysql&gt; grant all on easyweb_db.* to apache@localhost;</b><br>
+  <br>
+<ita>
+potreste dover sostituire localhost con il vostro nome host, o apache con
+l' utente predefinito del vostro server web. 
+</ita>
+<eng>
+This may change: It could be necessary to wrote your hostname instead of localhost, or 
+"nobody" instead of "apache".
+</eng>
+<br>
+</blockquote>
+<ul>
+  <li>
+<ita>sotto windows non so come funzionino gli utenti di mysql, comunque
+e' sempre meglio creare il database, e e' necessario dare&nbsp; privilegi
+di accesso al web server. 
+</ita>
+<eng>
+Under windows, i don't know how mysql users works. 
+You need to create "easyweb_db" database and give access privileges to web users.  
+</eng>
+<br>
+  </li>
+</ul>
+<p><ita>Uso:</ita><eng>Use: </eng><br>
+</p>
+<ul>
+  <li><ita>&nbsp;installate la versione di easyweb<b> 4.14 o successive</b>.</ita>
+<eng>Install easyweb version 4.14 or diamond (easyweb 5).</eng></li>
+  <li>
+<ita>compilate aggiungendo l' opzione di compilazione
+</ita><eng>Compile with option </eng><b> -dbmysql</b></li>
+  <li><ita>esempio</ita><eng>Example</eng>:<b> ewb -dbmysql prova.ewb</b>&nbsp;</li>
+  <li><ita>spostate il programma su una cartella del web e usatelo normalmente.
+Buona fortuna. </ita>
+<eng>Move your program on a web folder and use it normally. Good luck.</eng><br>
+  </li>
+</ul>
+<p><br>
+<ita>
+Limitazioni: le tabelle, che sul database su files hanno i campi di dimensione
+illimitata, in questo caso limitano i campi a 256 caratteri, oltre i quali
+i dati vengono troncati. Sorry. 
+</ita>
+<eng>
+Limits: Tables on file-based database engine has fields of unlimited size, in sql 
+the limit of easyweb is 256 chars. Over that limit the fields are cutted. Sorry. 
+</eng>
+<br>
+ </p>
+<ita>Dalla versione 5.0 sono previste le seguenti modifiche:</ita>
+<eng>From version 5.0 there are the following changes: </eng><br>
+<ul>
+  <li><ita>possibilit&agrave; di usare mysql per collegarsi ad un server di database
+remoto, anche con utente e password. </ita>
+<eng>You can use mysql to connect to a remote database server, also with user and password.
+</eng>
+</li>
+  <li><ita>possibilt&agrave; di usare un qualunque database, e non per forza easyweb_db,
+che comunque rester&agrave; il default.&nbsp;</ita>
+<eng>
+You can use any database, and not only easyweb_db (the default database for easyweb applications).  
+</eng> </li>
+  <li><ita>possibilt&agrave; di accedere a database informix o oracle, ed in generale
+tutto quanto compatibile con DBI di perl. Ad oggi non lo uso in quanto richiede
+l' installazione di molte librerie, e non la macchina "pulita" come e' filosofia
+di easyweb.</ita>
+<eng>
+You can use an informix or oracle database, and all databases compatible with perl-DBI. 
+I don't like that because it needs many libraries, and non the only perl interpreter. 
+</eng>(work in progress).
+<br>
+  </li>
+</ul>
+</body>
+</html>

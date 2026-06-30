@@ -1,0 +1,8 @@
+6#193.205.2.25#easyweb.uniurb.it#macchina dei tecnici#true64#cesi#3#filismi#100mbps
+7#193.205.2.26#skat.uniurb.it#www.uniurb - web server#true64#cesi#3#filismi#100mbps
+9#193.205.2.17#pix.uniurb.it#firewall#cisco#cesi#3#filismi#100mbps
+10#193.205.2.249#cisco1.uniurb.it#cisco dorsale#cisco#cesi#3#filismi#100mbps
+11#193.205.2.29#pcenzo.uniurb.it#pc enzo#wincozz#cesi#3#filismi#100mbps
+12#193.205.2.30#dns1.uniurb.it#dns, mailer, xtacacs#true64#cesi#3#filismi#100mbps
+13#193.205.2.24#linux.uniurb.it#vecchio mailer#dec unix 4#cesi#3#filismi#100mbps
+14#193.205.2.21#cisco2.uniurb.it#router dei modem, moda, etc..#cisco#cesi#3#filismi#100mbps

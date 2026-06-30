@@ -1,0 +1,15 @@
+Funziona.
+
+Adesso distingue locali e globali, anche se le tiene sullo stesso stack.
+Le globali sono riconosciute con indirizzo fisso, le locali come differenza
+dallo SP.  In  entrambi  i casi  le variabili sono definite usando una push
+sull'ultimo valore. Le funzioni sono piu' leggere perche' non serve piu' 
+estrarre i valori dallo stack per metterli in una variabile. 
+Spero che  non saltino fuori problemi dopo, ma la visibilita' delle globali
+funziona e anche le  chiamate in ricorstione.  Va valutato se e' il caso di
+modificare il modo di chiamata di indirizzamento, in modo da poter avere un
+numero massimo di globali superiore. Per ora sono  2048 e lo stack e' 8102,
+ma lo stack puo' essere esteso e il numero di globali no.  In generale ogni
+funzione puo' avere al massimo 2047 variabili. 
+
+

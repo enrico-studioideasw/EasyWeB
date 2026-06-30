@@ -1,0 +1,9 @@
+
+sub prn(f)
+{ print f+5; 
+  print "\n"; 
+};
+
+var a="3w"; 
+prn a; 
+print a; 

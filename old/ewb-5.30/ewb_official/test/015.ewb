@@ -1,0 +1,6 @@
+var a,b;
+b="ok";
+'ask a:text,b:submit;
+
+ask a:text("ciao"),b:submit;
+

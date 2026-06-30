@@ -1,0 +1,18 @@
+Name: amethist
+Summary: Amethist  - A new idea for web programming. 
+Version: <VER>
+Release: 1
+Copyright: GPL - By Enrico Betti, Paride Dominici 
+Group: Developement/Languages
+Packager: Enrico Betti <enrico@w3n.it>
+
+%description
+Amethyst easyweb
+A new language to develop web applications "all in a single file", like a basic program. 
+
+%files
+/bin/ewb
+/bin/amethist
+/lib/ewb/
+/var/www/html/ewb5/
+

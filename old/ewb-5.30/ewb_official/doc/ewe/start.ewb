@@ -1,0 +1,20 @@
+'login al servizio di editor amethyst 
+
+table utenti=user, pass; 
+var b, inf; b="Ok";
+var lnk; 
+lnk="<br><br>
+</b>
+<a href=admin.cgi>Amministra gli utenti</a>
+<b>";
+inf="Login al servizio amethyst editor";
+ask inf:info, user:text("Utente"), pass:password("Password"), b:submit, 
+lnk:info;
+
+if (!login(utenti))
+{ show "Accesso non valido";
+  end; 
+};
+
+template=load "pages/start.html";
+show [?].user.[&].pass; 

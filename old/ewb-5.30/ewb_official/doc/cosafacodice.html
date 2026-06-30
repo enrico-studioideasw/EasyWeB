@@ -1,0 +1,65 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.72 [en] (X11; I; OSF1 V5.1 alpha) [Netscape]">
+</head>
+<body text="#000000" bgcolor="#FFFFCC" link="#0000EE" vlink="#551A8B" alink="#FF0000">
+&nbsp;
+<br>Perche' easyweb
+<p>Necessita' di realizzare applicazioni sul web in tempo reale, spesso
+mentre le specifiche vengono dettate tramite telefono.
+<br>Necessita' di utilizzo di database, possibilmente senza la complessita'
+dovuta alla realizzazione da zero delle tabelle
+<br>Riduzione della complessita' sia del database che del codice rinunciando
+alla tipizzazione dei dati.
+<br>Necessita' di raccogliere l' intera applicazione non su una cartella
+ma su un singolo file, in modo da aggiornare un solo file in caso di modifiche.
+<br>Necessita' di rinunciare a tutta la complessita' dovuta alla creazione
+di forms, e di suddividere l' interfaccia grafica di un servizio dal codice,
+premettendone magari l' uso da parte di utenti diversi.
+<br>Necessita' di implementare query estremamente avanzate sul database,
+senza la complessita' di istruzioni come join, renaming, etc.
+<br>Idea di considerare il web come un completo sistema operativo e non
+come un&nbsp; interfaccia grafica.
+<br>Necessita' di migrare rapidamente le applicazioni da piattaforma unix
+a linux o windows senza riscrivere codice.
+<br>
+<hr WIDTH="100%">
+<br>Differenze da asp e perl
+<p>ASP non permette la scrittura rapida di una applicazione, non permette
+la scrittura di una applicazione in un singolo file, non permette di separare
+dal codice la pagina html,&nbsp; non si appoggia su un web server multitask
+ma solo multithread e quindi del codice asp bloccante blocca i servizi
+web, non permette a piu' utenti di usare la stessa pagina in vera contemporanea.
+<p>
+<hr WIDTH="100%">
+<br>Compilatore Easyweb.
+<p>Traduce il codice Easyweb in codice perl.
+<p>1 - l' utente scrive un programma Easyweb con comandi per costruire
+form, per accedere a tabelle, per l' interprete prolog.
+<p>2 - il compilatore traduce il codice dell' utente in un programma perl.&nbsp;
+Il programma e' costruito con diversi punti di entrata, ciascuno dei quali
+corrisponde alla chiamata da un form.
+<p>3 - Per una ask il programma perl genera i form a video scrivendo metacodice
+html.&nbsp; Il metacodice html contiene informazioni su tutto l' ambiente.
+Il form viene mostrato e il programma termina.
+<p>4 - alla pressione di un pulsante di submit il programma viene nuovamente
+eseguito, ma il codice e' in grado di accorgersi che la chiamata e' diversa,
+e quindi di passare ad un diverso punto di entrata.
+<p>5 - per una azione su tabella il programma ha necessita' di conoscere
+info della tabella che esistono solo run-time. Quindi il codice easyweb
+scrive durante la sua esecuzione del nuovo codice perl, all' interno di
+una variabile, e poi lo esegue. Questo codice accede alle tabelle di database.
+<p>6 - Il file compilato dal compilatore easyweb contiene un interprete
+prolog. Questo interprete puo' usare piu' insiemi di regole (programmi
+logici).
+<br>7 - L' utente puo' costruire programmi logici dall' interno del codice
+easyweb con le istruzioni per accedere alle clausole.
+<br>8 - I programmi logici vengono mantenuti in una tabella di database,
+e interpretati dall' interprete prolog interno al programma compilato di
+easyweb alla richiesta di un ciclo goal.
+<br>&nbsp;
+<br>&nbsp;
+</body>
+</html>

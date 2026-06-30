@@ -1,0 +1,148 @@
+sub PD_in($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 2));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#\n\$tot=";
+#modifica paride inizio
+#  $res.="{";
+#Tolta perch potrebbe creare pi problemi di quelli che risolve
+#modifica paride fine
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+
+  $res.= "  \$tot=\$ax;
+  \$n=((split(\":\",\$tot))[0]);
+  #modifica 030425P inizio
+  \$ax=join(\"\\n\",\@p);
+  push \@as, \$ax;
+  #modifica 030425P fine
+  \@p=split(\":\",substr(\$tot,length(\$n)+1));
+  tab_wlock(\$n);
+
+  #modifica 030423 inizio
+  #my \@f=tab_read(\$tot);
+  \$ax=join(\"\\n\",\@f);
+  push \@as, \$ax;
+  \@f=tab_read(\$tot);
+  #modifica 030423 fine
+
+  tab_unlock(\$n);
+  #modifica 030423 inizio
+  #my \$l; my \$i=0;
+  #my \$g=0;
+  \$ax=join(\"\\n\",\@aa);
+  push \@as, \$ax;
+  push \@as, \$ct;
+  push \@as, \$i;
+  push \@as, \$l; 
+  push \@as, \$g;
+  \$i=0;
+  \$g=0;
+  #modifica 030423 fine
+  #modifica 030424 inizio
+  push \@as, \$k;
+  push \@as, \$found;
+  #modifica 030424 fine
+area".$num_calls.":;
+  if (\$g > \$#f) { goto area".($num_calls + 2)."; };
+  \$l=\$f[\$g]; \$l=substr(\$l,0,length(\$l));
+  #modifica 030424 inizio
+  #my \$k;
+  #my \$found=0;
+  \$k=0;
+  \$found=0;
+  #modifica 030424 fine
+  \$i++;
+  for (\$k=\$i; \$k<=\$#f; \$k++)
+  { if ( ((split( \"#\",\$l))[0]) eq ((split(\"#\",\$f[\$k]))[0]) )
+    { \$found=1; };
+  }
+  if (\$found) { goto area".($num_calls+1).";};
+  ";
+  my $nc=$num_calls; $num_calls=$num_calls+3;
+
+  inblock();
+  #nel ciclo devo assegnare le variabili
+  $res.= "\@aa=split(\"#\", \$l);
+  #my \$ct=0;
+  \$ct=0;
+  \$code=\"\";
+  foreach \$p(\@p)
+  { \$code=\$code.\"\\\$EWB_\".\$p.\"=addchar(\\\$aa[\$ct]);\n\";
+    \$ct++;
+  };
+  eval(\$code);$T";
+  #eventuale condizione di ricerca del ciclo in.
+  my $cond=1;
+  if (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    $res.= "";#"\nif (!(";
+
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+    $res.= "if (!(\$ax)) { goto area".($nc+1).";};$T";
+  }
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "ciclo in - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+
+  #codice del ciclo di in
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0, 1)) ne "{")
+  { errore "ciclo di in: manca { "; }
+  ($code,$rr)=delperc(substr($code,1));
+
+  while ( substr($code, 0, 1) ne "}")
+  { if (length($code)==0)
+    { errore "Ciclo di in non terminato. Manca }.";
+    };
+    
+    my $rb;
+    ($code,$rb)=(codice($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  ($code,$rr)=delperc(substr($code,1));
+  $res.= "
+area".($nc+1).":;
+  \$g=\$g+1;
+  goto area".($nc).";
+area".($nc+2).":;$T";
+  #modifica 030424 inizio
+  $res.="
+  \$found=pop \@as;
+  \$k=pop \@as;
+  ";
+  #modifica 030424 fine
+  #modifica 030423 inizio
+  $res.="
+  \$g=pop \@as;
+  \$l=pop \@as; 
+  \$i=pop \@as;
+  \$ct=pop \@as;
+  \$ax=pop \@as;
+  \@aa=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@f=split(\"\\n\", \$ax);
+  #modifica 030425P inizio
+  \$ax=pop \@as;
+  \@p=split(\"\\n\", \$ax);
+";
+  #modifica 030425P fine
+	#modifica 030423 fine
+  outblock();
+  return ($code,$res);
+}

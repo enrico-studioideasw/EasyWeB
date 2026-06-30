@@ -1,0 +1,35 @@
+'aggiunta di un utente per posta. 
+#include "tabelle.inc"
+
+var a,b; b="invia"; 
+
+var r; 
+r="Nessuno";
+
+in (referenti)
+{ r=r.";".nomecogn;
+};
+nomecogn=r; 
+r="Inserimento nuovo account di posta"; 
+ask r:info, nomepers, telp, user, password, nomecogn:option, b:submit; 
+
+lock accessi; 
+lock personale; 
+if (nomecogn eq "Nessuno") { nomecogn=""; };
+a=user; 
+b=password;  
+if (exist (accessi))
+{ show "Errore - account gia' esistente"; 
+};
+user=a; 
+password=b; 
+
+add accessi;
+add personale; 
+
+unlock accessi;
+unlock personale; 
+show "Personale : inserito 
+<br>&nbsp;".nomepers." 
+<br>&nbsp;".telp."
+<br>"; 

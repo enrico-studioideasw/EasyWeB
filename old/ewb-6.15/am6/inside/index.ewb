@@ -1,0 +1,13 @@
+
+sub index(s, sb)
+{ 
+  var res=-1;
+  var cnt=0; 
+  var k=len(sb);  
+  while ((s ne "") && (res <0))
+  { if ((mid s, 0, k) eq sb) 
+       { res=cnt; }; 
+    cnt=cnt+1; 
+  };
+  return res; 
+};

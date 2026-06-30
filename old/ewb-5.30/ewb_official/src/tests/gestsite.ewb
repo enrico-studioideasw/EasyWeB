@@ -1,0 +1,53 @@
+'questo permette di attivare in automatico un nuovo sito
+#include "sendmail.ewb"
+
+
+template=load  "empty.html";
+template=change("<b><i>Il suo sito  subito</i></b>", "<Titolone>", template); 
+
+
+'dt e'la data di inserimento
+'state e'lo stato: temp o registered
+table utente=user, pass, dt, state, access, nome, cognome, nascita, codfisc, telefono, mail; 
+
+var errore;
+errore= [
+  <SCRIPT LANGUAGE="JavaScript">
+  <!--
+  function back() {
+      history.go(-1);
+  }
+  //--></SCRIPT>
+
+<A HREF="javascript:back()"><img
+src=back1.png border=0><b><i>Indietro</b></i></a>
+<br><br>
+];
+var a; a=uc(getquerystring()); 
+if (a eq "") { show errore."mancano dati indispensabili";};
+user=mid(a, 0, index(a, "&"));
+pass=mid(a, len(user)+1);
+user=mid(user, index(user, "=")+1);
+pass=mid(pass, index(pass, "=")+1);
+pass=mid(pass, 0, index(pass, "&"));
+
+if (!login(utente))
+{ show errore."Login non valido.<br>Si prega di riprovare.";
+};
+if (state eq "temp")
+{ var now, old; 
+  var a, b, c; 
+  a=int mid(date, 0, 2);  <--- questo non funziona !!!!! rallenta da matti il codice. 
+  b=int mid(date, 3, 2); 
+  c=int mid(date, 6, 4); 
+  now=a + (b*31)+(c*366); 
+  a=int mid(dt, 0, 2); 
+  b=int mid(dt, 3, 2); 
+  c=int mid(dt, 6, 4); 
+  old=(a) + (b*31)+(c*366); 
+  if (now-old >30)
+  { show errore."Questo account e' scaduto. <br>Il periodo di prova di un mese e' terminato.";
+  };
+};
+
+show "tutto ok.";

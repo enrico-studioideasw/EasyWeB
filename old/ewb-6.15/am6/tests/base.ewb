@@ -1,0 +1,42 @@
+' core functions, scritte in assembler per essere piu' veloce
+
+sub len(a)     'questa e' in assembler cosi' si semplifica
+{ var res=0;
+print "len (".a.")\n"; 
+'.len_start: 
+'  .LDA a .JES len_end                    ' while (a ne "")
+'  .LFT a [1]                             ' { a=mid a,1; res++; 
+'  .LDA res .SUM [1] .STA res             ' }; 
+'  .JMP len_start
+'.len_end: 
+  return 5; 
+};
+
+
+sub split(a, b) 'funzioni di perl.. mi interessa accelerare solo la split. 
+{ 
+'print "(".a.",".b.")\n";
+'  var c; var r;  var t; 
+  var l=len a;
+'print "len of [".a."] is ".l."\n"; 
+
+'.split_w:
+'  .LDA b .JES split_endw 'while (b ne "")
+' '{ 
+'    if ((mid b, 0, l) ne a)
+'    { 'print "B is [".b."],";  
+'      .LFT b [1] 
+'      .STA t .LDA c .SCAT t .STA c 'c=c.mid(b,0,1); b=mid(b, 1); 
+'      'print "[".b."]\n";  
+'      
+'    } else 
+'    { print "pushing ".c."\n"; 
+'      .LDA r .APSH c .STA r .LDA [] .STA c ' r=push(r, c); c="";  
+'    };
+' '}; 
+'  .JMP split_w
+'.split_endw: 
+'  return r; 
+};
+
+print "split 192.168.1.59 con . :".(split ".", "192.168.1.59" )."\n"; 

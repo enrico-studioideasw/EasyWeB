@@ -1,0 +1,10 @@
+Per funzionare correttamente i file vanno compilati con l'opzione noweb -nw o -l
+
+download.ewb
+* Prende il file "frecce136.psa" dall'hard disk e lo invia facendolo vedere al 
+  client come "downloaded.pdf"
+
+download.ewb
+* Questa cgi si limita a fare un redirect alla posizione corretta del file "frecce136.psa"
+
+La differenza principale tra il primo e il secondo e' che il primo "maschera" la reale posizione e nome del file, mentre il secondo si comporta un po' come un link simbolico.

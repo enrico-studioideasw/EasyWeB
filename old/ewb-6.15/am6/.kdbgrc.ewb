@@ -1,0 +1,54 @@
+[Breakpoint 0]
+Enabled=true
+File=ewb.c
+Line=21
+Temporary=false
+
+[Breakpoint 1]
+Enabled=true
+File=ewcc.c
+Line=333
+Temporary=false
+
+[Breakpoint 2]
+Enabled=true
+File=ewcc.c
+Line=979
+Temporary=false
+
+[Breakpoint 3]
+Enabled=true
+File=ewcc.c
+Line=637
+Temporary=false
+
+[Breakpoint 4]
+Enabled=true
+File=ewcc.c
+Line=663
+Temporary=false
+
+[General]
+DebuggerCmdStr=
+DriverName=GDB
+FileVersion=1
+OptionsSelected=
+ProgramArgs=tests/sub2.ewb tests/sub2.cgi
+TTYLevel=7
+WorkingDirectory=
+
+[Memory]
+ColumnWidths=80,0
+NumExprs=0
+
+[Watches]
+Expr0=code
+Expr1=cpos
+Expr2=respos
+Expr3=code[cpos]
+Expr4=&code[cpos]
+Expr5=currtok
+Expr6=instructions
+Expr7=NUM_ICODES
+Expr8=p
+Expr9=arity

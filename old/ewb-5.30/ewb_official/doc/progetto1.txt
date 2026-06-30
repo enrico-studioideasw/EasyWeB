@@ -1,0 +1,110 @@
+Questa e' stata la mia idea iniziale per lo sviluppo di un linguaggio che mi permettesse 
+di sviluppare in maniera comoda applicazioni web. 
+Ora che sono passati circa due anni, e il linguaggio ha superato la versione 4.02 
+(42 versioni stabili piu' taaante di prova che non ho mai pubblicato sul web), sono 
+soddisfatto di dire che sono riuscito a raggiungere, grazie alla collaborazione di Paride 
+e di altri beta testers,(Moino, il Prof Di Caro, Acconcia, etc..  tutti gli scopi che mi 
+sono prefisso, a far fare al linguaggio anche qualcosa in piu' e ad ottenere uno strumento 
+stabile e versatile, di cui sono piuttosto orgoglioso.
+Aspetto qualunque suggerimento possa servire a migliorarlo e qualunque critica vogliate
+farmi. 
+
+___________________________________________________________________________________________
+
+
+Progetto EasyWeb
+
+Idea: oggi come oggi una applicazione sul web viene realizzata in tre fasi:
+
+- Database di fondo
+- Applicazione al lato server, in asp, php, perl
+- Applicazione dal lato client, in html.
+
+Voglio provare a sviluppare un semplice linguaggio che mi permetta di sviluppare completamente
+l' applicazione senza conoscere nessuno di questi tre oggetti.
+Qualcosa analogo ad un applicativo cobol ma applicato al web.
+
+Un buon inizio e' la libtable, che mi nasconde la complessita' dell' html sotto uno split e join e la
+complessita' di SQL sotto semplici funzioni di aggiunta, eliminazione, etc...
+
+Ora vorrei fare questo senza dover passare per perl, e magari senza dover andare ad includere
+esplicitamente librerie.
+
+Un esempio semplice:
+
+segreteria.cgi
+tipi di dati: variabile da usare come intero o stringa.
+la funzione ask e' complicata e va scritta e documentata.
+
+#!/usr/bin/ewb
+template=[<html><body><></body></html>];
+'oppure template=load entry.html;
+ 
+user="nobody";
+ask utente, password:password;
+
+table utenti=utente, password, memo;
+if login(utenti)
+{ 'da notare che il valore delle var. gia' chieste permane.
+  area="docenti&moduli&sessioni";
+  ask area:checkbox;
+
+  if (area=="docenti")
+  { 'mostro il contenuto dell' area docenti, o niente se e' vuota.
+    'voglio poter indicare i campi per nome, anche se localmente.
+
+    table docenti =usr, nome, cognome, codice;
+
+    while(true)
+
+    { a="";
+      'la riga successiva e' una select. piu' avere condizione.
+      in (docenti)
+      { a=a."&".nome." ".cognome;
+      }
+      ask a:links;
+
+    'ripesco il docente indicato da a
+    in (docenti, nome." ".cognome == a)
+    { azione="inserisci&modifica&cancella";
+      ask nome, cognome, codice, azione:submit;
+      usr=user;
+      'controllo di condizioni.. non presente.
+      if (azione=="inserisci") { add(docenti); };
+      if (azione=="modifica") { update(docenti); };
+      if (azione=="cancella") { remove(docenti); };
+    }
+  }
+}
+
+
+ok.. direi che per una prima stesura ho tutto il necessario.
+Voglio inoltre le funzioni join e split del perl.
+Se possibile come tipo di dato anche la lista perl, con i suoi operatori push, pop, add
+ma non subito.
+Devo lavorare su codice interpretato perche' il compilato e' scomodo sul web.
+
+Non posso estendere la sintassi perl ad ottenere questo, ma posso fare qualcosa di simile al mio
+interprete basic e asp: tradurre in perl e eseguire.
+
+nota:stiamo parlando di sistemi nultitasking/multithread e multi-macchina.
+     niente mi impedisce di pescare un html da remoto o passare il risultato di una ask ad una
+     altra pagina di ewb, o magari di avere query a tabelle su un altro sistema?
+
+     template=load "http://www.uniurb.it/a.html";
+     askto "http://localhost/patata.ewb", a:links;
+
+     table 193.205.2.26:docenti=a,b,c;
+     scarto quest' ultima ipotesi per problemi di sicurezza.
+
+Devo comunque poter bloccare o sbloccare una tabella in caso di necessita', per svolgere in
+maniera atomica azioni consecutive.
+lock(docenti)
+unlock(docenti)
+Per me sono trasparenti ma divengono un blocco per gli altri utenti.
+
+nota: inserire in sintassi le funzioni assert(clause) e goal(clause) : mi permettono di usare lo stesso
+linguaggio anche per I.A.
+Questo quando saro' piu' vecchio.
+
+

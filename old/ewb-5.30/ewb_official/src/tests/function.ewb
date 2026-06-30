@@ -1,0 +1,10 @@
+sub printres(res, v)
+{ res=res+v; 
+  print "Res:".res."\n"; 
+};
+
+
+var res; res=0;
+printres(res, 4);
+printres(res, 2); 
+

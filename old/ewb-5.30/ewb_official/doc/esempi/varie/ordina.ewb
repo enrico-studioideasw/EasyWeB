@@ -1,0 +1,3 @@
+#include "tabelle.inc"
+
+sort(tipiintervento, "tipo"); 

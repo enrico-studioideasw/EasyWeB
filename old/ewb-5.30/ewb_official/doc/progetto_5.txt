@@ -1,0 +1,6 @@
+progetto per la versione 5: 
+1 - completamento della libreria di accesso a sql (mysql). 
+2 - inserimento della sintassi con quadre per gli array. 
+3 - wrapper per l' accesso ad altri sql con perl::DBI
+4 - test per sql e sintassi
+

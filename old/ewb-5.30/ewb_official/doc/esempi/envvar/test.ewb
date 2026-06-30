@@ -1,0 +1,16 @@
+var a;
+a=  "<BR>REMOTE_ADDR >".getremoteaddress();
+a=a."<BR>QUERY_STRING >".getquerystring(); 
+a=a."<br>------------------<br><BR>REMOTE_ADDR
+>".getenvvar("REMOTE_ADDR");
+a=a."<BR>REMOTE_HOST >".getenvvar("REMOTE_HOST");
+a=a."<BR>SERVER_NAME >".getenvvar("SERVER_NAME");
+a=a."<BR>SERVER_PORT >".getenvvar("SERVER_PORT");
+a=a."<BR>DOCUMENT_ROOT >".getenvvar("DOCUMENT_ROOT");
+a=a."<BR>HTTP_REFERER >".getenvvar("HTTP_REFERER");
+a=a."<BR>HTTP_USER_AGENT >".getenvvar("HTTP_USER_AGENT");
+a=a."<BR>PATH_INFO >".getenvvar("PATH_INFO");
+a=a."<BR>PATH_TRANSLATED >".getenvvar("PATH_TRANSLATED");
+a=a."<BR>QUERY_STRING >".getenvvar("QUERY_STRING"); 
+
+show a;

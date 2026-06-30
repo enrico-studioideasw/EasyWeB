@@ -1,0 +1,6 @@
+sub p(a,b,c)
+{ print "P is (".a.[,].b.[,].c.[)\n];
+ return "ciao\n"; 
+};
+
+print p("uno","due","tre"); 

@@ -1,0 +1,42 @@
+[Breakpoint 0]
+Enabled=true
+File=vm_c.c
+Line=147
+Temporary=false
+
+[Breakpoint 1]
+Enabled=true
+File=vm_c.c
+Line=255
+Temporary=false
+
+[Breakpoint 2]
+Enabled=true
+File=vm2.c
+Line=162
+Temporary=false
+
+[General]
+DebuggerCmdStr=
+DriverName=GDB
+FileVersion=1
+OptionsSelected=
+ProgramArgs=inside/base.cod
+TTYLevel=7
+WorkingDirectory=
+
+[Memory]
+ColumnWidths=80,0
+NumExprs=0
+
+[Watches]
+Expr0=code
+Expr1=A
+Expr2=c
+Expr3=vars
+Expr4=stack
+Expr5=C
+Expr6=d
+Expr7=SP
+Expr8=VPOS
+Expr9=ofs

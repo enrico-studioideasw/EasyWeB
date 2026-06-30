@@ -1,0 +1,40 @@
+' by Paride Dominici 2002
+' Modificato nel 2003 per ovviare ad un inconveniente con il 
+' campo from (appariva POP user)
+
+' includere questo file con #include "sendmail.ewb"
+'
+' primo parametro mail from
+' Secondo parametro mail to
+' terzo parametro soggetto dell'e-mail
+' quarto parametro testo dell'e-mail
+sub SendMail(from,to,subject,data)
+{
+ 	var ret;
+  var EOL;
+  var BLANK;
+  var sock;
+  EOL = "\015\012";
+  BLANK = EOL.EOL;
+
+  sock = socket("www.uniurb.it","25");
+  swrite (sock, ("HELO www.uniurb.it".EOL));
+  ' da chi viene l'e-mail
+  swrite (sock, ("MAIL FROM:<".from.">".EOL));
+  ' a chi deve essere inviata
+  swrite (sock, "RCPT TO:<".to.">".EOL);
+  swrite (sock, "DATA".EOL);
+  'scrivo il From
+  swrite (sock, "From: \"".from."\" <".from.">".EOL);
+  'scrivo il subject
+  swrite (sock, "Subject: ".subject.EOL);
+  ' testo dell'e-mail
+  swrite (sock, data.EOL);
+  ' fine dati dell'e-mail
+  swrite (sock, ".".EOL.BLANK);
+  swrite (sock, "".EOL.BLANK);
+  swrite (sock, "QUIT".EOL.BLANK);
+  ' chiudo il socket
+  close sock;
+  return ret;
+};

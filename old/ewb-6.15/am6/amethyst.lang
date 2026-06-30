@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<language _name="Amethyst" version="1.0" _section="Sources" mimetypes="text/x-ewb">
+	
+	<escape-char>\</escape-char>
+
+	<line-comment _name = "Line Comment" style= "Comment">
+		<start-regex>'</start-regex>
+	</line-comment>
+
+	<!--<block-comment _name = "Block Comment" style = "Comment">
+		<start-regex>/\*</start-regex>
+        	<end-regex>\*/</end-regex>
+	</block-comment>-->
+
+	<!--<block-comment _name = "'#if 0' Comment" style = "Comment">
+		<start-regex>^[ \t]*#[ \t]*if[ \t]*0</start-regex>
+        	<end-regex>[ \t]*#[ \t]*(endif|else)</end-regex>
+	</block-comment>
+
+	<block-comment _name = "assembly" style = "Preprocess">
+		<start-regex>\.[a-zA-Z]</start-regex>
+        	<end-regex>:| |\n</end-regex>
+	</block-comment>-->
+
+	<string _name = "String" style = "String" end-at-line-end = "false">
+		<start-regex>&quot;</start-regex>
+		<end-regex>&quot;</end-regex>
+	</string>
+	<string _name = "Stringb" style = "String" end-at-line-end = "false">
+		<start-regex>\[</start-regex>
+		<end-regex>\]</end-regex>
+	</string>
+
+	<syntax-item _name = "Include/Pragma" style = "Preprocessor">
+		<start-regex>^#[ \t]*(include|pragma)</start-regex>
+	         <end-regex>\n</end-regex>
+	</syntax-item>
+
+	<keyword-list _name = "Keywords" style = "Keyword" case-sensitive="TRUE">
+		<keyword>sub</keyword>
+		<keyword>table</keyword>
+		<keyword>var</keyword>
+		<keyword>if</keyword>
+		<keyword>elseif</keyword>
+		<keyword>else</keyword>
+      		<keyword>for</keyword>
+		<keyword>foreach</keyword>
+		<keyword>while</keyword>
+		<keyword>do</keyword>
+		<keyword>return</keyword>
+		<keyword>in</keyword>
+		<keyword>inall</keyword>
+		<keyword>delete</keyword>
+		<keyword>text</keyword>
+		<keyword>password</keyword>
+		<keyword>submit</keyword>
+		<keyword>textarea</keyword>
+		<keyword>links</keyword>
+		<keyword>option</keyword>
+		<keyword>options</keyword>
+		<keyword>checkbox</keyword>
+		<keyword>checks</keyword>
+		<keyword>radio</keyword>
+		<keyword>hidden</keyword>
+		<keyword>goal</keyword>
+	</keyword-list>
+
+	<keyword-list _name = "Predef" style = "Data Type" case-sensitive="TRUE">
+		<keyword>print</keyword>
+		<keyword>eprint</keyword>
+		<keyword>input</keyword>
+		<keyword>load</keyword>
+		<keyword>save</keyword>
+		<keyword>loaddir</keyword>
+		<keyword>int</keyword>
+      		<keyword>abs</keyword>
+		<keyword>cos</keyword>
+		<keyword>sin</keyword>
+		<keyword>hex</keyword>
+		<keyword>sqr</keyword>
+		<keyword>random</keyword>
+		<keyword>asc</keyword>
+		<keyword>char</keyword>
+		<keyword>mid</keyword>
+		<keyword>len</keyword>
+		<keyword>uc</keyword>
+		<keyword>index</keyword>
+		<keyword>change</keyword>
+		<keyword>split</keyword>
+		<keyword>join</keyword>
+		<keyword>date</keyword>
+		<keyword>lessdate</keyword>
+		<keyword>login</keyword>
+		<keyword>add</keyword>
+		<keyword>exist</keyword>
+		<keyword>remove</keyword>
+		<keyword>lock</keyword>
+		<keyword>unlock</keyword>
+		<keyword>ask</keyword>
+		<keyword>askto</keyword>
+		<keyword>showform</keyword>
+		<keyword>show</keyword>
+		<keyword>assert</keyword>
+		<keyword>aretract</keyword>
+		<keyword>goal</keyword>
+		<keyword>push</keyword>
+		<keyword>pop</keyword>
+		<keyword>setelem</keyword>
+		<keyword>getelem</keyword>
+		<keyword>numel</keyword>
+		<keyword>socket</keyword>
+		<keyword>server</keyword>
+		<keyword>accept</keyword>
+		<keyword>sread</keyword>
+		<keyword>read</keyword>
+		<keyword>swrite</keyword>
+		<keyword>write</keyword>
+	</keyword-list>
+
+        <pattern-item _name = "Assembler" style = "Data Type"> 
+        <regex>\.[a-zA-Z][a-zA-Z][a-zA-Z][a-zA-Z] </regex>
+        </pattern-item>
+
+        <pattern-item _name = "Assembler2" style = "Data Type"> 
+        <regex>\.[a-zA-Z][a-zA-Z][a-zA-Z] </regex>
+        </pattern-item>
+
+        <pattern-item _name = "Assembler3" style = "Data Type"> 
+        <regex>\.[a-zA-Z][a-zA-Z] </regex>
+        </pattern-item>
+
+	<pattern-item _name = "Floating Point Number" style = "Floating Point">
+		<regex>\b([0-9]+[Ee][-]?[0-9]+|([0-9]*\.[0-9]+|[0-9]+\.)([Ee][-]?[0-9]+)?)[fFlL]?</regex>
+	</pattern-item>
+	<pattern-item _name = "Octal Number" style = "Base-N Integer">
+		<regex>\b0[o]+([Uu]([Ll]|LL|ll)?|([Ll]|LL|ll)[Uu]?)?\b</regex>
+	</pattern-item>
+
+	<pattern-item _name = "Hex Number" style = "Base-N Integer">
+		<regex>\b0[x][0-9a-fA-F]+([Uu]([Ll]|LL|ll)?|([Ll]|LL|ll)[Uu]?)?\b</regex>
+	</pattern-item>
+
+	<pattern-item _name = "Bin Number" style = "Base-N Integer">
+		<regex>\b0[b][0-9a-fA-F]+([Uu]([Ll]|LL|ll)?|([Ll]|LL|ll)[Uu]?)?\b</regex>
+	</pattern-item>
+
+<!--
+	<keyword-list _name = "Common Macro" style = "Preprocessor" case-sensitive="TRUE">
+		<keyword>NULL</keyword>
+		<keyword>TRUE</keyword>
+		<keyword>FALSE</keyword>
+		<keyword>MAX</keyword>
+		<keyword>MIN</keyword>
+		<keyword>__LINE__</keyword>
+		<keyword>__DATA__</keyword>
+		<keyword>__FILE__</keyword>
+		<keyword>__func__</keyword>
+		<keyword>__TIME__</keyword>
+		<keyword>__STDC__</keyword>
+	</keyword-list>
+
+	<keyword-list _name = "Preprocessor Definitions" style = "Preprocessor" case-sensitive="TRUE"
+		match-empty-string-at-beginning = "FALSE"
+		match-empty-string-at-end = "TRUE"
+		beginning-regex = "^[ \t]*#[ \t]*">
+		<keyword>if</keyword>
+		<keyword>ifdef</keyword>
+		<keyword>ifndef</keyword>
+		<keyword>else</keyword>
+		<keyword>elif</keyword>
+		<keyword>define</keyword>
+		<keyword>endif</keyword>
+		<keyword>undef</keyword>
+		<keyword>error</keyword>
+		<keyword>pragma</keyword>
+		<keyword>line</keyword>
+	</keyword-list>
+-->
+</language>

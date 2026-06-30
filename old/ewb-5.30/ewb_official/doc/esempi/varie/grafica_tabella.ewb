@@ -1,0 +1,32 @@
+var a,b,c,d,e;
+a="uno;*due;tre";
+b="invia;annulla";
+d="prima;seconda;terza;*selezionata;quarta"; 
+var frm;
+
+
+'ask a:radio,c:text, d:text, e:textarea, b:submit;
+print format."<br>";
+
+
+frm="<table border=1><tr><td>";
+format="40:6:v";
+
+
+frm=frm.form a:radio("<font color=red>Seleziona:</font>");
+
+
+frm=frm."</td><td>";
+frm=frm.form c:text;
+frm=frm."</td></tr><tr><td>";
+format="8:6:v";
+frm=frm.form d:option;
+frm=frm."</td><td>";
+format="10:8:v";
+frm=frm.form e:textarea;
+frm=frm."</td></tr><tr><td>";
+format="40:6:h";
+frm=frm.form b:submit;
+frm=frm."</td><td></tr></table>";
+showform frm;
+

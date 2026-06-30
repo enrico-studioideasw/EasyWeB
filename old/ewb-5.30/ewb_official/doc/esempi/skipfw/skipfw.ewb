@@ -1,0 +1,35 @@
+'skip firewall
+'una pagina che puo' essere utilizzata per scavalcare le impostazioni
+'di sicurezza per firewalls 
+'basta inserire la pagina in uno dei siti trusted e tramite questa si 
+'naviga al di fuori delle restrizioni
+
+
+var sk, a, b, i, rd;
+
+sk="Go"; 
+ask a:text, sk:submit; 
+
+'spezzo a per ottenere sito/pagina
+i=index(a, "/");
+if (i > 0)
+{ 
+  b=mid(a, (i+1), len(a));
+  a=mid(a, 0, (i-1));
+};
+print "a vale [".a."] </n>b vale [".b."]\n";
+
+
+sk=socket( a, 80);
+
+swrite(sk, "GET /".b."/\n\n");
+a=" "; rd="";
+while (a ne "")
+{ a=sread(sk);
+  rd=rd.a; 
+};
+close(sk);
+
+print rd; 
+
+

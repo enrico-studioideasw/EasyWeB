@@ -1,0 +1,1857 @@
+<!DOCTYPE doctype PUBLIC "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+  <meta http-equiv="Content-Type"
+ content="text/html; charset=iso-8859-1">
+  <meta name="GENERATOR"
+ content="Mozilla/4.72 [en] (X11; I; OSF1 V5.1 alpha) [Netscape]">
+  <title>ref.manual &lt;VER&gt;</title>
+</head>
+<body style="color: rgb(255, 255, 255); background-color: rgb(0, 0, 0);"
+ link="#ccccff" vlink="#990099" alink="#ccccff">
+<font face="Arial"> <img src="am2.jpg" height="63" width="60"> <b><ita>Manuale
+di riferimento</ita><eng>Reference manual</eng> </b>
+</font>&nbsp;
+<hr style="width: 100%; height: 2px;"><ver>
+<i><ita>Linguaggio per lo sviluppo di applicazioni web interattive,
+e per la realizzazione di database relazionali.</ita>
+<eng>The language for a speedy and powerful develop of informative
+systems.
+</eng></i>
+</ver>
+<ul>
+  <li><a href="#convenzioni"><ita>Convenzioni tipografiche</ita><eng>How
+to read this manual</eng></a></li>
+  <li><a href="#uso_ewb"><ita>Uso del compilatore di linguaggio "ewb"</ita>
+    <eng>Using the compiler "ewb"</eng></a><br>
+  </li>
+  <li> <a href="#Concetti_base_del_linguaggio"><ita>Concetti base del
+linguaggio</ita><eng>Language concepts</eng></a></li>
+  <li> <a href="#Sintassi"><ita>Sintassi</ita><eng>Syntax</eng></a></li>
+  <li> <a href="#funzioni_predefinite"><ita>Funzioni predefinite</ita><eng>Predefined
+functions</eng></a></li>
+  <li> <a href="#Il_meccanismo_one-action_web"><ita>il meccanismo
+one-action web</ita><eng>The "one action web" mechanism</eng></a></li>
+  <li> <a href="#Gestione_dell_interfaccia_al_web"><ita>Gestione dell'
+interfaccia al web.</ita><eng>The web interface</eng></a></li>
+  <li> <a href="#Preprocessore"><ita>Il preprocessore di Amethyst</ita><eng>The
+Amethyst preprocessor</eng></a></li>
+  <br>
+  <li> <a href="progetto1.txt"><ita>Progetto iniziale</ita><eng>Initial
+project</eng></a></li>
+  <br>
+<!--
+<li>
+il meccanismo database on-demand</li>
+
+<li>
+gestione delle tabelle di database.</li>
+
+<li>
+gestione su tabella di clausole logiche per database intelligenti e sistemi
+esperti</li>
+-->
+</ul>
+<hr width="100%" size="2">
+<p><b><br>
+<a name="convenzioni"></a><ita>Convenzioni tipografiche</ita><eng>How
+to read this manual</eng></b></p>
+<p><b> </b><ita>Un inizio di un paragrafo o un cambio di argomento
+viene
+segnalato con un carattere in <b>grassetto</b>.</ita>
+<eng>The start of a paragraph or the change of argument is highlighted
+whit a <b>bold</b> font.</eng> <br>
+<ita>Un esempio, o una parte di programma in amethyst che puo' essere
+accettata dal compilatore viene scritta in <i>corsivo</i>.</ita>
+<eng>An example or part of an amethyst program that the compiler can
+read is written in <i>italic</i>.</eng><br>
+<ita>
+Una parte di codice che funziona solo da una certa versione del
+linguaggio viene segnalata con un <font color="#cc0000">carattere rosso</font></ita>
+<eng>A part of the code that works only from a certain version of the
+language is written with <font color="red">red font</font>.<br>
+<br>
+</eng></p>
+<hr width="100%" size="2"><b><br>
+<a name="uso_ewb"></a><ita>Uso del compilatore di linguaggio ewb</ita>
+<eng>Using the compiler "ewb"</eng></b><b> <br>
+<br>
+</b><ita>Potete scaricare il compilatore di linguaggio amethyst dal
+sito
+easyweb.w3n.it, oppure dal sito amethyst.w3n.it </ita>
+<eng>You can download the amethyst language compiler from the site
+easyweb.w3n.it, or from
+amethyst.w3n.it .
+</eng><br>
+<ita>Dalla cartella di download potete selezionare l' ultima versione:
+e' un
+unico file in formato. ".tgz", cioe' archiviato con tar e compresso
+con l'algoritmo gzip.Potete aprirlo con winzip.</ita>
+<eng>From the download folder you can select the last version: a single
+file
+in .tar.gz format. This is a tar archive compressed with gzip. Winzip
+can open it.</eng>
+<br>
+<ita>Per prima cosa installate il linguaggio PERL. Sotto unix o sui mac
+questo e' gia' installato, mentre sotto windows va installato.
+</ita><eng>First, you have to install a PERL interpreter. Under unix or
+on a mac this is already installed.
+</eng><ita>Un ottimo
+strumento e' Activeperl della Activestate, che potete scaricare
+tranquillamente
+dalla rete. </ita>
+<eng>A good perl interpreter is Activeperl from Activestate, that you
+can download from internet.</eng>
+<br>
+<ita>Amethyst e' un linguaggio ad uso generale, che ha funzioni
+predefinite
+per realizzare applicazioni utilizzabili sul web. Questo tipo di
+applicazioni devono essere installate su un web server, e il web server
+deve essere in grado di eseguire script di tipo cgi.
+</ita><eng>Amethyst is a general purpose language, whit many predefined
+functions to develop applications that works on a web browser.
+This kind of programs needs to be installed on a web server, and that
+web server has to support the cgi scripts.
+</eng><br>
+<ita>
+Un ottimo strumento e'Apache, un altro strumento libero che puo' essere
+installato praticamente su qualunque piattaforma.
+</ita><eng>A good web server is Apache, another free tool that run
+pratically on each platform.
+</eng><br>
+<ita>Scompattate l' archivio che avete scelto, e otterrete una cartella
+ewb5 , dove il 5 e' il primo numero della versione corrente.</ita>
+<eng>Unpack the archive, and a new folder named ewb5 will be created. 5
+is the first number of the current version.
+</eng> <br>
+<ita>
+Entrate nella cartella ewb, e vedrete le sottocartelle:
+</ita><eng>Entering that folder you will see some subfolder:
+</eng><br>
+<ita>doc - contiene questa documentazione assieme al manuale for
+dummies etc.<br>
+</ita>
+<eng>doc - contains that manual, the manual for dummies, etc.<br>
+</eng>
+<ita>src - contiene i sorgenti del linguaggio - quelli da installare
+</ita><eng>scr - contains the sources and the install scripts.
+</eng><br>
+<ita>esempi - contiene un po' di esempi compilabili e utilizzabili sul
+web.
+</ita><eng>esempi - contains some example that you can compile and use
+on the web.
+</eng><br>
+<br>
+<ita>Per installare amethyst entrate nella cartella src e lanciate
+./Make ,
+con la m maiuscola. &nbsp;(sotto windows .\Make )<br>
+Ora provate a lanciare "ewb": questo e' il compilatore di amethyst e
+dovrebbe apparire un messaggio del tipo:
+</ita><eng>To install amethyst you have to enter the src folder and run
+./Make .
+Now try to launch "ewb": this is the amethyst compiler, and it should
+write a message like that:
+</eng><br>
+<u>Versione 4.01 - newForm + loadtab<br>
+Enrico Betti e Paride Dominici<br>
+<br>
+Uso ewb [parametri]filename [outfile]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; parametri:<br>
+&nbsp; -v mostra la versione corrente.<br>
+&nbsp; -g inserisce codici di debug<br>
+&nbsp; -nw,
+-l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+nessun motore di accesso web<br>
+&nbsp; -dbmysql&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; usa database engine mysql<br>
+&nbsp; -dbf&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; usa
+database su files<br>
+<br>
+Nota : Se outfile e' omesso viene creato da filename.ewb filename.cgi<br>
+</u><br>
+<br>
+<ita>che torna un help veloce sull' uso di ewb.
+</ita><eng>a little help on the ewb use.
+</eng><br>
+<ita>Per scrivere il vostro programma potete usare un qualunque editor
+di
+testi. Una volta che lo avete scritto salvatelo in un file con
+estensione .ewb, ad esempio "prova.ewb". </ita>
+<eng>To write your program you can use a common text editor. You have
+to save a file with ".ewb"
+extension. For example "prova.ewb".
+</eng><br>
+<ita>per compilarlo usate easyweb in questo modo:
+</ita><eng>To compile it:</eng>
+<br>
+<i>ewb prova.ewb</i><br>
+<br>
+<ita>Il risultato e' un file di nome <b>prova.cgi</b>.</ita>
+<eng>The result is a fil named <b>prova.cgi</b></eng>
+<br>
+<ita>Una volta copiato questo file su una cartella del vostro web
+server e
+avere abilitato l' uso delle cgi potete eseguirlo aprendolo con un
+qualunque browser, ad esempio netscape.
+</ita><eng>You have to copy that file on a folder of your web server,
+and if you enabled the cgi scripts, you can
+run your program opening it with a browser, like netscape.
+</eng><br>
+<ita>Se il vostro scopo e' compilare una applicazione che giri dal
+prompt
+dei comandi e non una &nbsp;applicazione per il web, dovreste
+utilizzare lo switch -nw, cioe' NoWeb, anche se questo non e' piu'
+obbligatorio dalla versione 4.00.
+</ita><eng>If you want to write an application that run from the
+command prompt, you should use the
+switch -nw, it's to say "No Web".
+</eng><br>
+<br>
+<ita>Ad esempio scrivete</ita><eng>For example:</eng> <br>
+ewb -nw prova.ewb<br>
+<br>
+<ita>e eseguite il risultato con il comando </ita>
+<eng>and run the result with the command </eng>&nbsp; <i>./prova.cgi</i><br>
+<ita>Nota: se utilizzate come sistema operativo windows, per far girare
+una applicazione locale avrete bisogno di eseguirla usando perl, in
+questo
+modo:</ita>
+<eng>If you use windows as operating system, to run a local application
+you need to start it with "perl":</eng> <br>
+<i>perl prova.cgi</i> <br>
+<br>
+<br>
+<ita>Alcuni degli esempi che troverete in seguito riguardano codice per
+il web, e altri codice che potete eseguire solo dal vostro terminale. </ita>
+<eng>Some example in this manual is about web code, and some about
+terminal-running code.</eng>
+<br>
+<ita>
+Per distinguerli la regola e' semplice: normalmente si usano le
+istruzioni print e input per comunicare con il terminale, e quindi i
+programmi con print e input vanno compilati con lo switch -nw, e le
+funzioni show e ask per comunicare con il browser. </ita>
+<eng>We will use "print" and "input" commands to talk with the
+terminal, and "show" and "ask" commands to talk with web-browsers.
+Programs with "print" and "input" are compiled with the "-nw" switch. </eng>
+<br>
+<br>
+<hr><a name="Concetti_base_del_linguaggio"></a> <br>
+<b><ita>Concetti base del linguaggio</ita>
+<eng>Basical conception</eng></b> <br>
+<br>
+<ita>Un programma easyweb e' un file di testo con estensione .ewb , che
+va
+compilato con il compilatore "ewb". </ita>
+<eng>The easyweb rogram is a test file with extension ".ewb", that will
+be compiled with the "ewb" compiler.
+</eng><br>
+<ita>Un programma e' composto da definizione di funzioni e codice.</ita>
+<eng>The program is made by functions and the main code. </eng> <br>
+<ita>Normalmente, le funzioni che verranno utilizzate in una parte del
+codice sono definite prima che il codice inizi, ma e' possibile
+inserire liberamente linee di codice e definizione di funzioni, senza
+un ordine preciso. </ita>
+<eng>Normally the functions are inserted before the main code, but if
+you want, you can freely insert main code lines or new functions
+without an order.
+</eng><br>
+<ita>Una funzione viene definita con la parola chiave sub:</ita>
+<eng>A new function starts with the keyword "sub" </eng> <br>
+<br>
+sub <ita>nomefunzione</ita><eng>name</eng> (<ita>parametro, parametro</ita><eng>parameter,
+parameter</eng> .... ) <br>
+{ <ita>codice della funzione</ita><eng>code of the function</eng> <br>
+};<br>
+<br>
+<ita>Il codice e' composto di istruzioni e puo' contenere commenti.</ita>
+<eng>The code is made by instructions and comments.</eng><br>
+<ita>Un commento e' una istruzione che inizia con un apice, e su questa
+line
+si puo' scrivere qualunque cosa, fino al caporiga. Il contenuto della
+linea viene&nbsp; ignorato dal compilatore.</ita>
+<eng>A comment is a line that starts with " ' ". On that line you can
+write everything,
+and the compiler will ignore it, till the end of line char. </eng><br>
+<ita>Una istruzione e' sempre terminata da un punto e virgola. Ad
+esempio <i>print
+"ciao\n";</i> e' una istruzione. Un programma minimale e' composto di
+almeno una istruzione. </ita>
+<eng>Each instruction ends with a " ; ". For example <i>print "ciao\n";</i>
+is an instruction. A minimal program is composed by at least one
+instruction.
+</eng><br>
+<ita>Se una istruzione utilizza delle variabili, queste devono per
+prima
+cosa essere dichiarate. </ita>
+<eng>If an instruction use some variabile, you have to declare that
+variabile on a previous instruction. </eng><br>
+<ita>
+Esistono due tipi di dichiarazione di variabili: inplicita ed
+esplicita.</ita>
+<eng>There are two ways to declare a variable: implicit or explicit. </eng>
+<br>
+<ita>Il caso di dichiarazione esplicita e' quello in cui viene indicata
+la
+parola chiave var seguita dall' elenco delle variabili da dichiarare:</ita>
+<eng>On the esplicit way, you write the keyword "var" followed by the
+variabile name(s):
+</eng><br>
+<i>var alfa, beta, gamma; <br>
+</i><ita>Dichiara le tre variabili</ita><eng>This declare three
+variabiles:</eng> alfa, beta e gamma. <br>
+<ita>Esistono due casi di dichiarazione implicita:</ita>
+<eng>There are two implicit-declaration cases:</eng> <br>
+1 - <ita>dichiarazione all'apertura di una funzione</ita><eng>the
+opening of a function</eng>:<br>
+<i>sub prova(uno, due)<br>
+{<br>
+'<ita>dentro questa funzione sono definite le variabili "uno" e "due",
+ma
+non esistono piu' dopo la chiusa graffa di fine funzione.</ita>
+<eng>In that function we have two variables: "uno" and "due", but they
+disappear after che end of the function.
+</eng><br>
+};<br>
+</i>2 - <ita>dichiarazione alla dichiarazione di una tabella.</ita>
+<eng>The declaration of a table.</eng> <br>
+table presone=nome, cognome, indirizzo; <br>
+<ita>Dopo questa riga sono dichiarate le variabili</ita>
+<eng>After that row there are new variabiles:</eng> "nome", "cognome",
+"indirizzo".<br>
+<ita>Una seconda dichiarazione di una variabile gia' dichiarata non
+causa un
+errore, ma semplicemente azzera il valore della variabile.
+</ita><eng>Repeating a variabile declaration you won't receive an
+error, but simply the value of the variabile will be zero.
+</eng><br>
+Una dichiarazione all' interno di un blocco di una variabile che gia'
+esista esternamente non ne cambia il valore, ma maschera solamente la
+variabile
+esterna, dimodoche' nel blocco non la si puo' utilizzare. <br>
+<br>
+<i>var a; <br>
+a=4;<br>
+sub prova()<br>
+{ var a;<br>
+&nbsp; &nbsp;a=5;<br>
+};<br>
+print a; &nbsp;'qui a vale ancora 4.<br>
+</i>&nbsp;<br>
+Il linguaggio easyweb contiene un preprocessore simile a quello del
+linguaggio C. Il preprocessore puo' essere utilizzato per spezzare il
+codice in piu' files, creare delle librerie di funzioni, o avere del
+codice che venga compilato solo se sussistono certe condizioni e
+sostituito con altro codice se le
+condizioni non sussistono.<br>
+Lo stesso preprocessore puo' essere utilizzato per definire costanti,
+da utilizzare poi nel codice.<br>
+La sintassi del preprocessore e' &nbsp;la stessa del preprocessore del
+linguaggio C. <br>
+<br>
+La compilazione e' seguita da una fase di link che rende il piu'
+possibile compatto il file risultante, mentre nelle versioni di easyweb
+precedenti
+alla 3.0, praticamente ogni programma occupava piu' di 40 kilobytes
+solo
+per lo spazio occupato dalle librerie.&nbsp; <br>
+<br>
+Easyweb e' un linguaggio che puo' essere utilizzato sia per realizzare
+applicazioni da console, come ad esempio il C, sia per realizzare
+applicazioni
+per piattaforma web. <br>
+<br>
+Il linguaggio Easyweb e' pensato per essere concettualmente differente
+da linguaggi come perl, php, asp, che sono solo un ausilio per rendere
+dinamico il web. <br>
+In un linguaggio per pagine dinamiche, come asp, un file asp non
+descrive una applicazione, ma semplicemente una pagina dell'
+applicazione. <br>
+L' applicazione viene costruita come un insieme di pagine distinte, di
+cui alcune dinamiche e altre no, e le informazioni devono essere
+passate continuamente da una pagina all' altra mentre l' utente naviga.
+<br>
+Inoltre l' interfaccia grafica dell' applicazione e' solo il web:
+allora per poter fare all' utente una richiesta e' necessario costruire
+la pagina web che ne contenga i campi, e la corrispondente pagina asp
+che si occupi di controllarli ed utilizzarli. <br>
+Questo significa che ci sono problemi di concorrenza tra il contenuto
+dei form html e il contenuto delle pagine asp che rispondono a questi
+form, e c'e' disordine nell' applicazione: una applicazione e'
+contenuta
+solitamente in una cartella, ma all' interno di questa cartella e'
+composta
+di molti piccoli files distinti. <br>
+Per fare un esempio, una semplice applicazione che raccolga un nome e
+un numero di telefono e li registri in una tabella deve essere composta
+di tre files: <br>
+- un file di inserimento del numero di telefono. <br>
+- un file che legge i valori del numero inserito, li controlla e
+fornisce la risposta <br>
+- l' html di risposta<br>
+- oltre a questi abbiamo solitamente un file di database che contega la
+tabella, collegato in qualche modo all' applicazione.<br>
+<p>Un altro problema dello sviluppo dell' applicazione in questo modo
+e' che non esistono costrutti di linguaggio che permettano di accedere
+in maniera semplice ad un database: <br>
+Per accedere ad un database e' solitamente necessario utilizzare una
+libreria di interfaccia esplicita ad odbc, scrivere esplicitamente le
+richieste sql e gestire come liste le risposte, sempre che il
+linguaggio dia la possibilita' di gestire liste. <br>
+Per utilizzare una tabella di database dalla mia applicazione e'
+necessario che per prima cosa l' amministratore del database abbia
+creato l' intera struttura di database che io intendo utilizzare e me
+ne abbia dato i diritti. <br>
+Questo meccanismo, per quanto molto ordinato e' comunque estremamente
+complesso da applicare, e richiede un intervento esterno perche' l'
+applicazione possa girare. </p>
+<p><b>EasyWEB</b> risolve i due problemi a questo modo: </p>
+<blockquote>Per quello che riguarda la necessita' di spezzare una
+singola applicazione in piu' files, easyweb permette di descrivere l'
+interazione con il web server con un unico costrutto, analogo al
+comando input di un interprete basic. <br>
+L' utente dell' applicazione scrivera' qualcosa di analogo alle
+seguenti righe: <br>
+  <br>
+  <i>utente="nobody"; <br>
+pass=""; <br>
+ask utente,pass; <br>
+if ((utente="a") &amp;&amp; (pass=b)) ... <br>
+  </i><br>
+In realta' quello che succede e' che easyweb lancia una prima volta l'
+applicazione, crea un form con cui inviare la richiesta all' utente e
+si ferma. <br>
+Una volta che l' utente abbia risposto a questo form l' applicazione
+viene ripresa da dopo la ask, con le variabili valorizzate, e l'
+elaborazione continua come se il programma fosse unico. <br>
+Quello che abbiamo ottenuto e' intrinsecamente un'applicazione
+multi-tasking il cui singolo flusso di esecuzione e' anche esso
+spezzato in piu' processi. <br>
+&nbsp;
+  <p>Per quello che riguarda la necessita' di accedere in maniera
+semplice alle tabelle di un data base relazionale, la soluzione e' un
+po' discutibile: viene infatti implementato il piu' ridotto possibile
+insieme di istruzioni di accesso al database per poi lasciare al
+software la combinazione
+di queste:<br>
+  <br>
+Normalmente in un database si memorizzano tabelle, ciascuna composta di
+piu' colonne, &nbsp;e ogni riga di tabella contiene la nostra
+unit&agrave; di informazione: ad esempio<br>
+  </p>
+  <table cellpadding="2" cellspacing="2" border="1" width="100">
+    <tbody>
+      <tr>
+        <td valign="top"><b>nome</b><br>
+        </td>
+        <td valign="top"><b>cognome</b><br>
+        </td>
+        <td valign="top"><b>telefono</b><br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">Enrico<br>
+        </td>
+        <td valign="top">Betti<br>
+        </td>
+        <td valign="top">113<br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">Andrea<br>
+        </td>
+        <td valign="top">Rossi<br>
+        </td>
+        <td valign="top">418965<br>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>L' intera tabella con i nomi dei campi viene detta relazione, e la
+singola riga, il cui significato e' ad esempio nome=enrico,
+cognome=betti, numero=113 viene detta t-upla , in quanto composta da t
+elementi. <br>
+  </p>
+  <p>Una relazione e' semplicemente un insieme di tuple. Questo
+significa che solitamente le righe della tabella non hanno un
+particolare ordine: se avessi scambiato la t-upla "enrico, betti, 113"
+con la t-upla "andrea,rossi,418965" , avrei comunque le stesse
+informazioni.</p>
+  <p> Il collegamento tra una tupla e il nome della tupla stessa non fa
+parte della relazione: e' una informazione riguardante il programma
+applicativo. Questo almeno in easyweb. <br>
+Nel mio programma devo quindi essere io ad indicare un nome per
+le informazioni contenute in una tabella. <br>
+  <b>table utenti= nome, cognome, password;<br>
+  </b>Da qui in poi nel programma esistono tre variabili: nome cognome
+e password, che possono essere utilizzate ad esempio per calcoli:<b><br>
+  </b>Non e' possibile usare variabili se prima queste non sono state
+dichiarate, e l' uso del costrutto table equivale ad una dichiarazione.<b><br>
+  </b></p>
+  <p><i><br>
+nome =[Enrico];<br>
+password = 123* 42 +5; <br>
+  </i></p>
+  <p>Dato che le variabili fanno parte di una tabella, possono essere
+valorizzate con quella che noi vogliamo sia una t-upla valida nella
+tabella utenti: <br>
+  </p>
+  <p><i>nome=[Enrico]; cognome=[Betti]; password=[EnrB];<br>
+  </i></p>
+  <p>A questo punto e' possibile inserire la t-upla nella tabella
+semplicemente con l' istruzione<br>
+  </p>
+  <p><i>add(utenti);<br>
+  </i></p>
+  <p>Allo stesso modo, quando andremo a leggere un dato dalla tabella,
+quello che succeder&agrave; e' che cambieranno i valori di nome,
+cognome e telefono per ritornare il dato richiesto. <br>
+  </p>
+  <p>Si e' scelto di non tipizzare le variabili, e quindi i dati
+contenuti nelle tabelle.<br>
+Questo significa che una variabile una volta dichiarata puo' essere
+utilizzata per contenere un dato di qualunque tipo, quindi ad esempio
+una stringa, un numero, un carattere, un valore booleano vero/falso, un
+testo di piu' righe o un file, o anche una lista di variabili. <br>
+La stessa cosa vale per una riga della tabella. <br>
+Vedremo piu' avanti come funziona questo meccanismo. <br>
+  <br>
+  </p>
+  <p>Le funzioni di accesso ad una tabella, passando per le variabili
+dichiarate quando si e' dichiarata la tabella stessa, sono piuttosto
+semplici una volta capito il meccanismo.&nbsp; <br>
+inserimento di un dato in tabella: il dato e' in ambiente. <br>
+add (utenti);&nbsp;<br>
+Viene inserito il valore corrente di nome, cognome e password nella
+tabella. <br>
+  </p>
+  <p> login: controllo della corrispondenza sui primi due campi della
+tupla (la linea che contiene t valori). <br>
+login (utenti);<br>
+Ritorna vero se nella tabella esiste una riga con gli stessi valori di
+nome e cognome che ci sono al momento nelle due variabili. </p>
+  <p>delete (utenti);&nbsp;<br>
+Cancella tutte le righe il cui nome sia lo stesso contenuto nella
+variabile nome. <br>
+Un elenco completo delle funzioni di accesso al motore di database si
+trova nella sezione funzioni predefinite. <br>
+  </p>
+  <p>Abbiamo detto che una applicazione easyweb non e' un programma
+singolo, ma ne possono girare piu' istanze contemporaneamente, e
+ciascuna di queste puo' essere ad un punto diverso della comunicazione
+con il proprio utente. <br>
+Se l' accesso alla tabella degli utenti avvenisse contemporaneamente
+per due copie dell' applicazione, potremmo leggere dati inconsistenti,
+e questo potrebbe essere causa di problemi, incomprensioni o perdita di
+dati. <br>
+Ad esempio potrebbe accadere che una altra istanza della mia
+applicazione stia leggendo le righe della tabella mentre la mia istanza
+sta inserendo su questa un nuovo dato, e questo potrebbe portare alla
+lettura di dati incompleti o errati. <br>
+Per questo easyweb prima di accedere ad una tabella la blocca, cioe' ne
+richiede l' uso esclusivo per una istanza dell' applicazione, o se
+la tabella e' gi&agrave; in uso attende che questa sia libera prima di
+utilizzarla. <br>
+Lo stesso problema si puo' pero' porre per un aggiornamento che
+coinvolga piu' tabelle: ad esempio se dovessi spostare del denaro da un
+conto in banca ad un altro dovrei probabilmente svolgere due
+operazioni: la prima e' togliere la cifra dalla tabella dei miei conti,
+e la seconda inserire la stessa cifra nella tabella di conto di
+destinazione. <br>
+Anche se le due tabelle vengono bloccate una alla volta, esiste una
+fase intermedia in cui sono entrambe sbloccate, e il denaro non si
+trova ne' in un conto ne' nell' altro. Cosa accadrebbe se in questo
+momento la tabella venisse usata da un programma di revisione di conti?
+sicuramente segnalerebbe un ammanco di cassa. <br>
+Deve allora essere possibile bloccare piu' tabelle contemporaneamente,
+e ancora sbloccarle contemporaneamente, per svolgere quella che viene
+chiamata una "transazione". <br>
+Questo viene fatto utilizzando le istruzioni lock e unlock. <br>
+Riporto come esempio il codice che cancella una persona dalla tabella
+"conoscenti" e la sposta nella tabella "amici" per il telefono.<br>
+  </p>
+  <p><i>table conoscenti=nomecognome, telefono;<br>
+table amici=nomecognome, telefono;<br>
+'notate che ho usato lo stesso nome per le voci di entrambe le tabelle.<br>
+  </i></p>
+  <p><i>nomecognome="Andrea Rossi";<br>
+lock(conoscenti);<br>
+lock(amici);<br>
+  </i></p>
+  <p><i>delete(conoscenti);<br>
+add(amici);</i></p>
+  <p><i>unlock(amici);<br>
+unlock(conoscenti);<br>
+  </i></p>
+  <p>Dopo una lock la tabella conoscenti e amici possono essere
+utilizzate solo dall' istanza corrente del programma. <br>
+E' necessario ricordarsi di sbloccare le tabelle, altrimenti altri per
+poterle usare dovranno attendere. Un meccanismo di sicurezza fa
+comunque in modo che il lock venga rimosso dopo un certo tempo,
+impedendo ad un programma errato di bloccare tutto il sistema.<br>
+  </p>
+  <p>Un lock non puo' rimanere attivo durante una ask, perche' questo
+significherebbe bloccare la tabella per un tempo indefinito. <br>
+Il lock serve quindi a gestire azioni transazionali su piu' tabelle
+contemporanee. </p>
+  <p>Per l' interrogazione di una tabella, cioe' la lettura di alcune
+delle tuple in essa contenute in base ad una condizione, esistono le
+istruzioini in e inall. <br>
+  </p>
+  <p>ad esempio per una tabella persone=nome, telefono contenente i
+seguenti dati:<br>
+  </p>
+  <table cellpadding="2" cellspacing="2" border="1" width="100">
+    <tbody>
+      <tr>
+        <td valign="top">nome<br>
+        </td>
+        <td valign="top">telefono<br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">enrico<br>
+        </td>
+        <td valign="top">113<br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">andrea<br>
+        </td>
+        <td valign="top">45678<br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">paolo<br>
+        </td>
+        <td valign="top">345<br>
+        </td>
+      </tr>
+      <tr>
+        <td valign="top">enrico<br>
+        </td>
+        <td valign="top">327151<br>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <br>
+il seguente codice: <br>
+  <i>table persone=nome, telefono:<br>
+in(persone, nome=enrico)<br>
+{ print nome.",".cognome."\n";<br>
+};<br>
+  </i>scrive <br>
+  <b>enrico, 327151<br>
+  </b>
+  <p>mentre sostituendo "in" con "inall" torna anche i duplicati, e
+scrive:<br>
+  <b>enrico,113<br>
+enrico,327151<br>
+  </b></p>
+  <p>Dalla versione 3.21 e posi sulla 4.0 sono disponibili molte
+funzioni in piu' per l' accesso al database, che dovrebbero
+semplificare la cancellazione, le interrogazioni complesse e la
+duplicazione di tabelle. <br>
+Dalla versione 3.18 esiste una variabile predefinita "tabpath". Di
+default
+questa vale "." , cioe' la dir. corrente, ed e' la directory dove
+verranno
+create le tabelle utilizzate dal programma easyweb. <br>
+E' possibile cambiare questo valore per creare le tabelle su un altra
+cartella,
+per motivi di sicurezza o di ordine. <br>
+Le tabelle sono comunque su files nascosti, il cui nome inizia con
+".TB"
+e ha estensione .tab <br>
+Operazioni che devono cancellare la tabella, come update, creano un
+file
+.bkp, &nbsp;che contiene il backup della tabella prima della modifica.<br>
+  <br>
+  </p>
+</blockquote>
+<hr> <br>
+<a name="Sintassi"></a><b>Sintassi</b>
+<p>La sintassi di easyweb viene riportata come insieme di produzioni
+nel
+file <a href="sintassi.txt">sintassi.txt</a>. Questo file e' stato il
+mio
+riferimento durante tutta la fase di sviluppo del linguaggio stesso ed
+e'
+a tutt' oggi valido.<br>
+In una variabile puo' essere inserito un qualunque valore,
+indipendentemente dalle sue dimensioni. Queste, che nella maggior parte
+dei casi e' una semplificazione, (basti pensare alle tabelle di
+database) diventa una complicazione nel
+momento in cui si usano operatori per svolgere i calcoli. Vedremo
+operatori
+diversi per ogni tipo di dati. <br>
+<br>
+<b>Operatore di assegnamento = <br>
+</b>Viene utilizzato per assegnare ad una variabile un valore. Da
+notare che non e' lo stesso operatore utilizzato per confrontare una
+variabile con un valore come si usa in basic.<br>
+<i>a="3";<br>
+if (a=1) {<br>
+&nbsp; &nbsp; 'questo codice verr&agrave; sempre eseguito, e il valore
+di a diventer&agrave; 1: cosi' il confronto non funziona.<br>
+&nbsp;};</i><br>
+</p>
+<p><b>Operatori di confronto: </b><b>==, &gt;, &lt; , &gt; &gt;=,
+&lt;=, eq,
+ne, ge, gt, le, lt <br>
+</b></p>
+<p><b>==</b> (uguale), <b>&lt;</b> (minore), <b>&lt;</b>(maggiore), <b>&gt;=</b>(maggiore
+o uguale), <b>&lt;=</b> (minore o uguale): tutti questi sono operatori
+da utilizzare per confrontare tra loro numeri interi o valori booleani.
+ad esempio:<br>
+<i>a="3"; <br>
+b=5; <br>
+if (a&lt;b) { <br>
+'questo confronto e' vero, perche 3&lt;5 &nbsp;<br>
+};<br>
+if (a==b) {<br>
+'questo confronto e' falso, perche' 3 non e' uguale a 5<br>
+};<br>
+</i>Sono da notare alcune cose: <br>
+Per prima cosa abbiamo scritto i numeri sia con che senza le
+virgolette. Questo perche' nella variabile i numeri vengono memorizzati
+come stringhe, cioe' come sequenze di caratteri. <br>
+Questo vuol dire anche che una stringa verra' accettata come un numero,
+prendendone tutte le cifre valide. <br>
+Ad esempio "3prova" corrisponde al numero 3, mentre "parola"
+corrisponde al numero 0. <br>
+Allo stesso modo un valore booleano "vero" e' rappresentato da una
+qualunque stringa non vuota, mentre il falso e' la stringa vuota "". <br>
+</p>
+<p>Operatore concatena&nbsp;&nbsp;<b> .</b>&nbsp;</p>
+<p>L' operatore concatena serve a concatenare piu' stringhe, cioe' a
+mettere i caratteri della seconda in coda ai caratteri della
+prima.&nbsp;</p>
+<p>Ad esempio: &nbsp;<br>
+</p>
+<p><i>a="3.1421";<br>
+print "prova". [ di scrittura del numero]. a."\n"; <br>
+</i></p>
+<p>Scriver&agrave; a video "prova di scrittura del numero 3.1421 e poi
+andra' a capo.<br>
+</p>
+<p>Operatori algebrici: <b>+, -, *, / ,%</b> <br>
+</p>
+<p>Sono i normali operatori, che possiamo trovare su una qualunque
+calcolatrice, cioe' piu', meno, per e diviso. L' ultimo e' l' operatore
+modulo, che torna il resto di una divisione intera. <br>
+Cosi' <br>
+<i>print 2+2; 'scrive 4<br>
+print 2-2; &nbsp;'scrive 0<br>
+print 3*2; 'scrive 3<br>
+print&nbsp; 9/2; scrive 4.5<br>
+print 10/6; scrive il resto di 20/6, cioe' 2. <br>
+</i><br>
+Operatori di or e and <b>||, |, &amp;&amp;, &amp;</b>&nbsp;</p>
+<p>Sono gli operatori utilizzati per un confronto tra valori booleani,
+cioe' ad esempio all' interno di una condizione.&nbsp;<br>
+|| e' l' or logico: ad esempio la condizione "se a e' minore di dieci
+oppure a e' maggiore di venti" si scrive cosi':<br>
+</p>
+<p><i>if ( (a&lt;10) || (a&gt;20)) { codice };</i><br>
+</p>
+<p>&amp;&amp; e' l' and logico, quindi <br>
+<i>if ((a&lt;20) &amp;&amp; (a&gt;10)) {};</i> &nbsp;significa "se
+a e' compreso tra dieci e venti, estremi esclusi. <br>
+</p>
+<p>| e' l' or bit a bit sui valori della variabile, letta in binario. <br>
+Ad esempio 3 | 6 = 7 &nbsp;(0011b &nbsp;| 0110b = 0111b)<br>
+&amp; e' l' and bit a bit fatto allo stesso modo. <br>
+&nbsp;3 &amp; 6 = 2 &nbsp;(0011b &amp; 0110b = 0010b)<br>
+<br>
+Operatore negazione <b>!</b>&nbsp;</p>
+<p>L' operatore negazione inverte il valore di una variabile booleana.
+ad esempio: <br>
+<i>if (! (a&lt;3)) {};<br>
+</i>la condizione e' "se non (a minore di tre), quindi se a e' maggiore
+o uguale a tre. <br>
+</p>
+<p> L'operatore di confronto ha la precedenza sugli operatori di
+confronto. Gli operatori di confronto hanno la precedenza sugli
+operatori algebrici, e questi sugli operatori di or, and e
+sull'operatore di negazione. <br>
+</p>
+<p><br>
+E' possibile indicare valori numerici, stringa, booleani nel seguente
+modo: "sringa", [stringa],&nbsp; 32.4 , 32, true. <br>
+E' possibile racchiudere espressioni tra parentesi tonde per modificare
+la priorita' degli operatori. </p>
+<p><i>cicli</i> <br>
+I cicli disponibili sono gli stessi del linguaggio C standard: <br>
+<br>
+<b>Ciclo for<br>
+</b>for (a ; b ; c) { d };<b><i><br>
+</i></b> cioe': A; finche B : D, C <br>
+Funziona a questo modo: <br>
+All'inizio del ciclo viene eseguita a: solitamente questa e' la
+condizione di apertura del ciclo, cioe' quella che setta il valore
+iniziale della
+variabile di conteggio. <br>
+Prima dell' esecuzione del codice tra parentesi graffe viene valutata
+l' espressione b: se questa e' falsa il ciclo termina, altrimenti viene
+eseguito quello che c'e' tra le parentesi graffe.<br>
+Una volta eseguito il codice tra le parentesi graffe viene eseguita
+l'istruzione c, che solitamente viene usata per incrementare il
+contatore.<br>
+</p>
+<p>Ad esempio: <br>
+<i>for (a=4; a&lt;=40; a=a+4)<br>
+{ print a."\n";<br>
+}; <br>
+</i>Scrive la tabellina del 4 da 4 a 40.&nbsp;<br>
+La linea a=a+4 assegna ad a il valore contenuto in precedenza su a
+stesso piu' quattro. <br>
+</p>
+<p><b>Ciclo while <br>
+</b>while (A) {B};<br>
+</p>
+<p>Esegue il codice b finche e' vera la condizione a. <br>
+Ad esempio:<br>
+a=4; <br>
+<i>while (a&lt;=40)<br>
+{ print a."\n";<br>
+&nbsp; a=a+4; <br>
+&nbsp;};<br>
+</i>E' codice equivalente al precedente, che scrive la tabellina del 4.
+<br>
+<br>
+</p>
+<p><b>Ciclo do-while</b></p>
+<p>do {A} while (B);&nbsp;</p>
+<p>E' analogo al ciclo while, ma la condizone viene valutata dopo aver
+svolto per la prima volta il ciclo. <br>
+Ancora scriviamo il codice della tabellina del 4: <br>
+</p>
+<p>a=4;<br>
+do<br>
+{ print a."\n";&nbsp;<br>
+&nbsp; a=a+4; <br>
+} while (a&lt;=40);<br>
+</p>
+<p> </p>
+<p>I cicli sono tutti equivalenti, e ciascuno puo' essere sostituito
+con
+tutti gli altri, ma e'comunque utile avere una certa varieta'.<br>
+<b><br>
+</b></p>
+<p><b>Condizioni</b></p>
+<p>Le condizioni sono simili a quelle del linguaggio C.&nbsp;</p>
+<p><b>if (A) B ;</b>&nbsp;</p>
+<p>Se e' vera la condizione A, viene eseguito il codice B. <br>
+Ad esempio:<br>
+<i>if (a&gt;10) { print "oltre il limite\n"; };<br>
+</i></p>
+<p> oppure: <br>
+<b>if (A) { B }</b><br>
+<b>else (C);</b>&nbsp;</p>
+<p>Se e' vera la condizione A viene eseguito il codice B, altrimenti
+viene eseguito il codice C. <br>
+<i>if (a&gt;10) { print "oltre il limite massimo\n"; }<br>
+else { print "nei limiti. Dato accettato.\n"; };<br>
+</i>Da notare che prima dell'else non c'e' il punto e virgola, che
+porrebbe termine alla condizione.<br>
+<br>
+</p>
+<p> oppure: <br>
+<b>if (A) {B}</b> <br>
+<b>elseif (C) {D}</b> <br>
+<b>else {E};<br>
+</b></p>
+<p>Se e' vera la condizione A viene eseguito il codice B. Altrimenti
+viene valutata la condizione C e se e' vera viene eseguito il codice D.
+Se nessuna delle condizioni A o C e' vera viene eseguito il codice E. <br>
+</p>
+<p>La condizione di un if e' positiva se il risultato dell' if e' un
+numero positivo. <br>
+I cicli vengono trasformati dal compilatore per utilizzare istruzioni
+di salto. Il risultato e' un programma in cui appaiono solo goto e
+label: questo serve perche' poi il programma dovra' essere spezzato
+dalle istruzioni di ask, e quindi e' necessario che queste ritornando
+non necessitino
+di uno stack.<br>
+Il file compilato dal compilatore ewb e' leggibile, ed e' un
+applicativo in linguaggio perl. Questo per rendere questo eseguibile
+indipendente
+dall' implementazione, e fare in modo che giri su qualunque piattaforma
+che possa supportare il linguaggio perl stesso. Sono adeguati un
+windows,
+un mac, una macchina dos, e un qualunque sistema unix. <br>
+Il compilatore ewb e' anch'esso scritto in perl, e quindi puo'essere
+eseguito su qualunque macchina che supporti perl. &nbsp; </p>
+<p><i>funzioni e dichiarazione </i>e' possibile dichiarare una nuova
+funzione nel seguente modo: <br>
+<b>sub nomefunzione(variabile ... ,variabile)</b> <br>
+<b>{ codice</b> <br>
+<b>}</b> <br>
+La funzione torna come risultato l' ultimo risultato di elaborazione. <br>
+E' allora implementata la FUNZIONE PREDEFINITA return che non fa nulla:
+semplicemente torna quello che elabora. </p>
+<p>La funzione viene chiamata semplicemente con il suo nome seguito
+dall' elenco dei valori delle variabili. <br>
+Ad esempio:<br>
+<i>sub prodotto(a,b)<br>
+{ var c;<br>
+&nbsp; c=a*b;<br>
+&nbsp; return c;<br>
+&nbsp;}; &nbsp; </i></p>
+Le variabili a e b sono dichiarate implicitamente con la dichiarazione
+della funzione prodotto.
+<hr width="100%"> <br>
+<a name="funzioni_predefinite"></a><i><font size="+1">funzioni
+predefinite</font></i> <br>
+<br>
+<font color="#0000ff"><a href="#func_com">- funzioni per la
+comunicazione su files -</a></font> <br>
+<font color="#0000ff"><a
+ href="#funzioni_per_la_gestione_di_interi_e_reali">- funzioni per la
+gestione di interi e reali -</a></font> <br>
+<font color="#0000ff"><a href="#funzioni_per_il_taglio_di_stringhe">-
+funzioni per il taglio di stringhe -</a></font> <br>
+<font color="#0000ff"><a href="#funzioni_di_gestione_carattere">-
+funzioni di gestione carattere -</a></font> <br>
+<font color="#0000ff"><a href="#funzioni_di_gestione_data">- funzioni
+di gestione data.</a></font>
+<br>
+<font color="#0000ff"><a href="#funzione_di_shell">- funzione di shell</a></font>
+<br>
+<font color="#0000ff"><a href="#funzioni_di_accesso_ai_database">-
+funzioni di accesso ai database -</a></font> <br>
+<font color="#0000ff"><a href="#funzioni_di_gestione_interfaccia_al_web">-
+funzioni di gestione
+interfaccia al web -</a></font> <br>
+<font color="#0000ff"><a href="#gestione_di_liste">- gestione di liste -</a></font>
+<br>
+<font color="#0000ff"><a
+ href="#funzioni_per_accesso_al_motore_inferenziale">- funzioni per
+accesso al motore inferenziale -</a></font> <br>
+<font color="#0000ff"><a href="#funzioni_per_l_uso_delle_socket_tcp">-
+funzioni per l' uso delle socket tcp -</a></font> <br>
+<font color="#0000ff"><a
+ href="#funzioni_per_l_uso_variabili_di_ambiente">- funzioni per l' uso
+variabili di ambiente&nbsp; -</a></font> <br>
+&nbsp; <br>
+&nbsp;
+<p><i>Questa lista potra' crescere durante lo sviluppo e dovra' essere
+aggiornata.</i> <br>
+<a name="func_com"></a><font color="#0000ff">- funzioni per la
+comunicazione con la console e per lettura /scrittura di files.</font><br>
+&nbsp; </p>
+<p><b>print espressione;</b> <br>
+Stampa a video il valore di una exp. <br>
+La stampa avviene sullo stdout, e quindi sulla linea di comunicazione
+con il web server se la pagina e' per il web. <br>
+Il risultato appare visibile all' utente del web o appare sul terminale
+corrente. <br>
+&nbsp;<br>
+Esempio:&nbsp;<br>
+print("Hello world\n"); </p>
+<p>Sul web si consiglia comunque di utilizzare l' istruzione show
+anziche' print, in quanto questa riporta anche il template grafico
+della pagina.<br>
+</p>
+<p><b>eprint espressione;</b> <br>
+Stampa a video il valore di una exp. <br>
+La stampa avviene sullo stderr, e quindi sulla linea di errore del web
+server&nbsp; (error.log). <br>
+Il risultato appare visibile al web administrator dai log. Se il
+programma e' locale (-nw), anche questa scritta appare sul terminale,
+ma viene considerata come errore e non come testo. <br>
+&nbsp;<br>
+esempio:<br>
+eprint("Transazione non completata corettamente - controllare le
+tabelle");<br>
+</p>
+<p><b>input variabile;</b> <br>
+Richiede dallo standard input una variabile. <br>
+E'&nbsp; utilizzabile solo per applicazioni non web <b>(lancio del
+compilatore easyweb con il parametro -l )<br>
+</b>Funziona in maniera simile all' input del linguaggio basic. <br>
+Esempio - una utility per calcolare l' iva su una fattura:</p>
+<p><i>var a;<br>
+input a;<br>
+print "Valore: ".a."\n";<br>
+print "Iva: ".(a*0.2)."\n";<br>
+print "Totale: ".(a*1.2)."\n";<br>
+</i></p>
+<br>
+<b>load&nbsp; espressione;</b> <br>
+<p> Carica il file richiesto e ne ritorna i dati contenuti. <br>
+E' un modo spiccio per inserire tutto un file (ad esempio un template)
+nella stessa variabile. <br>
+Secondo il web server, puo' essere necessario specificare il percorso
+completo del file. <br>
+Si fa notare che non esiste limite nella dimensione delle variabili, se
+non legato alla quantita' di memoria disponibile per la macchina. </p>
+<p>Ad esempio: <br>
+<i>print ("Il file prova.txt contiene:\n".load "prova.txt");</i></p>
+<p><b><br>
+save espressione, espressione;</b> <br>
+apre il file passato come primo parametro e ci scrive il contenuto
+della espressione passata come secondo parametro. <br>
+Non e' previsto l' append. ma lo si puo' realizzare come: <br>
+save file, ( (load file) . "\n riga&nbsp; aggiuntiva \n"); </p>
+<p>Esempio: scrivo un testo sul file prova.txt<br>
+<i>save "prova.txt", [testo scritto<br>
+con una applicazione "easyweb".<br>
+];<br>
+</i></p>
+<p>Esempio: accodo al file un altra riga.<br>
+<i>save "prova.txt", ((load "prova.txt") . "P.S. Con questo meccanismo
+posso anche accodare.\n");</i></p>
+<p>Nel primo esempio sono state usate aperta e chiusa quadra per
+inserire il testo. Questo sonsente di inserire liberamente le
+virgolette, molto usate su testi in formato html.<br>
+<b><br>
+loaddir&nbsp; espressione;</b> <br>
+Carica la directory e la ritorna in una lista di ewb. <br>
+Per ogni file viene caricato il solo nome. Torna anche i nomi dei
+file "." e ".." se la dir. esiste. <br>
+</p>
+<p>Esempio: scrive il contenuto della directory corrente.<br>
+Utilizza il costrutto pop che troverete nella sezione "gestione di
+liste".<br>
+</p>
+<p><i>a=loaddir(".");<br>
+while (a &nbsp;ne "")<br>
+{ print [file:&nbsp; ].(pop a).[\n];<br>
+};&nbsp; </i></p>
+<p><a name="funzioni_per_la_gestione_di_interi_e_reali"></a><font
+ color="#0000ff">- funzioni per la gestione di interi e reali -</font> <br>
+&nbsp; </p>
+<p><b>int(exp)</b> trasforma la variabile in intero. <br>
+<i> &nbsp; &nbsp;print int(3.14);&nbsp;</i><br>
+&nbsp; &nbsp;scrive il numero 3.&nbsp;<br>
+<i>&nbsp; &nbsp;print int(3.98);<br>
+</i>&nbsp; &nbsp;scrive il numero 4.&nbsp;<br>
+<br>
+<b>abs(exp)</b> torna il valore assoluto. Cioe' trasforma in positivo
+ogni numero negativo.</p>
+<p>Percio' abs(-9.4) vale 9.4, mentre abs(6.2) vale 6.2 . &nbsp; </p>
+<p><b>cos(exp), sin(exp)&nbsp;</b> funzioni trigonometriche.. lavorano
+in gradi. Questo significa che se richiedete sin(90) il risultato sara'
+1.&nbsp; <br>
+&nbsp; </p>
+<p><b>hex(exp)&nbsp; </b>torna l' esadecimale corrispondente a
+exp.&nbsp;</p>
+<p><i>print hex(255); &nbsp;' scrive FF. <br>
+</i>&nbsp; </p>
+<p><b>sqr(exp) </b>radice quadrata <br>
+&nbsp; </p>
+<p><b>random()</b> torna un numero casuale tra 0 e 1. Non e' necessario
+inizializzare il generatore di numeri casuali perche' lo fa
+l'applicazione di easyweb alla sua apertura, utilizzando come seme il
+tempo corrente. </p>
+<p><a name="funzioni_per_il_taglio_di_stringhe"></a><font
+ color="#0000ff">- funzioni per il taglio di stringhe -</font> <br>
+&nbsp; </p>
+<p><b>mid(a, start, length)</b> <br>
+oppure: <br>
+<b>mid (a, start)</b> <br>
+Taglia una stringa. Il primo car. di una stringa ha posizione 0.<br>
+Ad esempio <br>
+<i>print mid("tagliolini", 1, 5); ' scrive aglio<br>
+print mid([tagliolini], 6); 'scrive taglio. <br>
+</i> </p>
+<p><b>len(a)</b> Torna la lunghezza della stringa a.<br>
+<i>print len("tagliolini"); 'scrive 10<br>
+</i>&nbsp; <br>
+<b>index( a,b)&nbsp;</b> torna la posizione della stringa b all'
+interno della stringa a oppure -1, se questa non c'e'. <br>
+Ad esempio&nbsp;<br>
+print index("tagliolini", "aglio" ); 'scrive la posizione cioe' 1. <br>
+print index("tagliolini", "aceto"); &nbsp;'scrive -1 perche non
+c'e'&nbsp; aceto in tagliolini &nbsp; </p>
+<p><b>change( b, a, str)&nbsp;</b> sostituisce su str tutte le
+occorrenze di a con b.&nbsp; Poi torna la stringa.&nbsp;</p>
+<p>esempio&nbsp;<br>
+<i>print change "u", "i", "tagliolini"; &nbsp;' scrive tagluolunu&nbsp;
+<br>
+</i></p>
+<p><i>print change "pretende", "richiede", (load prova.txt);
+'sostituisce &nbsp;richiede con pretende su tutto il testo.<br>
+</i></p>
+<p><b>split( separatore, str)&nbsp;</b> Taglia la stringa secondo la
+sequenza di caratteri separatore e ne ritorna le varie parti in una
+lista.<br>
+Ad esempio <br>
+</p>
+<p><i>var a;<br>
+a=split(" ", "scrivo un testo e provo a dividerlo");&nbsp;<br>
+while (a ne "")<br>
+{ print ("parola:".pop(a)."\n");<br>
+};<br>
+</i></p>
+<p>'scrive tutte le parole ciascuna su una diversa linea.<br>
+</p>
+<p><b>join( separatore, lista)&nbsp;</b> Compone una stringa unendo gli
+elementi della lista e inserendo tra l' uno e l' altro il separatore
+indicato. Funziona al contrario della funzione split.&nbsp;</p>
+<p>Ad esempio:<br>
+<i>var a;&nbsp;<br>
+a=split(";", "uno;due;tre");<br>
+print join(",", a);&nbsp;<br>
+</i>Scrive uno,due,tre </p>
+<p><b><br>
+uc stringa </b>Trasforma la stringa in maiuscolo. <br>
+<i>print uc [Carlo Rossi];<br>
+</i>Scrive CARLO ROSSI&nbsp; </p>
+<p><a name="funzioni_di_gestione_carattere"></a><font color="#0000ff">-funzioni
+di gestione carattere -</font> </p>
+<p><b>asc(a) </b>torna l' ascii corrispondente al primo carattere
+della stringa a. <br>
+<br>
+<i>print asc("Test");<br>
+</i>Torna il codice ascii corrispondente alla lettera T maiuscola. <br>
+</p>
+<p><b>char(a) </b>torna il carattere corrispondente al numero indicato.<br>
+<i>print char(65); <br>
+</i>scrive il carattere di ascii 65, cioe' credo una a minuscola.<br>
+</p>
+<p><a name="funzioni_di_gestione_data"></a><font color="#0000ff">-
+funzioni di gestione data.</font> </p>
+<p><b>date</b> <br>
+Torna la data corrente nel formato "gg mm aaaa". <br>
+<i>Print "oggi: ".date()."\n";<br>
+</i>Scrive, nel mio caso "oggi 1 1 2004", dato che lavoro durante le
+ferie. Buon anno. (questo manuale e' stato aggiornato per la versione
+4.02 di ewb).<br>
+</p>
+<p><b>time</b> <br>
+Torna l'ora corrente - dalla versione 2.08.<br>
+<br>
+<i>Print "ora: ".time()."\n";<br>
+</i>Scrive nel mio caso 18:05:30, cosi' ora sapete cosa fa un
+programmatore a capodanno nel pomeriggio.<br>
+<br>
+</p>
+<p><b>lessdate (data1, data2)</b> <br>
+Confronta data1 con data2 e torna true se data1 e' minore di data2. Per
+confrontare se due date sono uguali basta un confronto di stringhe.<br>
+<br>
+<i>if (lessdate "07 01 2004", date()) { show "Sveglia! fine ferie."; };
+<br>
+</i> </p>
+<p><a name="funzione_di_shell"></a><font color="#0000ff">- funzione di
+shell</font> </p>
+<p><b>exec "comando"</b> <br>
+Esegue il comando richiesto e torna in una stringa il risultato
+del comando stesso. E' una forma un po' primitiva di esecuzione ma per
+ora accontentatevi. Al comando possono essere passati parametri o
+ridirezioni.<br>
+</p>
+<p>Esempio: <br>
+<i>exec("format c: &nbsp;&lt; echo y"); &nbsp;'non fatelo.</i></p>
+<p>Se eseguite questo codice il vostro q.i. e' basso: il vostro disco
+fisso viene infatti formattato senza richiesta di conferma. Ovviamente
+se questo viene fatto da una applicazione per il web e se il programma
+ha i diritti di farlo, il disco fisso formattato e' quello del web
+server, e il q.i. basso e' quello del vostro amministratore di sistema.<br>
+</p>
+<p><a name="funzioni_di_accesso_ai_database"></a><font color="#0000ff">-
+funzioni di accesso ai database -</font> <br>
+Dalla <font color="#ff0000">versione 2.0 </font>i nomi delle tabelle
+possono essere passati come parametri a funzioni, e quindi la libreria
+per la gestione di tabelle puo' essere estesa dall' utente, senza
+modificare il codice di easyweb.<br>
+Ad esempio, &nbsp;provate ad eseguire il seguente codice: </p>
+<p><i>table prova=nome, cognome, telefono, indirizzo;<br>
+print prova;<br>
+print "\n";<br>
+</i></p>
+<p>Il programma scrive <br>
+prova:nome:cognome:telefono<br>
+In quanto questo e' il testo contenuto all' interno della costante che
+si chiama prova, e che e' il descrittore della tabella. <br>
+</p>
+<p><b>add (tabella) </b>Aggiunge l' elemento corrente alla tabella. <br>
+Inibisce la visibilita' con la funzione in di altri elementi che
+abbiano come primo campo lo stesso valore.<br>
+Esempio: creazione della tabella utenti. <br>
+</p>
+<p><i>table utenti=user, password, datiriservati; <br>
+user=[Andrea]; password=[Aw77]; datiriservati="Ti mangi ancora le
+unghie"; <br>
+add(utenti);<br>
+user="Paolo"; password="peanuts"; datiriservati="E chi ti conosce"; <br>
+</i></p>
+<p><b>login (tabella) </b>confronta i primi due elementi della tabella
+e se
+trova un elemento valido lo torna. Se sono piu' di uno torna l' ultimo.
+<br>
+</p>
+<p><br>
+esempio (applicazione per il web):</p>
+<p><i>table utenti=user, passwd, datiriservati;<br>
+b="entra"; <br>
+ask user, passwd:password, b:submit; &nbsp;<br>
+if (login(utenti))<br>
+{ show "Accesso valido: i tuoi dati riservati sono
+".datiriservati."\n"; <br>
+};<br>
+</i></p>
+<p>Ovviamente per usarlo occorre avere inserito qualcosa all' interno
+della tabella utenti. Vedi funzione add.<br>
+<br>
+</p>
+<p><br>
+&nbsp; </p>
+<p><b>sort (tabella,campo) <font color="#ff0000">(presente dalla
+versione 1.32 in poi)</font> </b>Mette in ordine la tabella secondo il
+campo indicato. <br>
+Il nome del campo va inserito in una stringa.<br>
+es: <br>
+<i>sort utenti, "user";</i><b><i> <br>
+</i></b> &nbsp; <br>
+<b>remove (tabella) </b>cancella ogni elemento il cui primo campo
+corrisponda al corrente dalla tabella. <br>
+E' pensata per tabelle il cui primo elemento sia una chiave univoca
+della tabella stessa. <br>
+Ad esempio nella tabella<br>
+table persone=nome, cognome, telefono, etc; <br>
+"nome", che e' il primo campo, non identifica univocamente un elemento
+della tabella, in quanto potrei avere ad esempio sia Mario Rossi che
+Mario Bianchi. <br>
+Mentre nella tabella<br>
+table persone=codicefiscale, nome, cognome, telefono, etc; <br>
+il campo codicefiscale e' una chiave univoca per la tabella. <br>
+<br>
+Esempio: <br>
+<i>table utenti=user, passwd, dati; <br>
+user="Paolo";<br>
+remove(utenti);<br>
+</i></p>
+<p><b>del (tabella [,condizione]) </b><font color="red"> - Presente
+dalla versione 3.21 -<br>
+</font>cancella ogni elemento che risponda alla condizione indicata.
+Senza condizione vuota la tabella.<br>
+E' pensato per estendere l' uso del database a tabelle il cui primo
+campo non sia necessariamente chiave primaria.&nbsp;</p>
+<p>Ad esempio:<br>
+<i>table utenti=nome, cognome, telefono; <br>
+del(utenti, (nome eq "Mario") &amp;&amp; (cognome eq "Rossi")); <br>
+</i>Cancella Mario Rossi dalla tabella degli utenti. <br>
+</p>
+<p> <b>update(tabella)</b> <font color="#cc0000">- presente dalla
+ver. 3.21 - </font>modifica la riga della tabella con chiave indicata.<br>
+</p>
+<p>Ad esempio, supponiamo che il mio numero di telefono cambi da 113 a
+800900800<br>
+table&nbsp; utenti=nomecognome, telefono;<br>
+'ho messo nome e cognome insieme perche' siano chiave univoca. <br>
+nomecognome="Enrico Betti";<br>
+telefono="800900800";<br>
+update(utenti);</p>
+<p><b>lock (tabella) </b>Blocca la tabella per impedirne la lettura o
+scrittura da altri processi. Deve per forza essere sbloccata prima di
+una ask. <br>
+Per esempi e spiegazioni vedi "Concetti base del linguaggio". &nbsp; </p>
+<p><b>unlock (tabella) </b>sblocca la tabella. <br>
+Per esempi e spiegazioni vedi "Concetti base del linguaggio". &nbsp;
+&nbsp; </p>
+<p><b>var=loadtab (tabella) <font color="red">presente dalla versione
+4.01</font> <br>
+</b>carica l' intera tabella e la inserisce nella variabile, compresi
+cancelletti e "\n" <br>
+Se si utilizza il motore di database sui files, una tabella di easyweb
+non e' altro che un file di testo di piu' righe separate da "\n". <br>
+ciascuna riga contiene un elenco di valori separati dal carattere
+cancelletto "#".<br>
+Se il testo contiene caratteri cancelletto o caporiga, questi vengono
+sostituiti con un altro separatore.<br>
+</p>
+<p>Esempio:<br>
+<i><br>
+table utenti=nome, cognome, telefono; <br>
+print loadtab(utenti);<br>
+</i><br>
+Scrivera' il contenuto della tabella, ad esempio:<br>
+Enrico#Betti#113<br>
+Mario#Rossi#117<br>
+</p>
+<p>Questa funzione e' stata inserita per motivi di ottimizzazione, e
+non e'
+consigliabile utilizzarla se non e' proprio necessario.<br>
+<br>
+</p>
+<p><b>savetab (tabella, var) <font color="red"> dalla versione 4.01</font>
+</b>salva nella tabella tutti i dati contenuti nella variabile var. I
+valori precedenti sono cancellati <br>
+</p>
+<p>Esempio: <br>
+<i>table utenti=nome, cognome, telefono; <br>
+var v;<br>
+v="Enrico#Betti#17<br>
+Mario#Bianchi#113<br>
+";<br>
+savetab(utenti, v);<br>
+</i><br>
+Questa funzione e' stata inserita per motivi di ottimizzazione, e non
+e' consigliabile utilizzarla se non e' proprio necessario.<br>
+<br>
+<b>exist (tabella) </b>Torna vero se l' elemento il cui primo campo
+corrisponda esiste nella tabella o torna false.&nbsp;</p>
+<p>table utenti=nome, cognome, telefono; <br>
+nome="Enrico";<br>
+if (exist&nbsp; utenti) { print "Evviva! esisto."; };</p>
+<p><b>in (tabella [,condizione])</b> <br>
+<b>{};</b> </p>
+<p>oppure: <br>
+<b>inall (tabella [,condizione])</b> <br>
+<b>{};</b>&nbsp;</p>
+<p>Sono funzioni che servono a svolgere una ricerca all' interno della
+tabella, e permettono di operare su righe che rispettano una condizione
+di ricerca.<br>
+Ad esempio: <br>
+table studenti=matricola, nome, cognome, esame, voto; <br>
+inall (studenti, voto&gt;=18)<br>
+{ print nome." ha superato l' esame di ".esame." con voto ".voto."\n";<br>
+};<br>
+'questo primo ciclo torna i risultati di tutti gli esami con esito
+positivo per tutti gli studenti<br>
+</p>
+<p>in (studenti, voto &gt;=18)<br>
+{ print [L' ultimo esame superato da ].nome.[ e' ].esame.[ con voto
+].voto.[\n];<br>
+};<br>
+'questo torna solo le informazioni sull' ultimo esame. <br>
+'notate che il codice con le quadre e' piu' leggibile di quello con
+le virgolette.<br>
+</p>
+<p>Quello che succede nella in e non succede nella inall, e' che il
+primo elemento viene considerato come chiave della tabella, e quindi
+,nel caso esistano piu' elementi con la stessa chiave, cioe' piu'
+ionformazioni riguardanti uno studente con una stessa matricola, solo
+l' ultima di esse viene ritornata, e le precedenti vengono considerate
+come non valide.&nbsp; </p>
+<p>Volendo utilizzare come chiave primaria il primo campo della tabella
+ma avendo una chiave composta da piu' campi distinti (es:
+esame+matricola), si ricorda che si puo' inserire in una variabile, e
+quindi in un qualunque campo della tabella, una lista contenente
+entrambi i campi senza problemi. <br>
+</p>
+<p><b>Transazioni</b> <br>
+Un utente puo' bloccare piu' volte la stessa tabella. La seconda volta
+che il blocco verra' tentato, se la tabella e' gia' bloccata dallo
+stesso utente, questo sara' ignorato, mentre la prima unlock la
+sblocca. <br>
+Ogni volta che sulla tabella va effettuata una add, una remove,
+o qualunque altra operazione, la tabella viene prima di tutto bloccata.<br>
+Questo significa che un utente puo' bloccare piu' tabelle, svolgere
+su queste una serie di operazioni e poi sbloccarle. E' allora possibile
+svolgere operazioni sulla base di dati in maniera transazionale,
+liberandone
+la parte interessata solo al momento del completamento. <br>
+Per informazioni sulle transazioni, vedi "concetti base del
+linguaggio".&nbsp; <br>
+</p>
+<p><a name="funzioni_di_gestione_interfaccia_al_web"></a><font
+ color="#0000ff">- funzioni di gestione interfaccia al web -</font> </p>
+<p><b>ask variabile[:tipocampo] [, variabile [:tipocampo]] </b>Mostra
+a video un form contenente i nomi delle variabili segiti da campi di
+tipo tipocampo in cui e' inserito il valore corrente della variabile e
+puo' essere inserito un nuovo valore. <br>
+I tipocampo validi sono text, password, "submit", "textarea", "links",
+"option", "checkbox", "radio", "hidden",&nbsp; <font color="#cc0000">dalla
+versione 4.0</font> "file", e <span style="color: rgb(255, 0, 0);">dalla
+versione 5.16</span> "checks". <br>
+Vengono automaticamente inseriti come nascosti i campi contenenti tutte
+le variabili del programma al momento e la posizione di PC, in
+modo da poter riprendere da questo punto l' esecuzione al ritorno dalla
+ask. </p>
+<p>Alcuni campi di ask, come per esempio option, radio, submit, possono
+avere diversi valori. <br>
+I valori possono essere inseriti tutti nella stessa variabile separati
+da punto e virgola. <br>
+I campi di tipo option e radio permettono di mettere un asterisco(*)
+davanti ad uno dei valori per indicare quello selezionato di default. <br>
+<b>a="uno;due;tre"; ask a:option;</b> <br>
+</p>
+<form>
+  <select>
+  <option value="uno">uno </option>
+  <option value="due">due </option>
+  <option value="tre">tre </option>
+  </select>
+</form>
+<p> <b>a="uno;*due;tre"; ask a:option; '</b>(due selezionato di
+default)<br>
+</p>
+<form>
+  <select>
+  <option value="uno">uno </option>
+  <option value="due" selected="selected">due </option>
+  <option value="tre">tre </option>
+  </select>
+</form>
+<p> <br>
+La variabile torna valorizzata ad uno dei tre valori.<br>
+<br>
+</p>
+<p>Dalla versione 4.00 la ask puo' essere utilizzata anche per inserire
+dalla macchina cliente un file, in modo da fare un upload sul server. <br>
+</p>
+<p><i>var f;<br>
+ask f:file;</i> <br>
+</p>
+<form> <input type="file"> </form>
+<p>Al ritorno dalla ask, la variabile f contiene il file inserito dall'
+utente. <br>
+Una volta svolti alcuni controlli su questo file (il tipo, la
+dimensione, etc...), questo puo' essere salvato sul server. <br>
+Questo sistema si dimostra utile, ad esempio, per avere un sistema
+"user friendly" di update delle pagine su un sito web. <br>
+</p>
+<p><span style="color: rgb(255, 0, 0);">Dalla versione 5.16</span> si
+puo'chiedere una serie di checkbox a scelta multipla con ask:<br>
+a="*uno;*due;tre;quattro"; <br>
+ask a:checks;<br>
+<input type="checkbox" name="a" checked="checked">uno<br>
+<input type="checkbox" name="b" checked="checked">due<br>
+<input type="checkbox" name="c">tre<br>
+<input type="checkbox" name="d">quattro<br>
+uno e due, che hanno un'asterisco davanti, sono selezionati di default.
+<br>
+<br>
+</p>
+<p>Un caso particolare e' la ask per links. Ad esempio: <br>
+<b>a="uno;http://www.uniurb.it;tre";</b> <br>
+<b>ask a:links;</b> <br>
+Costruisce tre links a video, il primo dei quali salta al file "uno",
+il secondo al sito dell' universita' di Urbino, e il terzo al file
+"tre". <br>
+Per i links puo' essere indicato il nome (cio' che viene visualizzato)
+e il valore (dove saltare) a questo modo: <br>
+<b>a="uno:sintassi.txt;due:http://www.uniurb.it";</b> <br>
+<b>ask a;</b> <br>
+in questo caso viene visualizzato uno e due, ma si salta
+rispettivamente a sintassi.txt e a http://www.uniurb.it </p>
+<p><font color="#ff0000">Dalla versione 1.3</font> la ask permette
+anche
+di <b>indicare esplicitamente la label</b> che deve apparire a video
+assieme al campo, anziche' utilizzare il nome del campo stesso. <br>
+La sintassi e':&nbsp;</p>
+<p><b>b=[ok];</b> <b>ask a:text("Nome e cognome ? "), b:submit;</b> <br>
+Tra parentesi, dopo aver specificato il tipo del campo, puo' essere
+indicato un testo, che puo' contenere anche tags, e che appare a video
+prima del campo stesso.<br>
+</p>
+<form> <b>Nome e cognome ?</b> <input type="text"> <input
+ type="submit" name="ok" value="ok">&nbsp; </form>
+<p><b>askto url, variabile[:tipocampo] ... </b>Esegue la ask, ma il
+risultato va ad un altro programma easyweb, o ad esempio ad una normale
+cgi in
+perl o un asp. Non lo uso molto.. <br>
+<b>form variable[:tipocampo] ... </b>Crea un form con il campo
+indicato, ma anziche' chiederlo lo inserisce in una variabile. <br>
+<b>showform(variable) </b>svolge una ask con il form indicato nella
+variabile. <br>
+form e showform sono utili per modificare l'impaginazione standard di
+un programma easyweb. Dovrebbe esserci qualcosa a riguardo tra gli
+esempi.<br>
+</p>
+<p><b>Esempio:<br>
+</b><i>var a, txt, b; <br>
+b=ok;<br>
+a=form txt:text("testo");<br>
+a=a."&lt;br&gt;&lt;br&gt;&lt;br&gt;";<br>
+a=a.form b:submit;<br>
+showform a;&nbsp; <br>
+'i due input sono spaziati di tre righe<br>
+</i><b><br>
+</b></p>
+<p><b>show exp&nbsp;</b>&nbsp; mostra l' espressione indicata come
+parametro sul web, incorniciata con il template richiesto. Puo' essere
+visto come l' estensione di una print.&nbsp;</p>
+<p>Esempio:&nbsp;</p>
+<p>show "Hello world by &lt;b&gt;Easyweb&lt;/b&gt;";<br>
+Se lanciato da un browser genera una pagina html di hello world, con la
+parola easyweb in grassetto. <br>
+</p>
+<p>Esiste una variabile predefinita <b>format</b> contenente tre
+valori separati da duepunti. <br>
+Il primo di questi valori e' la larghezza di un campo di testo in
+caratteri, il secondo l' altezza (per campi di testo multiriga, come
+ad esempio le textarea), e il terzo puo' contenere h o v. <br>
+Se contiene h , le varie opzioni dei campi multivalori sono ordinate in
+orizzontale, mentre se contiene v le stesse opzioni sono ordinate in
+verticale, l' una sotto l' altra. <br>
+Il default e' <b>format="12:5:h";</b> </p>
+<p>Format puo' essere utilizzato per modificare l' impaginazione
+standard di una pagina easyweb, modificando le dimensioni e le
+posizioni l'uno rispetto all' altro dei campi di input. <br>
+</p>
+<p>Ad esempio:<br>
+b="ok;no;forse"; <br>
+ask b:submit;<br>
+b="ok;no;forse"; <br>
+format="12:5:v";<br>
+ask b:submit; <br>
+Alla prima richiesta appare a video<br>
+<br>
+</p>
+<div align="center"> </div>
+<div align="center">
+<form> <input type="submit" value="ok">&nbsp;<input type="submit"
+ value="no"> <input type="submit" value="forse"> </form>
+</div>
+<br>
+e alla seconda appare<br>
+<br>
+<div align="center">
+<form> <input type="submit" value="ok"><br>
+  <br>
+  <input type="submit" value="no"><br>
+  <br>
+  <input type="submit" value="forse"> </form>
+</div>
+<p><a name="gestione_di_liste"></a><font color="#0000ff">- gestione di
+liste -</font> <br>
+Easyweb fornisce un insieme di funzioni che permettono di utilizzare
+una variabile come una lista o come un array. </p>
+<p><b>push variabile, valore</b> <br>
+Considera la variabile come uno stack, e vi inserisce un elemento,
+cioe' il valore, che puo' essere ad esempio il risultato di un
+espressione. <br>
+La variabile deve essere vuota prima della prima push [], altrimenti
+conterra' una valore spurio. </p>
+<p>Esempio: <br>
+<i>var a; <br>
+push a, "uno"; <br>
+push a, "due";<br>
+push a, "tre"; &nbsp;<br>
+print a; <br>
+</i></p>
+<p>Scrive&nbsp; "756e6f 647565 747265" , che e' la codifica della lista
+("uno", "due", "tre"). <br>
+<b><br>
+</b></p>
+<p><b>pop variabile</b> <br>
+Recupera dalla variabile, considerata come stack, l' ultimo dei
+valori inseriti (politica lifo, la testa della lista). <br>
+Il seguente codice stampa tutti gli elementi di una lista.<br>
+</p>
+<p><i>while (a ne "")<br>
+{ print pop(a) . "\n"; <br>
+};<br>
+</i></p>
+<p>Se applicato alla lista di prima (istruzione push), il risultato e' <br>
+</p>
+<p>tre<br>
+due<br>
+uno<br>
+</p>
+<p>Cioe' gli elementi vengono estratti dalla lista in ordine inverso
+all' ordine di inserimento. </p>
+<p><b><br>
+numel variabile</b> <br>
+Torna il numero di elementi presenti nella variabile, vista come lista.<br>
+<br>
+Ad esempio:<br>
+<i>var a;<br>
+push a, "uno";<br>
+push a, "due";<br>
+push a, "tre";<br>
+print numel(a)."\n";<br>
+</i></p>
+<p>Scrive 3, che e' il numero di elementi contenuti nella lista a. <br>
+<br>
+</p>
+<p><b>setelem variabile, numero, valore</b> <br>
+Cambia il valore dell' elemento di variabile, vista questa volta come
+un array. <br>
+Se viene cambiato il valore di un elemento che passa il limite della
+dimensione della lista (o dell' array), questa viene estesa per
+contenerlo. <br>
+il numero degli elementi parte da 0. <br>
+Cosi' una lista in cui io ho aggiunto l' elemento n&deg;9, conterra'
+almeno dieci elementi, di cui alcuni possono essere la stringa nulla. </p>
+<p><i>var a;<br>
+push a, "uno";<br>
+push a, "due";<br>
+push a, "tre";<br>
+setelem a, 4, "cinque";<br>
+print numel(a)."\n"; </i> </p>
+<p>Stavolta la lista contiene cinque elementi, il cui quarto (posizione
+3) e' nullo: ("uno", "due", "tre", "", "cinque"),<br>
+</p>
+<p><b>getelem variabile numero</b> <br>
+Torna l' elemento alla posizione numero della variabile vista come
+array. <br>
+<b>&nbsp;</b>- <b>Una variabile contenente una lista puo' essere
+inserita in una lista</b> e cosi' via per ottenere strutture dati di
+una
+qualsiasi dimensione. <br>
+&nbsp;<br>
+Esempio:<br>
+<i>var a;<br>
+push a, "uno";<br>
+push b, "due";<br>
+var b;&nbsp;<br>
+push b, a;&nbsp;<br>
+push b, "tre";<br>
+'b e' una lista che contiene la lista a e l' elemento "tre"<br>
+'a e' una lista che coniene "uno", "due"<br>
+' &nbsp;( (uno, due), tre) <br>
+print getelem(b, 1)."\n"; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ' scrive "tre"<br>
+print getelem ( getelem(b, 0), 1)."\n"; &nbsp;' scrive "due" <br>
+</i></p>
+<p><a name="funzioni_per_accesso_al_motore_inferenziale"></a><font
+ color="#0000ff">- funzioni per accesso al motore inferenziale -</font>
+</p>
+<p>EasyWeb implementa un motore inferenziale, funzionante dalla
+versione
+0.8.<br>
+Questo funziona come nel linguaggio prolog classico, aparte il fatto
+che le regole possono essere raccolte in gruppi, il cui nome e' una
+stringa, ad es. "general". </p>
+<p><b>assert ( nomegruppo, regola )&nbsp;</b>&nbsp; asserisce una
+regola
+nel gruppo<br>
+Un gruppo di regole e' in realta' una tabella, quindi una volta che una
+regola e' stata asserita in un gruppo, questa e' visibile a tutte le
+applicazioni di easyweb che sfruttino quel gruppo di regole la
+vedranno.&nbsp;<br>
+<br>
+<b>retract ( nomegruppo, head_regola )&nbsp; </b>ritratta la regola,
+cioe' la cancella dal gruppo indicato. Non e' necessario indicare tutta
+la regola, ma solo il suo funtore. Studiatevi un manuale di prolog.
+&nbsp;</p>
+<p><b>goal (gruppo, richiesta)</b> <br>
+<b>{ [codice]</b> <br>
+<b>}</b> <br>
+Svolge il ciclo per tutti i possibili valori di richiesta che rendono
+vero il goal. Se il ciclo viene svolto almeno una volta torna true,
+altrimenti torna false. <br>
+</p>
+<p>Un esempio:proviamo ad indicare alcune regole, e vediamo come si
+possono utilizzare per svolgere delle operazioni. <br>
+Ad esempio indichiamo che mario e' piu' alto di gino, che luca e' piu'
+alto di mario, e che andrea e' piu' alto di gino<br>
+</p>
+<p>assert( altezza, "piualto(mario,gino).");<br>
+assert( altezza, "piualto(luca, mario).");<br>
+assert( altezza, "piualto(andrea,gino).");<br>
+<br>
+E spieghiamo all' interprete prolog che se A e' piu' alto di B e B e'
+piu' alto di C, allora A e' piu' alto di C:<br>
+</p>
+<p>assert(altezza, <br>
+"piualto(A,C):=piualto(A,B),piualto(B,C).");<br>
+</p>
+<p>Ora svolgiamo un calcolo: chiediamo al compilatore chi e' piu' alto
+di gino: <br>
+goal(altezza, "piualto(gino,X).")<br>
+{ print X."\n";<br>
+};<br>
+Se lanciamo il programma il risultato sara': <br>
+luca<br>
+mario<br>
+andrea<br>
+</p>
+<p>Quindi dalla informazione che mario e' piu' alto di gino e luca e'
+piu' alto di mario, il programma e' riuscito a decidere che luca e'
+anche piu' alto di gino. <br>
+Questo meccanismo puo' essere utilizzato per sviluppare database che
+siano in grado di rispondere a questioni semplici (chi e' piu' alto di
+gino?) , di capire regole e di svolgere, utilizzando queste regole, dei
+ragionamenti per rispondere anche a domande non direttamente pensata
+dall' autore del programma.
+<br>
+</p>
+<p><a name="funzioni_per_l_uso_delle_socket_tcp"></a><font
+ color="#0000ff">- funzioni per l' uso delle socket tcp -</font> </p>
+<p>Easyweb non e' pensato come un linguaggio per applicazioni
+inter-processo, ma permette di comunicare con altri programmi tramite
+socket TCP, o
+di costruire in maniera semplice un server. </p>
+<p>Per creare un processo client, che comunichi con un server, vanno
+usate le seguenti funzioni: <br>
+<b>sock = socket ( hostname, porta )</b> <br>
+hostname e' un indirizzo ip o nome di una macchina, porta e' la
+porta tcp a cui collegarsi. <br>
+sock contiene il numero della socket, fornito dal sistema. <br>
+<b>a = sread (sock) ;</b> <br>
+a contiene una riga letta dalla socket. <br>
+<b>swrite (sock, exp);</b> <br>
+scrive sulla socket il risultato dell' espressione exp <br>
+<b>close (sock);</b> <br>
+chiude la socket. </p>
+<p>Per creare un processo server il meccanismo e' analogo, con la
+differenza che va creata una socket di tipo server, <br>
+e si rimane su questa in attesa di una connessione. <br>
+<b>srvsock = server (porta);</b> <br>
+Trasforma il programma in un server in attesa sulla porta. <br>
+<b>sock&nbsp; = accept (srvsock);</b> <br>
+attende che un cliente si colleghi. Quando succede sock viene
+valorizzato con la socket di comunicazione con il client. <br>
+La comunicazione con il client, usando sock, e' analoga a quanto visto
+in precedenza.<br>
+<br>
+</p>
+<p>Ad esempio scriviamo un programma che stia in attesa di un messaggio
+su una socket, sulla porta 2000 della nostra macchina, che e' ad
+esempio prova.w3n.it, con indirizzo 192.168.2.3<br>
+</p>
+<p>Programma <b>"server"</b>: in attesa di fornire un servizio sulla
+porta 2000.<br>
+</p>
+<p><i>var srvsock, sock, a; <br>
+srvsock=server(2000);</i></p>
+<p><i>while (1)<br>
+{ 'ciclo ripetuto per sempre.<br>
+&nbsp; &nbsp;sock=accept(srvsock);<br>
+&nbsp;&nbsp; a=sread(sock);<br>
+&nbsp;&nbsp; print "Ho ricevuto la stringa [".a."]\n";<br>
+&nbsp; &nbsp;close(sock);<br>
+};<br>
+</i></p>
+<p>E scriviamo un programma <b>"cliente"</b> che invii un messaggio
+sulla macchina prova.w3n.it, alla stessa porta:<br>
+</p>
+<p><i>var sock;<br>
+sock=socket("prova.w3n.it", 2000);<br>
+swrite(sock, "C'e' nessiunooo ? \n");<br>
+close(sock);<br>
+</i></p>
+<p>I due programmi sono in grado di comunicare, anche se il programma
+cliente gira su una macchina diversa dal programma server.<br>
+<br>
+</p>
+<p><a name="funzioni_per_l_uso_variabili_di_ambiente"></a><font
+ color="#0000ff">- funzioni per l' uso variabili di ambiente&nbsp; -</font>
+<br>
+<font color="#ff0000">Presenti dalla versione 3.12</font> <br>
+E' possibile accedere alle variabili di ambiente fornite dal server
+come l'ip del client che si collega (per permettere l'accesso solo a
+coloro che sono autenticati). </p>
+<p>Le funzioni utilizzabili sono : </p>
+<p><b>getenvvar("VARNAME")</b> ; <br>
+Per ottenere il valore della variabile di ambiente <b>VARNAME</b>&nbsp;</p>
+<p>Ad esempio: <br>
+<i><br>
+print getenvvar("HOSTNAME")."\n";<br>
+</i><br>
+torna il nome della macchina (non su windows) su cui il programma
+gira.. <br>
+</p>
+<p><b>getremoteaddress();</b> <br>
+Per ottenere l'indirizzo ip remoto del client collegato (Equivale a
+getenvvar("REMOTE_ADDR");) </p>
+<p>Ad esempio <br>
+show "La macchina che apre questa pagina web ha indirizzo
+".getremoteaddress();<br>
+</p>
+<p><b>getquerystring();</b> <br>
+Per ottenere le variabili passate sulla linea di comando dal browser
+(Es. : pippo.cgi?nome=pincopallino)&nbsp; (Equivale a
+getenvvar("QUERY_STRING");) <br>
+&nbsp; </p>
+<p> </p>
+<hr><br>
+<a name="Il_meccanismo_one-action_web"></a><b>Il meccanismo one-action
+web</b>
+<p>In pratica e' il meccanismo con cui una sola pagina ewb e' in
+realta'
+un server che risponde a parecchie richieste http, anche contemporane,
+e
+per ciascun utente mantiene una sessione dimodoche' le richieste
+seguano
+un ordine logico analogo a quello di un programma con un singolo flusso
+di
+esecuzione. <br>
+E' comunque da ricordare che il risultato non e' in realta' un
+programma a singolo flusso di esecuzione, anche quando viene usato da
+un singolo utente. Il linguaggio quindi prevede meccanismi impliciti
+per gestire la concorrenza di tabelle, e qualcosa di analogo va fatto
+per la gestione ad esempio di files. <br>
+Il meccanismo viene implementato traducendo un programma ewb in
+un codice perl piuttosto complesso, con piu' punti di entrata, ciascuno
+in corrispondenza di una ask, ed un' area iniziale di recupero
+variabili e salto. </p>
+<p>ad ogni lancio della cgi in perl, si controlla una variabile del
+form: Questa variabile contiene come informazione la posizione a cui
+saltare per riprendere l' esecuzione. <br>
+Lo stesso form contiene anche come nascoste tutte le variabili gia'
+esistenti al momento della ask. <br>
+Questo significa che tutte le variabili dell' esecuzione corrente
+vengono ripristinate al ritorno dalla ask, e si puo' riprendere dalla
+riga successiva, indipendentemente da quanto tempo sia trascorso dall'
+operazione precedente, mentre in linguaggi come asp la sessione scade
+dopo un tempo limitato.&nbsp;
+<br>
+I cicli vengono tutti sostituiti con istruzioni di salto condizionato
+per non avere problemi con lo stack al ritorno dalla ask. Il codice
+compilato e' costruito con una complessa struttura a stack in modo da
+poter annidare ask e cicli.&nbsp; </p>
+<p> </p>
+<hr> <br>
+<a name="Gestione_dell_interfaccia_al_web"></a><b>Gestione dell'
+interfaccia al web.</b> <br>
+<br>
+la gestione di interfaccia e' sicuramente piu' limitata che con
+i programmi sviluppati in perl e libcgi. <br>
+E' comunque possibile spedire i dati al cliente dopo averli
+"impacchettati" con un template grafico utilizzando l' istruzione
+template. E' possibile utilizzare come template sia una stringa
+indicata esplicitamente sia
+un file caricato dall' esterno. <br>
+Il template deve contenere un tag nullo "&lt; &gt;" che viene tagliato
+e sostituito dal codice del form o dei forms, e va semplicemente
+inserito nella variabile predefinita "template". <br>
+Il template puo' essere modificato, come codice html, &nbsp;se viene
+costruito con l' istruzione form. <br>
+Ancora, la grafica dell' applicazione easyweb puo' essere modificata
+agendo sulla variabile predefinita format, che cambia la forma e la
+distribuzione dei campi di richiesta a video. <br>
+<hr><a name="Preprocessore"></a> <br>
+<b>Il preprocessore di EasyWEB</b> <br>
+<br>
+Easyweb implementa un preprocessore analogo a quello del linguaggio C,
+anche se ridotto. <br>
+Le direttive permesse per un programma ewb sono #include, #define,
+#ifdef, #ifndef
+<p><b>#include</b> permette di inserire all' interno di un programma
+EasyWEB delle funzioni prese da un altro file. <br>
+Puo' essere usato in due modi: con un file che si trova nella stessa
+cartella del programma o in un percorso specificato, o con un file che
+si trova nella directory delle librerie di EasyWeb. <br>
+La directory predefinita per le librerie di EasyWEB e' "/lib/ewb". <br>
+<b>#include &lt; libreria.ewb &gt;</b> cerca la libreria nella cartella
+/lib/ewb/. <br>
+<b>#include " libreria.ewb "</b> cerca la libreria nella directory
+corrente. </p>
+<p><b>#define</b> permette di definire delle variabili di
+preprocessore,
+e di dargli un valore con cui possano essere sostituite all' interno
+del
+codice. </p>
+<p><b>#define value 15</b> <br>
+<b>print value * 2; ' scrive trenta.</b> </p>
+<p>La define puo' essere utilizzata per costruire del codice
+condizionale, dipendente ad esempio dal sistema operativo su cui il
+programma dovra' girare.&nbsp;</p>
+<p><b>#define windows</b> <br>
+<b>..</b> <br>
+<b>#ifdef windows</b> <br>
+<b>codice per wincozz</b> </p>
+<p><b>#else</b> <br>
+<b>codice per gli altri sistemi</b> </p>
+<p><b>#endif</b> <br>
+&nbsp; <br>
+&nbsp; <br>
+</p>
+<hr width="100%" size="2">Spero che qualcuno di voi sia arrivato a
+leggere fino a qui. Se si spero che questo linguaggio vi sia utile,
+come lo e' stato a me. <br>
+Buon lavoro<br>
+<br>
+Enrico Betti - 1 gennaio 2004. <br>
+<br>
+</body>
+</html>

@@ -1,0 +1,15 @@
+sub hex(a)
+{ var b; 
+  while (a>0)
+  { var t=a%16; 
+    if (t<10) { b=b.t; };
+    if (t==10) { b=b.[A]; };
+    if (t==11) { b=b.[B]; };
+    if (t==12) { b=b.[C]; };
+    if (t==13) { b=b.[D]; };
+    if (t==14) { b=b.[E]; };
+    if (t==15) { b=b.[F]; }; 
+
+    a=int a/16;
+  }; 
+}

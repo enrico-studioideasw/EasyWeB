@@ -1,0 +1,5 @@
+var a; 
+a=input; 
+print "a is "; 
+print a; 
+print "\n"; 

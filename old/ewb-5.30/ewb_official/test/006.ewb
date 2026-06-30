@@ -1,0 +1,10 @@
+'gestione condizionali
+var a; a=0;
+if (a>0){ print a."\n";
+}
+elseif (a==0)
+{ print "zero.\n";
+}
+else
+{ print 0-a." inv\n";
+};

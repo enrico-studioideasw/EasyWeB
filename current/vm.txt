@@ -1,0 +1,53 @@
+Con amethist 6 ho sbagliato: ho fatto una macchina virtuale troppo classica e quindi difficile da gestire.
+Il segreto per un compilatore semplice è una macchina virtuale complessa.
+Proviamo..
+
+
+stack:contiene indirizzi, stringhe, aray di stringhe.
+istruzioni: sono una lista di strighe primitive, stringhe con parametri. 
+SP - stack pointer
+PC - program counter - un passo, un istruzione.
+A  - accumulatore, serve sempre.
+
+PC   SP   stack=[], symbol table=[]
+      EP0:
+-- dataset utenti=ut_user, pw_passwd, datiriservati;
+1    0    addsymtable "utenti", SP         
+2    1    push ""
+3    1    addsymtable "utenti.ut_user", SP 
+4    2    push ""
+5    2    addsymtable "utenti.pw_password", SP 
+6    3    push ""  
+7    3    addsymtable "utenti.datiriservati", SP 
+8    4    push ""  
+
+-- var b="entra";
+9    4    addsymtable "b", SP
+10   5    push "entra"
+-- ask ut_user, pw_passwd:password, b:submit;  
+11   5    startForm 
+12   5    addToForm "ut_user",""
+13   5    addToForm "pw_password", "password"
+14   5    addToForm "b", "submit"
+15   5    sendFormAndStop [PC + 1]
+[ invia in form multipart, il form, entry point PC+1 e anche lo STACK] 
+
+EP1:
+-- if (login("utenti"))
+16   5    A=findField "ut_", "utenti" 
+17   6    A=getvalue(A) -> cerca la prima corrispondenza del nome in stack. Solo se specificato usa il prefisso.
+18   7    push A    
+16   6    findField  "pw_",  "utenti"
+17   6    A=getvalue(A)
+18   7    push A    
+19   7    push PC+2 
+20   7    jmp login  <-- login è definita in termini di microcodice e chiamata con lo stack.
+21   7    jz *after001*
+-- { show "Accesso valido: i tuoi dati riservati sono ".datiriservati."\n";
+21   l7   A="Accesso valido: i tuoi dati riservati sono "
+22   17   A=A + getvalue(datiriservati) 
+23   17   A=A + "\n"; 
+24   17   echo 
+-- };     fine ciclo, è il seguito di if() ..  *after001* diventa PC+1 
+25   17   end 
+

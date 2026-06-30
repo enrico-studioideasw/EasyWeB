@@ -1,0 +1,73 @@
+'indice alla documentazione di easyweb, con supporto multilingua.
+'dalla 5.0 la stessa documentazione potrà essere utilizzata con lingue diverse.
+
+var default, lingua;
+default="Italiano";
+lingua="";
+var pagina;
+
+'qui leggo da query string lingua e pagina
+var k; k=getquerystring();
+
+
+k=split("&", k);
+pagina=pop k;
+lingua=pop k;
+if (lingua eq "") { lingua=default; };
+if (pagina eq "") { pagina="indice.html"; };
+print "<meta Lingua=".lingua." pagina=".pagina.">\n";
+'qui mostro i flag di lingua.
+print [<div align=right>];
+print [&nbsp;<a href="./index.cgi?Italiano&].pagina.["><img src=it.gif border=0></a>];
+print [&nbsp;<a href="./index.cgi?English&].pagina.["><img src=en.gif border=0></a>];
+print [</div>];
+
+
+var a, b;
+a=load pagina;
+
+'qui inserisco la versione corrente
+var ver;
+exec "diamond -v > tmp";
+ver=load "tmp";
+a=change(ver, "<VER>", a);
+
+if (lingua eq "Italiano")
+{ 'mostro tutte le parti di pagina contenenti un riferimento italiano
+  'sostituisco i links
+  'spezzo e tolgo <eng></eng>
+  'spezzo e tolgo <frn></frn>
+  var i, ok, k;
+  ok=1; b="";
+  for (k=0, k<len(a), k=k+1)
+  {
+    if (mid(a, k, 5) eq "<eng>") {ok=0};
+    if (mid(a, k, 6) eq "</eng>") {ok=1};
+    if (mid(a, k, 5) eq "<frn>") {ok=0};
+    if (mid(a, k, 6) eq "</frn>") {ok=1};
+    if (ok == 1) { b=b.mid(a, k, 1); };
+  };
+};
+if (lingua eq "English")
+{ 'mostro tutte le parti di pagina contenenti un riferimento italiano
+  'sostituisco i links
+  'spezzo e tolgo <ita></ita>
+  'spezzo e tolgo <frn></frn>
+  var i, ok, k;
+  ok=1; b="";
+  for (k=0, k<len(a), k=k+1)
+  {
+    if (mid(a, k, 5) eq "<ita>") {ok=0};
+    if (mid(a, k, 6) eq "</ita>") {ok=1};
+    if (mid(a, k, 5) eq "<frn>") {ok=0};
+    if (mid(a, k, 6) eq "</frn>") {ok=1};
+    if (ok == 1) { b=b.mid(a, k, 1); };
+  };
+};
+
+'qui devo modificare i liks perche' passino attraverso index.cgi 
+'credo di avere la necessità di fare dei chdir. 
+
+
+print b."\n"; 
+

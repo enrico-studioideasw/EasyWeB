@@ -1,0 +1,8 @@
+var a=-3;
+print a;
+print "\n"; 
+if (a>0 ) { print "pos\n"; }; 
+if (a>=0) { print "poszero\n"; }; 
+if (a==0) { print "zero\n"; }; 
+if (a<0 ) { print "neg\n"; }; 
+if (a<=0) { print "negzero\n"; }; 

@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+#linker per generare ewb a partire dai componenti.
+#nel codice perl si puo' usare <<filename>> per fare riferimento
+#ad un'altro file
+#faro' lo stesso per le librerie. Comodo.
+
+my $curr="";
+sub addfile($)
+{ my $name=$_[0];
+  printf STDERR "Linking $name\n";
+  if ($name eq "")
+  {return 0;};
+  if (!(open iif, "<".$name))
+  { print STDERR "Errore
+File ($name) non trovato in genfile 
+";
+  return(-1);
+  };
+  $curr=$name;
+  my @file=<iif>;
+  foreach $line(@file)
+  { my $a=$line;
+    while (substr($a, 0, 1) eq " ")
+    { $a=substr($a,1); 
+    };
+    if (substr($a, 0, 2) eq "<<")
+    { my $b=substr($a, 2); 
+      my $fname=((split(">>", $b))[0]);
+      if ($fname eq "")
+      { print STDERR "Errore
+Errore di sintassi in genfile:
+$a";
+        return (-1);
+      }; 
+      if (addfile($fname) <0)
+      { print "Origine: $name\n";
+        exit(-1);
+      };
+    }
+    else
+    { if ((substr($a, 0, 1) ne "#") ||(substr($a,0,2) eq "#!"))
+      { print $line;
+      };
+    };
+  };
+  return 0;
+};
+
+
+if (($ARGV[0] eq "")||($ARGV[1] ne ""))
+{ print "Genfile Linker ver. 0.1
+Uso Genfile nomefile.p > destinazione
+
+Lanciate Make.. ci pensa lui. 
+";
+};
+
+addfile($ARGV[0]);
+print STDERR "Terminato\n";

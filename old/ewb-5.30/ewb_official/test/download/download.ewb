@@ -1,0 +1,8 @@
+var filec;
+
+' scrivo l'header per mandare un file
+' print "Content-type: text/html\n\n";  
+print "Content-type: application\n";  
+print "Content-Disposition: attachment; filename=downloaded.pdf\n\n"
+filec = load "frecce136.psa";
+print filec;

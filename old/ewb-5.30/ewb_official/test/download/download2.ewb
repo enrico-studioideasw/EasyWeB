@@ -1,0 +1,4 @@
+
+' scrivo l'header per mandare un file
+' print "Content-type: text/html\n\n";  
+print "Location: frecce136.psa\n\n";

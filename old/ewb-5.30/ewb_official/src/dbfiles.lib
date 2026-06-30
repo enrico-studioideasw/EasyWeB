@@ -1,0 +1,846 @@
+#!/usr/bin/perl
+my @EWlocked;
+use IO::Socket;
+my @fltype;
+my $EWB_tabpath="./";
+my $EWB_template="<html><body bgcolor=lightyellow><div align=center><></body></html>";
+my $EWB_format="12:5:h";
+my $EWB_sqldbase="";
+my $EWB_sqlserver="";
+srand(time());
+my $PROGRAM_NAME;
+{ my @a=split('/', $0);
+  $PROGRAM_NAME=$a[$#a];
+}
+my $rlist="";
+
+sub read_form_buffer()
+{ my $b=$ENV{"CONTENT_LENGTH"};
+  my $all=""; my $i;
+  for ($i=0; $i<$b;)
+  { $all=$all.<>;
+    $i=length($all);
+  };
+  my $boundary=((split("\n", $all))[0]);
+  my @all=split($boundary, $all);
+  $i=0;
+  foreach $p(@all)
+  {
+    my ($a, $first)=(split("\n", $p));
+    ($a, $b)=split(" name=\"", $first);
+    if ($b ne "")
+    { my $name;
+      ($name, $b)=split("\"", $b);
+      $parname[$i]=$name;
+      if (index($first, " filename=\"")<0)
+      { my $rest;
+          $rest="";
+          for($k=4; $k<=(split("\n", $p)); $k++)
+          { $rest=$rest.( (split("\n", $p))[$k]);
+          };
+        if ( ($rest) eq "")
+        {
+          $parvalue[$i]=((split("\n", $p))[3]);
+	  $parvalue[$i]=substr($parvalue[$i], 0, length($parvalue[$i])-1);
+	  $fltype[$i]="text";
+          if (substr($parvalue[$i],0, length("HidDenFieldDaTa")) eq
+                  ("HidDenFieldDaTa"))
+          { $parvalue[$i]=fromasc(substr($parvalue[$i],length("HidDenFieldDaTa")));
+          };
+        }
+        else
+        { my $k;
+          $parvalue[$i]="";
+          for($k=3; $k<=(split("\n", $p)); $k++)
+          { $parvalue[$i]=$parvalue[$i].( (split("\n", $p))[$k])."\n";
+          };
+	  $parvalue[$i]=substr($parvalue[$i], 0, length($parvalue[$i])-2);
+        };
+        $i++;
+
+      } else
+      { #cerco il content_type
+        $fltype[$i]="file";
+        my $ctype=((split("\n", $p))[2]);
+	$ctype=substr($ctype, 0, length($ctype)-1);
+	#print "Ctype: [$ctype]\n";
+        $parvalue[$i] = "";
+	if (substr(uc($ctype), 0, length("Content-type: "))  eq "CONTENT-TYPE: ")
+	{ #trasferimento file di testo.
+	  my @p=split("\n", $p);
+	  $p[0]=""; $p[1]=""; $p[2]=""; $p[3]="";
+	  $partype[$i]=substr($ctype, length("Content-type: "));
+	  #printf("partype: $partype[$i]\n");
+	  $parvalue[$i]=join("\n", @p);
+	  $parvalue[$i]=substr($parvalue[$i], 4);
+          $parvalue[$i]=substr($parvalue[$i], 0, (length($parvalue[$i])-1));
+	}
+        $i++;
+      }
+    }
+  }
+
+  my  $p, $r, $fn; my $cnp=0;
+  my @pnm; my  @pvl;
+  foreach $p(@parname)
+  { $fn=0;
+    my $cni=0;
+    foreach $r(@pnm)
+    { if  ($p eq $r)
+       { $pvl[$cni]=$pvl[$cni].";".$parvalue[$cnp];
+	 $fn=1;
+       };
+       $cni++;
+    };
+    if ( $fn==0 )
+    { $pnm[$#pnm+1]=$p;
+      $pvl[$#pvl+1]=$parvalue[$cnp];
+    };
+    $cnp++;
+  };
+  @parname=@pnm;
+  @parvalue=@pvl;
+
+  my $p; my $cnt=0;
+  my  @pv; my @tohide; my  @hideval;
+  foreach $p(@parname)
+  { if (substr($p, 0, length("EWcHECK_")) eq  "EWcHECK_")
+    { $p=substr($p, length("EWcHECK_"));
+      my $n=int($p);
+      $p=substr($p, length($n));
+
+      my $fnd=0;
+      for ($n=0; $n<=$#tohide; $n++)
+      { if ($p eq $tohide[$n])
+        { $fnd=1;
+          $hideval[$n]=$hideval[$n].";".$parvalue[$cnt];
+        };
+      };
+      if ($fnd!=1)
+      { $n=$#tohide+1;
+        $tohide[$n]=$p;
+        $hideval[$n]=$parvalue[$cnt];
+      };
+    };
+    $cnt++;
+  };
+  $cnt=0;
+  foreach $p(@tohide)
+  { my $a;
+    my $ctb=0;
+    foreach $a(@parname)
+    { if ($a eq $p) { $parvalue[$ctb]=$hideval[$cnt]; }
+      $ctb++;
+    }
+    $cnt++;
+  };
+}
+
+sub checkpath()
+{ my $a=$EWB_tabpath;
+  if (substr($a,length($a)-1,1) ne "/")
+  { $a=$a."/";
+  }; return $a;
+};
+
+sub EWconv($)
+{ my $a=$_[0];
+  $a=join("%3C", split("%253C", $a));
+  $a=~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C",hex($1))/eg;
+  $a=join("
+", split("%0A", $a));
+  $a=join("	", split("%09", $a));
+  $a=join("\"", split("%22", $a));
+  $a=join("<", split("%3C", $a));
+  return $a;
+}
+
+sub get_par($)
+{ my ($name)=@_;
+  my $res="";
+  my $n; my $i=0;
+  foreach $n(@parname)
+  { if ($name eq EWconv($n))
+    { if ($fltype[$i] ne "file") { $res=EWconv($parvalue[$i]); }
+      else { $res=$parvalue[$i]; };
+    };
+    $i++;
+  };
+  return $res;
+};
+
+sub EWload($)
+{ open iif,"<".$_[0];
+  my $a=join("",<iif>);
+  close iif;
+  return $a;
+}
+sub EWloaddir($)
+{ my $a=""; my $el;
+  my @f;
+  if (opendir(dirr, $_[0]))
+  { @f=readdir(dirr);
+    foreach $el(@f)
+    { $a=$a.toasc($el)." "; };
+  }
+  return $a;
+}
+sub EWsave($$)
+{ my ($a, $b)=@_;
+  my $r;
+  $r = open oof, "> $a";
+  if (!$r) { print "File di save non scrivibile. Controllare i permessi"; exit(0); };
+  print oof $b;
+  close oof;
+  return $r;
+}
+sub EWgetenvvar($)
+{
+  my $r;
+  $r= $ENV{$_[0]};
+  return $r;
+}
+
+sub tab_islock($)
+{ my $name=$_[0];
+  my $l; my $r=0;
+  foreach $l(@EWlocked)
+  { if ($l eq $name) {$r=1;}
+  } return $r;
+}
+sub tab_wlock($)
+{ my $name=$_[0];
+  $name=((split(":", $name))[0]);
+  my $i; my $d=0;
+  if (!tab_islock($name))
+  { while (($i<10)&&($d==0))
+    { if (!(open (III, "< ".checkpath()."TB".$name.".lck")))
+      { if (!(open (OOO, "> ".checkpath()."TB".$name.".lck")))
+        { print  "Attenzione: non posso creare files.\n";
+          exit(0);
+        };
+        close OOO;$d=1;
+      }
+      else
+      { close III; sleep (1); $i++;
+      }
+    }
+  }
+  push @EWlocked, $name;
+}
+sub tab_unlock($)
+{ my $name=$_[0];
+  $name=((split(":", $name))[0]);
+  my @a; my $l;
+  my $count=0;
+  foreach $l(@EWlocked)
+  { if (($l ne $name) || ($count>0)) { push @a,$l; }
+    if ($l eq $name) {++$count; };
+  }
+  @EWlocked=@a;
+  if ($count=1) { unlink(checkpath()."TB".$name.".lck"); };
+}
+
+sub tab_del($$)
+{ my ($n,$k)=@_; my $r=""; my $l;
+  tab_wlock($n);
+  open III,"< ".checkpath().".TB$n.tab";
+  my @a=(<III>); close III;
+  open oof,"> ".checkpath().".TB$n.tab";
+  foreach $l(@a)
+  {
+    if (substr($l,length($l)-1,1) eq "\n")
+    {  $l=substr($l, 0, length($l)-1);
+    }
+    if ( ((split("#",$l))[0]) eq delchar($k))
+    { $r=1;}
+    else
+    { print oof $l."\n";
+    }
+  }
+  close oof; tab_unlock($n); return $r;
+}
+sub tab_exist($$)
+{ my ($n,$k)=@_;
+  tab_wlock($n);
+  open III,"< ".checkpath().".TB$n.tab";
+  my $l; my @r;
+  foreach $l(<III>)
+  { #tolgo da $l il caporiga, o non funziona la exist.
+    if (substr($l,length($l)-1,1) eq "\n")
+    {  $l=substr($l, 0, length($l)-1);
+    }
+    if ( ((split("#",$l))[0]) eq delchar($k))
+    { my $a;
+      @r=();
+      foreach $a(split("#",$l))
+      { push @r, addchar($a);
+  } } }
+  close III; tab_unlock($n); return @r;
+}
+sub tab_sort($$)
+{ my ($name,$s)=@_; my $r=""; my $l;
+  my $n=((split(":",$name))[0]);
+  $name=substr($name,length($n)+1);
+  my $p; my $c=0;
+  foreach $p(split(":",$name))
+  { if ($p eq $s) { $k=$c; };
+    $c++;
+  }
+  my @b; $c=0;
+  tab_wlock($n);
+  open III,"<".checkpath().".TB$n.tab";
+  my @a=(<III>); close III;
+  foreach $p(@a)
+  { my $t;
+    my @p=split("#",$p);
+    $t=$p[0];
+    $p[0]=$p[$k];
+    $p[$k]=$t;
+    $b[$c]=join("#",@p);
+    $c=$c+1;
+  }
+  @b=sort(@b);
+  $c=0;
+  foreach $p(@b)
+  { my $t;
+    my @p=split("#",$p);
+    $t=$p[0];
+    $p[0]=$p[$k];
+    $p[$k]=$t;
+    $a[$c]=join("#",@p);
+    $c=$c+1;
+  }
+  open oof,"> ".checkpath().".TB$n.tab";
+  foreach $l(@a)
+  { print oof $l;
+  }
+  close oof; tab_unlock($n); return $r;
+}
+sub tab_read($)
+{ #esegue la lettura di una tabella gia bloccata.
+  my @t=split(":", $_[0]);
+  open III,"< ".checkpath().".TB$t[0].tab";
+    my $k=join("",<III>);
+    my @r=split("\n",$k);
+  close III;
+  return @r;
+};
+sub tab_save($$)
+{ #esegue la scrittura di una tabella gia bloccata.
+  my @t=split(":", $_[0]);
+  open III,"> ".checkpath().".TB$t[0].tab";
+     print III $_[1]."\n";
+  close III;
+};
+
+sub tab_login($$$)
+{ my ($n,$k,$p)=@_;
+  my @r; my @a=tab_exist($n,$k);
+  if ($a[1] eq $p) { @r=@a; }
+  return @r;
+}
+sub delchar($)
+{ my $a=join("<EWB_ASTErISCO>",split "#", $_[0]);
+  $a=join("<EWB_LineFEEd>", split(chr(0x0D), $a));
+  return join("<EWB_CARRIaGErETURN>", split("\n", $a));
+}
+sub addchar($)
+{ my $a=join("#",split "<EWB_ASTErISCO>", $_[0]);
+  $a=join(chr(0x0D),split("<EWB_LineFEEd>", $a));
+  return join("\n", split("<EWB_CARRIaGErETURN>", $a));
+}
+sub CreateForm
+{ #nomecampo, valore, tipo campo, nome a video
+  my ($n,$v,$t,$vidname)=@_;
+  if ($t eq "hidden")
+  { #conversione di un campo hidden, analoga a push
+    $v="HidDenFieldDaTa".toasc($v);
+  }
+  else
+  { if (($t ne "textarea")&&($t ne "info"))
+    { $v=join("%22", (split "\"", $v));
+      $v=join("%09", (split "\t", $v));
+      $v=join("%0A", (split "\n", $v));
+      $v=join("%3C", (split "<", $v));
+    };
+  };
+  my @f=split(":", $EWB_format);
+  if ($f[0]<1) {$f[0]=12; };
+  if ($f[1]<1) {$f[1]=5; };
+
+  my $res;
+  my $vn=$vidname;
+  if (length($vidname) <2) { $vidname=$n; };
+  $res="<table border=0><tr><td>$vidname</td><td>";
+
+  if (($t eq "submit") && (length($vn)<2)) { $res="<table border=0><tr><td></td><td>"; };
+  if ($t eq "file")
+  { $res=$res."<input name=\"$n\" value=\"\" type=file>"; }
+  if ($t eq "text")
+  { $res=$res."<input name=\"$n\" value=\"$v\" size=".$f[0].">"; }
+  if ($t eq "password")
+  { $res=$res."<input name=\"$n\" type=password value=\"$v\" size=".$f[0].">"; }
+  if ($t eq "hidden")
+  { $res="<input name=\"$n\" type=hidden value=\"$v\">"; }
+  if ($t eq "checkbox")
+  { $res=$res."<input name=\"$n\" type=checkbox value=\"1\">"; }
+  if ($t eq "info")
+  { $res="<table border=0><tr><td><b> $v </b>"; }
+  if ($t eq "textarea")
+  { $res=$res."<textarea name=\"$n\" cols=".$f[0]." rows=".$f[1].">$v</textarea>"; }
+  if ($t eq "option") { $res=$res."\n<select name=\"$n\">"; }
+  if ($t eq "options") { $res=$res."\n<select name=\"$n\" multiple>"; }
+  my @v=split(/;/,$v); my $p;
+
+  if ($t eq "checks")
+  { $res=$res."<input name=\"$n\" type=hidden value=\"\">\n";
+  }
+
+  my $sep; if ($f[2] eq "v") { $sep="<br>"; } else{ $sep=" &nbsp; "; };
+  my $counter=0;
+  foreach $p(@v)
+  {
+    if ($t eq "checks")
+    { my $CV="";
+      if (substr($p, 0, 1) eq  "*")
+      { $p=substr($p, 1);
+        $CV="checked";
+      };
+      $res=$res."<input name=\"EWcHECK_".$counter.$n."\" type=checkbox $CV value=\"$p\">$p $sep\n";
+      $counter++;
+    }
+    if ($t eq "links")
+    {  my ($vid,$dest)=split("->", $p);
+       if ($dest eq "") { $dest=$vid; };
+       $res=$res."<a href=\"$dest\">$vid</a>$sep"; }
+    if ($t eq "radio")
+    { if ( substr($p,0,1) eq "*")
+      { $p=substr($p,1);
+        $res=$res."<input type=radio name=\"$n\" value=\"$p\" checked>$p$sep";
+      }
+      else
+      { $res=$res."<input type=radio name=\"$n\" value=\"$p\">$p$sep";
+      };
+    }
+    if (($t eq "option") || ($t eq "options"))
+    { if ( substr($p,0,1) eq "*")
+      { $p=substr($p,1);
+        $res=$res."<option value=\"$p\" selected>$p";
+      }
+      else
+      { $res=$res."<option value=\"$p\">$p";
+      };
+     }
+    if ($t eq "submit")
+    { $res=$res."<input name=\"$n\" type=submit value=\"$p\">$sep"; }
+  }
+  if (($t eq "option")||($t eq "options")) { $res=$res."</select>"; }
+  if ($t ne "hidden") { $res=$res."</td></tr></table>"; }
+  return $res."\n";
+}
+
+sub toasc($)
+{ my $a=$_[0];
+  my $r; my $i;
+  for($i=0; $i<length($a); $i++)
+  { my $k=ord(substr($a,$i,1));
+    if ($k<16) {$r=$r."0";};
+    $r=$r.sprintf("%x",$k);
+  } return $r;
+}
+sub fromasc($)
+{ my $a=$_[0];
+  my $r; my $i;
+  for($i=0; $i<length($a); $i=$i+2)
+  { $r=$r.chr(hex(substr($a,$i,2)));
+  } return $r;
+}
+sub stpop($)
+{  my @a=split(/ /,$_[0]);
+   $res=$a[$#a];
+   $_[0]=substr($_[0],0,length($_[0])-(length($res)+1));
+   return fromasc($res);
+}
+sub getelem($$)
+{  my @a=split(/ /,$_[0]);
+   $res=fromasc($a[$_[1]]);
+   return $res;
+}
+sub setelem($$$)
+{ my @a=split(/ /,$_[0]);
+  $a[$_[1]] =toasc($_[2]);
+  $_[0]=join(" ",@a);
+}
+
+sub EWsplit($$)
+{ my $a=""; my $p;
+  foreach $p(split( $_[0], $_[1]))
+  { $a=$a.toasc($p)." ";
+  } return $a;
+}
+
+sub EWjoin($$)
+{ my @a;
+  foreach $p(split(/ /,$_[1]))
+  { @a[$#a+1]=fromasc($p); }
+  return join($_[0],@a);
+}
+
+sub EWsocket($$)
+{ my $remote= IO::Socket::INET->new( proto => "tcp",
+                                     PeerAddr => $_[0],
+                                     PeerPort => $_[1]);
+  if ($remote) { $remote->autoflush(1); };
+  return $remote;
+}
+sub EWserver($$)
+{ my $remote= IO::Socket::INET->new( Proto => "tcp",
+                                     Localport => $_[0],
+                                     Listen => 5,
+                                     Reuse => 1);
+  return $remote;
+}
+
+sub EWaccept($)
+{ my $client= ($_[0])->accept();
+  $client->autoflush(1);
+  return $client;
+}
+sub EWsread($)
+{ my $a=$_[0];
+  $a=<$a>; 
+  return $a;
+}
+
+sub funtore($)
+{ #torna la parte della stringa composta di caratteri a..z, A..Z, 1..9, _
+  my $l=$_[0];
+  my $a;
+  my $r;
+  for ($a=substr($l,0,1);
+        ( ((uc($a) ge "A") && (uc($a) le "Z")) || (($a ge"0") &&  ($a le "9")) || ($a eq "_") || 
+($a eq "~"));
+        $a=substr($l,0, 1) )
+        { $r=$r.$a;
+           $l=substr($l,1);
+        };
+  return $r;
+}
+sub parsepart($)
+{ #torna il funtore seguito dall' eventuale aperta parentesi,e da
+  my $l=$_[0];
+  my $a;
+  my $r = funtore $l;
+  $l=substr($l,length($r));
+  if (substr($l,0,1) eq "(")
+  { #conteggio di parentesi.. avere una macchina di touring..
+     my $cp=1; $l=substr($l,1);
+     $r=$r."(";
+     for($a=substr($l,0,1); $cp>0; $a=substr($l,0,1) )
+     { $l=substr($l,1);
+        if (($l eq "")&&($cp>1)) {die "$cp fine stringa inaspettato.";};
+        if ($a eq "(") {$cp++};
+        if ($a eq ")") {$cp--; };
+        $r=$r.$a;
+     }
+  }
+  return $r;
+}
+sub isvariable($)
+{ my $a=substr($_[0],0,1);
+  return (($a ge 'A') && ($a le 'Z')) || ($a eq "_");
+}
+
+sub varassign($$$)
+{ #ricorda l' associazione nome=valore.
+  my ($a,$b, $vars)=@_;
+  if ($a ne $b)
+  { my $n=$a."#".$b;
+    $vars=$vars.$n."\n";
+    $_[2]=$vars;
+  }
+}
+sub varval($$)
+{ #legge il valore di una variabile.
+  my ($a, $vars)=@_;
+  my $l;
+  my @vars=split("\n",$vars);
+  my $res="<Null>";
+  foreach $l(@vars)
+  { my($name,$val)=split("#",$l);
+    if ($name eq $a) {$res = $val;};
+  }
+  my $aa=substr($res,0,1);
+  if ((($aa ge "A") && ($aa le "Z")) || ($a eq "_"))
+  { $res=varval($res,$vars);
+  }
+  return $res;
+}
+sub match($$$)
+{my ($clausea,$clauseb, $vars)=@_;
+  my $a=funtore $clausea;
+  my $az=parsepart $clausea;
+  $clausea=substr($clausea, length($a));
+  my $b=funtore $clauseb;
+  my $bz=parsepart $clauseb;
+  $clauseb=substr($clauseb, length($b));
+  my $res="";
+
+  if (!isvariable($a) && !isvariable($b))
+  { #devono corrispondere i funtori e matchare gli argomenti.
+    if ($a eq $b)
+    { $res=1;
+      if ( ($a ne $az)&&(substr($clauseb,0,1) eq "(")&&(substr($clausea,0,1) eq "(") )
+      { $res=1;
+        $clausea=",".substr($clausea,1);
+        $clauseb=",".substr($clauseb,1);
+        do
+        { $clausea=substr($clausea,1);
+          $clauseb=substr($clauseb,1);
+	  if (($clausea ne ")") && ($clauseb ne ")"))
+	  { if  (match($clausea,$clauseb,$vars)ne 1)
+	    {$res=0;};
+	  }
+        $clausea=substr($clausea,length(parsepart($clausea)));
+        $clauseb=substr($clauseb,length(parsepart($clauseb)));
+        } while ((substr($clausea,0,1) eq ",") && (substr($clauseb,0,1) eq ","));
+        $res=$res && match($clausea,$clauseb,$vars);
+        if ((substr($clausea,0,1) ne ")" ) || (substr($clauseb,0,1) ne ")"))
+        { $res=0;
+        }
+        if ($res eq 1)
+        { $clausea=substr($clausea,0,1);
+          $clauseb=substr($clauseb,0,1);
+        }
+      }
+    }
+  }
+  elsif (isvariable($a) && isvariable($b))
+  { if ((varval($a,$vars)eq "<Null>") && (varval($b,$vars) eq "<Null>"))
+    { varassign $a,$b, $vars; $res=1;
+    }
+    elsif ((varval($a,$vars)eq "<Null>") && (varval($b,$vars) ne "<Null>"))
+    { varassign($a,varval($b,$vars), $vars); $res=1;
+    }
+    elsif ((varval($a,$vars) ne "<Null>") && (varval($b,$vars) eq "<Null>"))
+    { varassign($b, varval($a,$vars),$vars); $res=1;
+    }
+    else
+    { $res=match(varval($a,$vars), varval($b,$vars), $vars);
+    }
+
+  }
+  elsif (isvariable($a) && !isvariable($b))
+  { if (varval($a,$vars) eq "<Null>")
+    { varassign($a, $bz,$vars); $res=1;
+    }
+    else {
+    $res=match(varval($a,$vars),$bz, $vars);
+    }
+  }
+  elsif (!isvariable($a) && isvariable($b))
+  { if (varval($b,$vars) eq "<Null>")
+    { varassign($b, $az,$vars); $res=1;
+    }
+    else {$res=match($az,varval($b,$vars), $vars); }
+  }
+  if ($res) { $_[2]=$vars; }
+  return $res;
+}
+sub assert($$)
+{ my ($rule,$ruleset)=@_;
+  my $r=$rule;
+  my $as=1;
+  $r=substr($r,length(parsepart($r)));
+  if ((substr($r,0,1) ne ".")&&(substr($r,0,1) ne "!"))
+  { if (substr($r,0,2) ne ":=")
+    { $as=0;}
+    else
+    { $r=substr($r,2);
+      while (parsepart($r) ne "")
+      { $r=substr($r,length(parsepart($r)));
+        if (substr($r,0,1) eq ",") {$r=substr($r,1);};
+      }
+    }
+  }
+  if ((substr($r,0,1) ne ".") && (substr($r,0,1) ne "!"))
+  { $as=0;};
+  if ($as)
+  { $ruleset=$ruleset.$rule."\n";
+    $_[1]=$ruleset;
+  } return $as;
+}
+sub solve($$$)
+{ my ($rule,$ruleset,$vars)=@_;
+  my $cut=0;
+  my $ook=0;my $l;
+  foreach $l(split("\n",$ruleset))
+  {
+    {
+      my $a=$vars;
+      my $k=$rule;
+      if ((match($rule,$l,$vars)))
+      { $ook=1;
+	#attenzione - passo da $rule a $l
+        $rule=substr($l,length(parsepart($l)));
+        if(substr($rule,0,2) eq ":=") { $rule=substr($rule,2); };
+	if ($cut==1) {$ook=0;}
+        if ((substr($rule,0,1) ne ".") && (substr($rule,0,1) ne "!") && ($cut==0))
+        {  while ((substr($rule,0,1) ne ".") && (substr($rule,0,1) ne "!"))
+           {
+             if(substr($rule,0,1) eq ",") { $rule=substr($rule,1); };
+             my $a=parsepart($rule);
+             $rule=substr($rule,length($a));
+             if (substr($a,0,1) eq "~")
+             { $ook=$ook & (!solve(substr($a,1), $ruleset,$vars));
+             } else
+             { $ook=$ook & solve($a,$ruleset,$vars);
+             };
+           }
+	}
+        else
+        { #se la regola e' un goal, sono in fondo: memorizzo $vars valorizzate.
+          if (!$cut) {
+	  #print "soluzione:".join(" - ",split("\n",$vars))."\n";
+	  $rlist=$rlist.join("\t",split("\n",$vars))."\n";
+           }
+	  $ook=1;
+          if (substr($rule,0,1) eq "!") {$cut=1;};
+        };
+      }
+      $vars=$a;
+      $rule=$k;
+    }
+  }
+  if ($ook) { $_[2]=$vars; };
+  return $ook;
+}
+sub EWassert($$)
+{ my ($ruleset,$rule)=@_;
+  my $rs=EWload(".RULE".$ruleset.".tab");
+  my $res=assert($rule,$rs);
+  if ($res) {EWsave(".RULE".$ruleset.".tab",$rs);};
+  return $res;
+}
+sub EWretract($$)
+{ #elimina le regole con la testa indicata.
+  my ($ruleset,$rule)=@_;
+  my $rs=EWload(".RULE".$ruleset.".tab");
+  my $rsb; my $r;
+  foreach $r(split("\n",$rs))
+  { my $k="";
+    if (($rule ne "")&&(!match($rule, $r,$k))) { $rsb=$rsb.$r."\n";};
+  }
+  EWsave(".RULE".$ruleset.".tab", $rsb);
+}
+
+sub EWdate()
+{ my @ti=localtime(time);
+  return $ti[3]." ".($ti[4]+1)." ".($ti[5]+1900);
+}
+sub EWlessdate($$)
+{ my ($d1,$d2)=@_;
+  my ($day1,$mon1,$yea1)=split(" ",$d1);
+  my ($day2,$mon2,$yea2)=split(" ",$d2);
+  my $num1=$day1+($mon1*31)+($yea1*31*12);
+  my $num2=$day2+($mon2*31)+($yea2*31*12);
+  return ($num1<$num2);
+}
+
+sub EWtime()
+{ my @ti=localtime(time);
+  if ($ti[2] < 10)
+  { $ti[2] = '0'.$ti[2];
+  };
+  if ($ti[1] < 10)
+  { $ti[1] = '0'.$ti[1];
+  };
+  if ($ti[0] < 10)
+  { $ti[0] = '0'.$ti[0];
+  };
+  return $ti[2].":".($ti[1]).":".($ti[0]);
+}
+
+#<EWB_usercode>
+
+sub ewb_exist($)
+{  $cond="\$res=join(\"\",((";
+   $tab=$_[0];
+   my $count=0;
+   my @tot=split(":",$tab);
+   foreach $field(@tot)
+   { if ($count>0)
+     { $cond=$cond."\$EWB_".$field;
+       if ($count<$#tot) {$cond=$cond.","; };
+     }
+     $count++;
+  }
+  $cond=$cond.")=tab_exist(\"$tot[0]\",\$EWB_";
+  $cond=$cond.$tot[1].")));";
+  eval($cond);
+  return ($res ne "");
+}
+sub ewb_login($)
+{  $cond="\$res=join(\"\",((";
+   $tab=$_[0];
+   my $count=0;
+   my @tot=split(":",$tab);
+   foreach $field(@tot)
+   { if ($count>0)
+     { $cond=$cond."\$EWB_".$field;
+       if ($count<$#tot) {$cond=$cond.","; };
+     }
+     $count++;
+  }
+  $cond=$cond.")=tab_login(\"$tot[0]\",\$EWB_";
+  $cond=$cond.$tot[1].", \$EWB_".$tot[2].")));";
+  eval($cond);
+  return ($res ne "");
+}
+sub ewb_remove($)
+{ my @t=split(":", $_[0]);
+  $res="";
+  my $code="\$res=tab_del(\"".$t[0]."\",\$EWB_".$t[1].");";
+  eval($code);
+  return $res;
+};
+sub ewb_add($)
+{  my $cond="my \$line=";
+   my $tab=$_[0];
+   my $count=0;
+   my @tot=split(":",$tab);
+   tab_wlock($tab);
+   foreach $field(@tot)
+   { if ($count>0)
+     { $cond=$cond."delchar(\$EWB_".$field.")";
+       if ($count<$#tot) {$cond=$cond.".\"#\"."; };
+     }
+     $count++;
+  }
+  $cond.=";
+if (!(open oof,\">> ".checkpath().".TB$tot[0].tab\"))
+{ print \"\\nAttenzione: non posso creare files\\n\";
+  exit(0);
+};
+print oof \$line.\"\\n\";
+close oof;
+";
+  eval($cond);
+  tab_unlock($tab);
+  return ($res ne "");
+};
+sub ewb_update($$)
+{ my ($n1, $k)=@_;
+  my ($n)=split(":", $n1);
+  my $res=tab_del($n, $k);
+  if ($res ne "")
+  { 
+    return ewb_add($n1);
+  }
+  else { return ""; };
+}
+
+sub nothingelse() {};
+
+

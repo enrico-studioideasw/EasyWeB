@@ -1,0 +1,6 @@
+echo cc -g debug.c ewcc.c ew_predef.c -o ewdb
+cc -g debug.c ewcc.c ew_predef.c -o ewdb
+echo cc -g ewcc.c ew_predef.c ewb.c -o ewb
+cc -g ewcc.c ew_predef.c ewb.c -o ewb
+echo cc -g vm2.c -o evm -lm
+cc -g vm2.c -o evm -lm 

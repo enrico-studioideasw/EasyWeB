@@ -1,0 +1,16 @@
+L'installazione e'diversa per Linux o per windows.
+
+
+Sotto Linux lanciare, da questa directory:
+
+sh install.sh
+
+Sotto windows lanciare da questa directory:
+
+installa.exe
+
+Per testare la corretta installazione lanciare
+
+ewb
+
+

@@ -1,0 +1,25 @@
+V5.27
+ 01/07/2005  
+ *  Corretto errore nella funzione askto
+    Non passava correttamente i parametri alla nuova cgi. Ora basta dichiarare
+    le variabili con lo stesso nome per torvarle dall'altra parte.
+ 30/06/2005  
+ *  Corretto errore nella funzione askto
+    Non riconosceva come valido un sito nel cui url fosse presente un 
+    underscore (_).
+ 10/05/2005  
+ *  Corretto errore nella funzione pop(). 
+    Con valori vuoti nello stack faceva un gran casino.
+    (vedi errore_pop.ewb)
+ 02/05/2005  
+ *  Corretto errore nella funzione date(). Ora la data viene data sempre 
+    nello stesso formato con 2+2+4 cifre intramezzate da spazi. 
+    Prima con l'ordinamento dava dei problemi. (2 5 2005 => 02 05 2005)
+V5.26
+ 20/04/2005  
+ *  Aggiunta conversione automatica in formato unix per facilitare la
+    compilazione su windows.
+V5.25 
+ 05/04/2005  
+ *  Spezzata la compilazione in molti piccoli moduli per facilitare la 
+    manutenzione e condivisione del progetto.  

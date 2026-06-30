@@ -1,0 +1,39 @@
+'editor di codice easyweb  on-line 
+'risponde ad  una serie di comandi dal sito.
+table utenti=user, pass;
+table files=user, filename; 
+var pars;
+'devo fare una correzione alla  pop.  
+
+template=load "pages/left.html";
+pars=split [&], getquerystring();
+
+var cmd, b, inf;
+
+user=getelem(pars,0);
+pass=getelem(pars,1);
+
+if (!login(utenti))
+{ show "Login non valido.  Contattare l'amministratore"; 
+  end; 
+};
+var a; a=user;
+var res; 
+res="";
+
+var a; a=loaddir([files/].user);
+while (a ne "")
+{ b=pop(a); 
+  if ( (mid(b, 0, 3) eq ".TB") && (index(b, ".tab")>0) )
+  { b=mid(b, 3, len(b)); 
+    b=mid(b, 0, len(b)-4); 
+    res=res."<a href=editor.cgi?tbedit&".user."&".pass."&".b."&end
+        target=right>".b."</a><br>";
+  };
+};
+
+
+
+if (res eq "")
+{ res="No file"; };
+show res; 

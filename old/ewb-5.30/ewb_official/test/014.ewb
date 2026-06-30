@@ -1,0 +1,5 @@
+'goal di prolog
+
+goal tabellone,"a."
+{ print "coso\n";
+};

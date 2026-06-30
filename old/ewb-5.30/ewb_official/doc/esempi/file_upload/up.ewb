@@ -1,0 +1,5 @@
+var a, b; 
+b="ok";
+ask a:file, b:submit; 
+save "prova.dat", a; 
+show "file salvato"; 

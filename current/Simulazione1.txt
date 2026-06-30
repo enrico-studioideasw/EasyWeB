@@ -1,0 +1,98 @@
+Prima simulazione di un programma EWB, mi interessa il flusso di esecuzione.
+
+Contesto:
+- Ho un server web in grado di rispondere a richieste post e rispondere in http. 
+
+
+Un esempio di programma: ho un gicoo interattivo di costruzione tipo simcity.
+
+Ho uno shermo diviso in due sezioni:
+- da una parte ho la visualizzazione della mappa di gioco a riquadri con lo stato dei singoli elementi. Tra cui il personaggio.
+- da una parte ho la sezione di controllo del personaggio.
+  - deve poter percorrere la mappa e incontrare png o altri personaggi
+  - deve poter prendere oggetti, dialogare in qualche modo con i personaggi. 
+
+Cominciamo dalla pagina: ho due target principali.
+
+
+target body =  'suddivido lo schermo
+{ mappa, 
+  comandi
+}
+context giocone;
+dataset giocatori ={ id, x, y, oggetti = { nome, valore }, lastonline }; 
+dataset png =
+ { id, x, y, stato, id_oggetti,
+   enigmi = { 
+     'e qui ci inventeremo qualcosa
+     }, 
+   lastonline 
+ }; 
+dataset mondo =  { x, y, stato }: 'una mappa, se il punto non è definito è terreno calpestabile, senno definiremo i tipi.. 
+task muovi_png 
+{ in (_tasks.muovi_png, status!=running && stopitime < time()-60) ' uno solo per tutti, non importa chi lo lancia. 
+  { in (giocone.png)
+    { ' qui ci inventiamo qualcosa su come si muovono i png..  
+    }
+  };
+}
+target mappa(idgiocatore)
+{ ' lo tratto come un task esteso.. qui scarico da server la mappa aggiornata e la mostro
+}
+cron mappa_png 
+'run()      = esegui ora
+'cron()     = politica di esecuzione dei task
+'refresh()  = politica di aggiornamento dei target
+
+cron muovi_png "30 * * * *"
+refresh mappa, 10.2 'secondi
+
+' qui sotto il movimento del giocatore, su che target ? body di default se non specificato.. 
+' anche se ho mappa e comandi, body rimane 
+target comandi
+{ for (;;)
+  { 'ask con una serie di pulsanti..
+    'se premuto X fai Y .  
+  }
+} 
+run comandi; ' semplice e naturale, difficile da programmare ma pazienza.
+
+
+
+
+
+.. intanto mi fermo,principali problemi: 
+.. sto ridefinendo mappa che ho gia definito sopra e lo sto specializzando.. E' corretto o meglio fare tutto "in cima" ?
+.. se ho piu target ho bisogno di sapere quale sia quello di default si cui lavora il programma principale..
+.. devo avviare i task, preferireri non farlo alla definizione ma con una funzione apposita tipo un "run" o "cron". Comunque mper ora ho specificato semplicemente la sintassi cron, c'est plus facile.
+.. mi piace il modo in cui in raltà stiamo usando un database come mappa di gioco e sistema di ipc. Sarà lento ma oggi non è questo il problema.
+.. nell'insieme il giro funziona. Come dovrebbe girare ? 
+
+La ask, come al solito, genera un form che si porta dietro lo stato.
+
+Il task può essere lanciato in cron o a intervalli. Il task viene lanciato lato server con una chiamata all'HTTP che lancia il programma e un entry point per il task.
+La ask ferma il programma ma non il browser, la procedura che lancia i taget può essere un javascript con setTimout..   
+Il target nonè altro che un lancio del programma con il contesto di ask e un entry point che fa eseguire il codice del task
+Il target risponde con una pagina html che aggiorna il div. 
+Il task ha uno stato running/stopped etc.. unico a sistema.
+Il target ha lo stesso stato ma riferito al singolo ciclo di esecuzione. Intendo dire la sessione che un utente vede sul suo browser. Quindi il ciclo di esecuzione deve essere riconoscibile con un ID oltre che protetto con una firma. Penso che html preveda gia una specie di id di browser e pagina potremmo usarla. Vorrei evitare le sessioni perchè sono un forte vincolo per il parallelismo.
+
+
+Task
+-----
+- lato server
+- nessuna interfaccia
+- stato globale
+- schedulabile
+- eseguibile manualmente
+- unico o multiplo
+- entry point del runtime
+
+Target
+-------
+- lato client
+- associato a un renderer
+- aggiornato via AJAX
+- stato per browser/ciclo
+- può essere aggiornato periodicamente
+- può essere aggiornato da eventi

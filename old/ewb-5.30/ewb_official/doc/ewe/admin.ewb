@@ -1,0 +1,63 @@
+'area di anninstrazione per amethyst web editor.
+'template=load "pages/admin.html";
+
+table utenti=user, pass; 
+var inf, b, infb;
+inf="Qui effettuate il login come amministratore (root)" ;
+infb="<br><br></b><a href=start.cgi>Torna al servizio web editor</a><b>";
+b="ok";
+ask inf:info, user, pass:password, b:submit, infb:info;
+
+if ((user eq "root") && (login(utenti)))
+{ while (1)
+  { format="12:5:v"; 
+    var pb;
+    inf="<br><br></b><a href=start.cgi>Torna al servizio web editor</a><b>";
+    b="Crea utente;Elenca utenti;Cancella utente";
+    ask b:submit, inf:info;
+    user=""; pass=""; pb="";
+    if (b eq "Elenca utenti")
+    { inf="Elenco utenti per il web editor</b><br><br>";
+      sort (utenti, "user");
+      in (utenti)
+      { inf=inf.user."<br>";
+      };
+      b="ok";
+      ask inf:info, b:submit; 
+    };
+    if (b eq "Crea utente")
+    { inf="Crea utente o cambia password"; 
+      ask inf:info, user, pass:password("password"), pb:password("ripeti password"), b:submit;
+      if ((len(user)<2) || (pass ne pb))
+      { b="ok";
+        inf="Utente non valido o le password non corrispondono";
+        ask inf:info, b:submit; 
+      }
+      else
+      { inf="Utente ".user." inserito.";
+        b="ok";
+        add utenti; 
+        ask inf:info, b:submit;
+      };
+    };
+    if (b eq "Cancella utente")
+    { inf="Cancella utente";
+      ask inf:info, user, b:submit; 
+      remove(utenti); 
+      if ((user eq  "") || (user eq "root"))
+      { b="ok";
+        inf="Utente non valido";
+        ask inf:info, b:submit;
+      } 
+      else
+      { b="ok";
+        inf="Utente cancellato";
+        ask inf:info, b:submit;
+      };      
+    };
+  };
+}
+else
+{ show "Login non valido";
+};
+

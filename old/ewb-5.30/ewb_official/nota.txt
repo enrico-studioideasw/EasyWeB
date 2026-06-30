@@ -1,0 +1,3 @@
+nota: prendere la libreria dbfiles dalla copia di ewb del server.
+questa non e' corretta xche' non supporta tabpath. 
+ 

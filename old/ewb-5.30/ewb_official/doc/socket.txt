@@ -1,0 +1,39 @@
+#socket ..  funzioni da aggiungere in easyweb per l' accesso alle porte
+
+use IO::Socket;
+
+sub EWsocket($$)
+{ my $remote= IO::Socket::INET->new( proto => "tcp",
+                                     PeerAddr => $_[0],
+                                     PeerPort => $_[1]);
+  if ($remote) { $remote->autoflush(1); };
+  return $remote;
+}
+sub EWserver($$)
+{ my $remote= IO::Socket::INET->new( Proto => "tcp",
+                                     Localport => $_[0],
+                                     Listen => 5,
+                                     Reuse => 1);
+  return $remote;
+}
+
+sub EWaccept($)
+{ my $client= ($_[0])->accept();
+  $client->autoflush(1);
+  return $client;
+}
+#inline
+sub EWsread($)
+{ my $a=<$_[0]>;
+  return $a;
+}
+#inline
+sub EWswrite($$)
+{ print $_[0] $_[1];
+}
+
+#inline
+sub close($)
+{ close $_[0];
+}
+

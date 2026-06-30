@@ -1,0 +1,136 @@
+#versione 3.20 - del multipla su tabella.
+sub PD_del($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 3));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#\n\$tot=";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+
+#$n contiene il nome della tabella 
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$tot=\$ax;
+  \$n=((split(\":\",\$tot))[0]);
+  #modifica 030425P inizio
+  \$ax=join(\"\\n\",\@p);
+  push \@as, \$ax;
+  #modifica 030425P fine
+  \@p=split(\":\",substr(\$tot,length(\$n)+1));
+  tab_wlock(\$n);
+  #modifica 030423 inizio
+  #my \@f=tab_read(\$tot);
+  \$ax=join(\"\\n\",\@f);
+  push \@as, \$ax;
+  \@f=tab_read(\$tot);
+  #modifica 030423 fine
+  open rof,\"> \".checkpath().\".TB\$n.bkp\";
+  #modifica 030424 inizio
+  #my \$l; my \$i=0;
+  #my \$g=0;
+  \$ax=join(\"\\n\",\@aa);
+  push \@as, \$ax;
+  push \@as, \$ct;
+  push \@as, \$i;
+  push \@as, \$l; 
+  push \@as, \$g;
+  \$i=0;
+  \$g=0;
+  push \@as, \$k;
+  #modifica 030424 fine
+area".$num_calls.":;
+  if (\$g > \$#f) { goto area".($num_calls + 2)."; };
+  \$l=\$f[\$g]; \$l=substr(\$l,0,length(\$l));
+  #modifica 030424 inizio
+  #my \$k;
+  #push \@as, \$k;
+  \$k=0;
+  #modifica 030424 fine
+  \$i++;
+  ";
+  my $nc=$num_calls; $num_calls=$num_calls+3;
+
+  inblock();
+
+  #nel ciclo devo assegnare le variabili
+  $res.= "
+  #my \@aa=split(\"#\", \$l);
+  \@aa=split(\"#\", \$l);
+  \$ct=0;
+  \$code=\"\";
+  foreach \$p(\@p)
+  { \$code=\$code.\"\\\$EWB_\".\$p.\"=addchar(\\\$aa[\$ct]);\n\";
+    \$ct++;
+  };
+  eval(\$code);$T";
+
+  #eventuale condizione di ricerca del ciclo in.
+  my $cond=1;
+  if (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    $res.= "";#\nif (!(";
+
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+
+#Copio le righe che rispettano la condizione 
+    $res.= "if (\$ax) { goto area".($nc+1).";};$T";
+  }
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "ciclo in - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+
+  #codice del ciclo di in
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  #qui copia del campo..
+  $res.= "print rof \$l.\"\\n\";\n"; #copiala riga nella tabella di backup
+
+
+  $res.= "
+area".($nc+1).":;
+  \$g=\$g+1;
+  goto area".($nc).";
+area".($nc+2).": ;$T";
+  #modifica 030424 inizio
+  $res.="
+  close rof;  
+  #copia di un file sull altro
+  open rif,checkpath().\".TB\$n.bkp\";
+  open rof, \">\".checkpath().\".TB\$n.tab\";
+  my \@fl=<rif>;
+  my \$rw;
+  foreach \$rw(\@fl)
+  { print rof \$rw; };  
+  close rif;
+  close rof;
+  tab_unlock(\$n);
+  \$k=pop \@as;";
+  $res.="
+  \$g=pop \@as;
+  \$l=pop \@as; 
+  \$i=pop \@as;
+  \$ct=pop \@as;
+  \$ax=pop \@as;
+  \@aa=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@f=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@p=split(\"\\n\", \$ax);
+  ";
+  #modifica 030424 fine
+  outblock();
+  return ($code,$res);
+}

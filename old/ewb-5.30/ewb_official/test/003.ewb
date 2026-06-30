@@ -1,0 +1,7 @@
+'test di inserimento funzione 
+
+sub patata(a,b)
+{  return a*b;
+};
+
+print patata(3,2)."..\n";

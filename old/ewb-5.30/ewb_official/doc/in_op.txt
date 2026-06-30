@@ -1,0 +1,65 @@
+l' operazione in deve essere un po' complicata.
+Vediamo come va riscritta.
+
+tab_lock (tabella)
+open iif, "<tabella";
+my @f=<iif>;
+close iif;
+tab_unlock(tabella)
+my $i=0; my $l;  
+foreach $l(@f)
+{ 
+
+  my $k;
+  my $found=0; 
+  $i++; 
+  for ($k=$i; $k<=$#f; $k++)
+  { if (kkey($l) eq $key($f[$k])) 
+    { $found=1; }
+  }
+
+  if (!$found)
+  {  
+   [if (condizione di ricerca)]
+    [codice]
+  }
+}
+
+'ok.. da questo codice devo togliere i cicli per poter gestire le ask.
+
+
+tab_lock (tabella)
+open iif, "<tabella";
+my @f=<iif>;
+close iif;
+tab_unlock(tabella)
+my $i=0; my $l;  
+
+  my $g=0; 
+label1:
+  if ( $g >$#f ) { goto label3; };
+  $l=$f[$g]; 
+
+  my $k;
+  my $found=0; 
+  $i++; 
+  for ($k=$i; $k<=$#f; $k++)
+  { if (kkey($l) eq $key($f[$k])) 
+    { $found=1; }
+  }
+
+  if ($found) {  goto label2; }
+  [ if (!condizione di ricerca) { goto label2; } ]
+  
+  [codice]
+
+
+label2:
+  $g=$g+1;
+  goto label1
+
+label3:
+(fine)
+
+'codice da testare prima di inserire in ewb.. trasferisco su test.perl e provo.
+

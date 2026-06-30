@@ -1,0 +1,13 @@
+var a,b; 
+
+a="";
+a=split(";", "uno;due;tre;quattro");
+a[2]="ciao"; print a."\n"; 
+
+print a[2]; 
+print "\n";
+print "(".a[0].") (".a[1].") (".a[2].")\n"; 
+
+foreach b(a)
+{ print "{".b."}\n";
+};

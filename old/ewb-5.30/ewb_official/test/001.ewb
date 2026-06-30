@@ -1,0 +1,4 @@
+'test di espressioni
+var a;
+a=!(3*2||4)-1;
+

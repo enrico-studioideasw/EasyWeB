@@ -1,0 +1,5 @@
+template=load "pages/docs.html";
+var a;
+a=getquerystring();
+show a; 
+

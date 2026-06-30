@@ -1,0 +1,374 @@
+'editor di codice easyweb  on-line
+'risponde ad  una serie di comandi dal sito.
+table utenti=user, pass;
+table files=user, filename; 
+var pars;
+'devo fare una correzione alla  pop.  
+
+
+pars=split [&], getquerystring();
+
+var cmd, b, inf;
+
+var  lod;  lod="";
+cmd=getelem(pars, 0);
+user=getelem(pars,1);
+pass=getelem(pars,2);
+lod=getelem(pars,3); 
+
+'print [cmd: ].cmd.[ user: ].user.[ pass: ].pass.[ lod: ].lod.[<br>]; 
+
+
+if (!login(utenti))
+{ show "Login non valido.  Contattare l'amministratore"; 
+  end; 
+};
+
+exec [mkdir files/].user;
+if (cmd eq "nuovo")
+{ inf="nuovo programma amethyst<br>
+  </b>Scegli un nome per il file ewb o html<b>";
+  filename="noname.ewb";
+  b="Ok";
+  ask inf:info, filename:text("  "), b:submit; 
+  
+  'qui aggiungo l'eventuale estensione .ewb
+  if ((index(filename, ".ewb") <0) && (index(filename, ".htm") <0))
+  { filename=filename.".ewb";
+  }; 
+  'qui controllo che il file non contenga .. o / 
+  if ((index(filename, " ")>0) ||
+      (index(filename, "..")>0) ||
+      (index(filename, "/")>0))
+  { show "<b>Errore</b><br>Il nome file ".filename."  contiene caratteri non ammessi.";
+    end; 
+  };
+  'qui controllo che il file non esista
+  var a; 
+  a=loaddir("files/".user); 
+  while (a  ne "")
+  { if ((pop a) eq  filename)
+    { show "<b>Errore<br></b>Il file gia' esiste.";
+      end; 
+    };
+  }; 
+  if (index(filename, ".ewb")>0) 
+  { save [files/].user.[/].filename, 
+['''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' ].filename.[
+'                                           Amethist web editor
+'                                 Versione 0.2  By Enrico Betti
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+];
+  } else 
+  { save [files/].user.[/].filename, 
+[<!--
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' ].filename.[
+'                                           Amethist web editor
+'                                 Versione 0.2  By Enrico Betti
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+-->
+<html>
+  <head>
+  </head>
+  <body>
+
+  <>
+
+  </body>
+</html>
+
+];
+  };
+  'qui dovro'simulare il load del file. 
+  cmd="load"; 
+  lod=filename;  
+};
+
+if (cmd  eq  "view")
+{ var  a, b;
+  a=user; b=lod; 
+  del(files, (user eq a)&&(filename eq b));
+  cmd="load";
+  user=a; lod=b;  
+};
+
+if (cmd eq "load")
+{ 'carica un file:
+  'lo mostra nella lista dei files visibili
+  'lo porta a video 
+   if (lod eq "")
+   { var a, k;
+     a=loaddir("files/".user);
+     k=user;
+     while (a ne "")
+     { var b;
+       b=pop(a);
+       if ((index(b, ".ewb")>0)
+          || (index(b, ".htm")>0))
+       { 'qui controllo: se il file e'gia'caricato non lo carico.
+         var fnd; fnd="";
+         inall(files, ((user eq k) && (filename eq b)))
+         { fnd=1; };
+         if (!fnd)
+         { lod=lod.b.";";
+         };
+       };
+     };    
+     user=k;
+     b="Ok";
+     inf="Load di file</b><br>Seleziona il file dall'elenco seguente<b>";
+     ask inf:info, lod:option("  "), b:submit;
+   };
+
+
+  'qui mostriamo il file a video.
+  var f;
+  ' print "loading files/".user."/".lod."\n";
+  'segnalo il file come aperto.
+  f=load "files/".user."/".lod;
+  if  (f ne "")
+  { filename=lod;
+    add files;
+    format="85:22:h";
+    while (1)
+    { b="Salva";
+      inf="
+<font size=-1 color=red>
+Attenzione - premete salva prima di cambiare finestra per non perdere le modifiche</font>";
+      ask f:textarea("  "), b:submit, inf:info;
+
+f=join("", split("\r", f));
+      save "files/".user."/".lod , f;
+      b="ok"; inf="File salvato";
+      ask inf:info, b:submit;
+    };
+  }
+  else
+  { show "<b>Errore</b><br>Il file non sembra esistere.";
+    end;
+  };
+  end;
+};
+if (cmd eq "close")
+{
+  if (lod eq "")
+  { var a; a=user;
+    inall (files, user eq a)
+    { lod=lod.filename.";";
+    };
+
+    b="Ok";
+    inf="Chiusura di file</b><br>Seleziona il file dall'elenco
+seguente<b>";
+    ask inf:info, lod:option("  "), b:submit;
+  };
+  var  a, b;
+  a=user; b=filename;
+  del(files, (user eq a) && (filename eq b));
+  show "File ".b." chiuso";
+  end; 
+}; 
+
+if (cmd eq "closeall")
+{ var a; a=user;
+  del(files, (user eq a)); 
+  show "Tutti i files sono stati chiusi";
+
+};
+
+if (cmd eq "compila")
+{ 
+  if (lod eq "")
+  { var a; a=user; 
+    inall (files, (user eq a) && (index(filename, ".ewb")>=0))
+    { lod=lod.filename.";";
+    };
+
+    b="Ok";
+    inf="Compila file</b><br>Seleziona il file dall'elenco 
+seguente<b>";
+    ask inf:info, lod:option("  "), b:submit;
+    user=a; 
+  };
+  var res; 
+  var fn;
+  filename=lod; 
+  fn=mid(filename, 0, len(filename)-4);
+'print "fn vale ".fn."<br>";
+
+  res = exec [cd files/].user.[/; ewb ].filename.[ 2> .errors;  cd ../..]; 
+  fn=[cd files/].user.[/; cp ].fn.[.cgi ].fn.[cgi.txt; cd ../..];
+  exec fn; 
+'print "fn vale ".fn."<br>";
+ 
+  res=(load [files/].user.[/.errors])."\n\n".res;
+  res=res."\nTerminato alle ".time()." , ".date()."\n"; 
+  res=join("<br>", split("\n", res));
+  inf="Risultato di compilazione:";
+  res="</b><div align=left>".res."<b></div>";
+  ask inf:info, res:info;      
+  end; 
+}; 
+
+if (cmd eq "compilatutto")
+{ 
+  var res; 
+  res=res."\nIniziato alle ".time()." , ".date()."\n"; 
+  if (lod eq "")
+  { var a; a=user; 
+    inall (files, (user eq a) && (index(filename, ".ewb")>=0))
+    {  res=res."<b>File: ".filename."</b>\n";
+'var di;
+'       di=exec("pwd"); 
+       exec [cd files/].user.[/ ; ewb ].filename.[ 2> .errors];
+'       exec "cd ".di;  
+       res=res."\n".(load [files/].user.[/.errors]);
+    };
+  };
+  res=res."\nTerminato alle ".time()." , ".date()."\n";
+  res=join("<br>", split("\n", res));
+  inf="Risultato di compilazione:";
+  res="</b><div align=left>".res."<b></div>";
+  ask inf:info, res:info;      
+  end; 
+}; 
+
+if (cmd eq "esegui")
+{ var res; res="";
+  format="12;5:v";
+  if (lod eq "")
+  { var a; a=user; 
+    inall (files, user eq a)
+    { 
+      if (index(filename, ".ewb") >0)
+      { filename=mid(filename, 0, len(filename)-4); 
+        res=res."<br><br><a href=files/".user."/".filename.".cgi>
+         ".filename."</a>";
+      };
+      if (index(filename, ".html")>0)
+      { filename=mid(filename, 0, len(filename)-5);
+        res=res."<br><br><a href=files/".user."/".filename.".html>
+         ".filename." (html)</a>";
+      };
+    };
+  };
+  show res; 
+  end; 
+}; 
+
+if (cmd  eq "upload")
+{ var a, b;
+  a="jpg;png;gif;bmp;html;htm";
+  ask filename:file("Seleziona il file"),
+  b:text("Indica il nome del file"), 
+  a:submit("Indica il tipo di file"); 
+  if ((a  eq "") || (b eq "") || (filename eq ""))
+  { show "Operazione annullata"; 
+  };     
+  save "files/".user."/".b ,filename; 
+  show "File portato sul server.";
+  end;
+};
+
+if (cmd  eq  "files")
+{ var a, b;
+  var res; res="<br>";  
+  a=loaddir("files/".user."/"); 
+  while (a ne "")
+  { b=pop(a);  
+    if (
+(index(b, ".jpg")>=0) ||
+(index(b, ".png")>=0) ||
+(index(b, ".gif")>=0) ||
+(index(b, ".bmp")>=0) ||
+(index(b, ".ewb")>=0) ||
+(index(b, ".cgi")>=0) ||
+(index(b, ".txt")>=0) ||
+(index(b, ".htm")>=0))
+    { if  (
+(index(b, ".txt")<0) && 
+(index(b, ".htm")<0) &&
+(index(b, ".ewb")<0) &&
+(index(b, ".cgi")<0)
+        )
+      { res=res."<img src=files/".user."/".b." width=50>";
+      };
+      if (index(b, ".cgi") <0)
+      { res=res.[<a href="files/].user.[/].b.[">].b.[</a><br>];
+      } else 
+      { res=res.b.[<br>];
+      };
+    };
+  };
+  show "<b>Elenco dei files su server</b><br>".res;
+  end; 
+};
+
+
+if (cmd  eq  "del")
+{ var a, b;
+  var res; res="";  
+  a=loaddir("files/".user."/"); 
+  while (a ne "")
+  { b=pop(a);  
+    if (
+(index(b, ".jpg")>=0) ||
+(index(b, ".png")>=0) ||
+(index(b, ".gif")>=0) ||
+(index(b, ".bmp")>=0) ||
+(index(b, ".ewb")>=0) ||
+(index(b, ".cgi")>=0) ||
+(index(b, ".htm")>=0))
+    { 
+      res=res.b.";";
+    };
+  };
+  inf="Cancellazione file</b><br>Seleziona i files da cancellare. Puoi selezionare piu'files tenendo premuto 
+ctrl.<b>";
+  b="Ok";
+  ask inf:info, res:options("  "),b:submit; 
+
+  a=split(";", res);
+  while (a ne  "")
+  { b=pop(a);
+    var k;   
+    exec("rm -f files/".user."/".b);    
+    k=user;
+    del(files, (user eq k)&&(filename eq b));
+    user=k;
+  };
+  show "<b>cancellazione files</b><br>files (".res.") cancellati.\n";
+  end;
+};
+
+if (cmd eq "tbedit")
+{ lod=".TB".lod.".tab";
+  'qui mostriamo il file a video.
+  var f;
+  ' print "loading files/".user."/".lod."\n";
+  'segnalo il file come aperto.
+  f=load "files/".user."/".lod;
+  var a, b, leng; leng=85;
+  a=split("\n" , f);
+  while (a ne "")
+  { b=pop(a);
+    if (len(b)>leng) {leng=len(b); };
+  };
+    format=(leng+5).":22:h";
+    while (1)
+    { b="Salva";
+      inf="
+<font size=-1 color=red>
+Attenzione - premete salva prima di cambiare finestra per non perdere le modifiche</font>";
+      ask f:textarea("  "), b:submit, inf:info;
+
+f=join("", split("\r", f));
+      save "files/".user."/".lod , f;
+      b="ok"; inf="File salvato";
+      ask inf:info, b:submit;
+    };
+  end;
+};

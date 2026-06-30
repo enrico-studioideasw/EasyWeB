@@ -1,0 +1,1 @@
+h[var a; ]q[]_h[a=input; ]I[0]V !h[print "a is "; ]q[a is ]?[1]h[print a; ]q !?[1]h[print "\n"; ]q[\n]?[1]h[]

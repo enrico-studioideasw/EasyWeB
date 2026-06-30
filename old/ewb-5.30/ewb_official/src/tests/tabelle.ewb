@@ -1,0 +1,32 @@
+
+'login degli utenti'
+table utenti=uname, pass, nome, uinf, tel;
+
+'configurazione del programma al cliente'
+table config=consult, cifre, contab,pciva,pcirpef,pcinps;
+'consult indica se fattura di consulenza'
+'contab indica le scadenze di contabilita'
+'pciva/irpef/inps sono le percentuali di default di tasse'
+'informazioni sulla ditta utente'
+table ditta=ragsoc, piva, indirizzo, citta, sedelegale, scitta, logo;
+
+'tabella dei clienti registrati'
+table cliente=piva, ragsoc, indirizzo, citta, telefono, sito, mail;
+
+'tabella delle fatture in entrata o in uscita'
+table fattura=timestamp, fnum, fdir, ftipo, cragsoc, cpiva, cadr, ccitta, merce,
+      importo, aliva, alirpef, alinps;
+'timestamp: data e ora'
+'fnum: numero fattura'
+'fdir: direzione entrata/uscita'
+'ftipo: consulenza/merce per fattura in entrata'
+'cragsoc: ragione sociale cliente o fornitore'
+'cpiva, cadr, ccitta'
+'merce: indica ID di un operazione di magazzino o consulenza'
+'importo'
+'aliva: aliquota iva applicata'
+'alirpef: per consulenza in entrata o uscita'
+'alinps: sempre per consulenza'
+table magazzino=id, direzione; '...'
+'direzione = acquisto/vendita'
+table tipipagamento=tipop;

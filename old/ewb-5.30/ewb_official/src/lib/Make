@@ -1,0 +1,4 @@
+../genfile dbfiles.p > /lib/ewb/dbfiles.lib
+../genfile dbmysql.p > /lib/ewb/dbmysql.lib
+../genfile dbfv.p    > /lib/ewb/dbfv.lib
+../genfile db_dbi.p  > /lib/ewb/db_dbi.lib

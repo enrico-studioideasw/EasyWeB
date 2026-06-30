@@ -1,0 +1,6 @@
+'test della funzione in e inall
+table tb=a,b,c,d;
+
+inall(tb,b eq "bb")
+{ print a.[.].b.[.].c.[.].d.[\n];
+};

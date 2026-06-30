@@ -1,0 +1,21 @@
+' core functions, scritte in assembler per essere piu' veloce
+sub hex(a) { };
+
+sub len(a) { };
+
+sub uc(a)  { };
+
+sub index(s, sb) { };
+
+sub split(a, b)
+{ print a; print b;
+  print "\n";  
+  var c; var r;  var t; 
+  return r; 
+};
+
+'sub join(a, b) { };
+
+'sub change(b, a, s) { };
+
+split ".", "192.168.1.59"; 

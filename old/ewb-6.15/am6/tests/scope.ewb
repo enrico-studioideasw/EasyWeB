@@ -1,0 +1,10 @@
+var a="valore:"; 
+sub count(s)
+{ print a; 
+  print s; print "\n";  
+  s=s-1;
+  if (s) { count(s); };  
+};
+
+count(5);
+print "a is [".a."]\n";  

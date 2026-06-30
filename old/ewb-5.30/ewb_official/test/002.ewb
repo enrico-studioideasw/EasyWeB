@@ -1,0 +1,5 @@
+'test di predefinite
+var a;
+a=3.2;
+print (int a)."\n";
+

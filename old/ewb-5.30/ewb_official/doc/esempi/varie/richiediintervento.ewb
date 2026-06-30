@@ -1,0 +1,60 @@
+'aggiunta di un utente per posta. 
+#include "tabelle.inc"
+
+var nomepers, data1, ora1; 
+var b;
+b="invia"; 
+
+var r; 
+in(personale)
+{ r=r.nomepers.";"; 
+};
+nomepers=r; 
+r=""; 
+in(tipiintervento)
+{ r=r.tipo.";"; 
+};
+tipo=r; 
+
+var reqip; 
+
+
+
+ask nomepers:option("richiedente"), tipo:option, reqip, memo:textarea, b:submit; 
+
+var k; 
+in (host, ip eq reqip)
+{ 
+  var f; 
+  f="Host: ".ip."
+<br>nome:".nomehost."
+<br>sistema:".sistop."
+<br><b>E' corretto? </b>"; 
+  b="si;no"; 
+  ask f:info, b:submit; 
+  if (b eq "si")
+  { 'pesco data e ora.
+
+    intv=""; 
+    push intv, nomepers; 
+    push intv, date; 
+    push intv, time; 
+
+print "nomepers: ".nomepers."<br>"; 
+print "intv: ".intv."<br>"; 
+print "reqhost: ".chiaveprog."<br>"; 
+print "tipo: ".tipo."<br>"; 
+print "memo: ".memo."<br>"; 
+    nomecogn=""; 
+    add(interventi); 
+
+    show "Richiesta inserita."; 
+    end;   
+  };
+  show "Richiesta non inserita"; 
+  end; 
+};
+
+show "Host non in database"; 
+
+

@@ -1,0 +1,7 @@
+my $line=$EWB_intv."#".$EWB_tipo."#".$EWB_nomecogn."#".$EWB_data2."#".$EWB_ora2."#".$EWB_chiaveprog."#".$EWB_memo;
+if (!(open oof,">> .TBinterventi.tab"))
+{ print "\nAttenzione: non posso creare files\n";
+  exit(0);
+};
+print oof $line."\n";
+close oof;

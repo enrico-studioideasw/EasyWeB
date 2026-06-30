@@ -1,0 +1,5 @@
+template=load "pages/file.html";
+var a;
+a=getquerystring()."&&end";
+show a; 
+

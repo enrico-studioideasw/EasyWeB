@@ -1,0 +1,15 @@
+sub uc(a)
+{ var b; 
+  var c=0; 
+  var ch;
+  do 
+  { ch=mid a, c, 1; 
+    var cb=char ch; 
+    if ((cb>="a") && (cb<="z"))
+    { ch=asc(cb+32); 
+    };
+    b=b.ch; 
+  } 
+  while (ch) ne "";
+  return b; 
+};

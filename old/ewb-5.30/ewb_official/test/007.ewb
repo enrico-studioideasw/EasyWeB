@@ -1,0 +1,4 @@
+var a; a=5;
+while (a>0)
+{ print a."\n"; a=a-1;
+};

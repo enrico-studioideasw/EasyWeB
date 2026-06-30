@@ -1,0 +1,166 @@
+'Inserimento/modifica fattura in entrata'
+#include "tabelle.ewb"
+
+sub round(num, cif)
+{ if (cif eq "2")
+  { return (int(num*100))/100;
+  }
+  else
+  { return (int(num*1000))/1000;
+  };
+};
+
+template=change("<>", "<NEW>", load "fattin.html");
+var b, inf;
+
+
+in (config)
+{};
+aliva=pciva; alirpef=pcirpef; alinps=pcinps;
+
+'richiesta del tipo di fattura se tipo=entrambi'
+if ((consult eq "")||(consult eq "Entrambe"))
+{ consult="Fatture per merce;Fatture di consulenza";
+  inf="Seleziona il tipo di fattura da  inserire";
+  b="Avanti";
+  ask inf:info, consult:option, b:submit;
+};
+'determinazione di numero fattura e data'
+timestamp=date();
+var nm; nm=0;  
+inall(fattura, (fdir eq "entrata") && ( consult eq ftipo))
+{ if (nm < fnum) { nm=fnum; };
+};
+fnum=nm+1;
+
+in (config)
+{};
+aliva=pciva; alirpef=pcirpef; alinps=pcinps;
+
+'devo mostrare tutti i dati di fattura in una schermata.'
+
+'richiesta del cliente a cui fare fattura'
+'richiesta di importo, perc. iva / irpef / inps'
+'richiesta dell ID di operazione magazzino se merce o della'
+'dicitura se consulenza.'
+'richiesta del tipo di pagamento'
+var tipo; tipo="";
+inall (tipipagamento)
+{ tipo=tipo.tipop.";";
+};
+cragsoc="";
+in (cliente)
+{ cragsoc=cragsoc.ragsoc.";";
+};
+var idmag; idmag="";
+in (magazzino, direzione eq "vendita")
+{ idmag=idmag.id.";";
+};
+if (consult eq "Fatture per merce")
+{ alirpef="(nessuna)";
+  alinps="(nessuna)";
+};
+
+b="Inserisci fattura";
+inf="Inserisci dati di fattura</b>
+Alcuni dati vanno inseriti solo se la fattura e'di consulenza";
+ask inf:info, fnum:text("Fattura numero"),
+timestamp:text("del"),
+cragsoc:option("Cliente <a href=inscli.cgi>(nuovo)</a>"),
+idmag:options("merce <a href=magazzino.cgi>(magazzino)</a>"),
+merce:text("Descrizione (per consulenza/servizi)"),
+importo,
+aliva:text("% aliquota IVA"),
+alirpef:text("% ritenuta IRPEF <a href=info/infoconsult.html>(per consulenza)</a>"),
+alinps:text("% addizionale INPS <a href=info/infoconsult.html>(per consulenza)</a>"),
+tipo:option("Modo di pagamento"),
+b:submit;
+
+if (importo <=0)
+{ show [
+<a href="javascript:back();"><img src="back1.png" border="0"><b><i>Indietro</i></b></a>
+<br>
+  <b>Errore</b><br>E'stato impostato un importo negativo o nullo];
+  end; 
+};
+
+var fat;
+'visualizzazione e conferma'
+if (consult eq "Fatture per merce")
+{ fat=load "templates/fatturamerce.html";
+} else
+{ fat=load "templates/fatturacons.html";
+};
+
+
+'qui calcolo e sostituisco le cifre in fattura'
+if (consult ne "Fatture per merce")
+{ var a, b;
+  a=round(importo, cifre);
+  fat=change(a, "IMPORTO", fat);
+  a=round(((importo * alinps)/100), cifre);
+  fat=change(a, "ALIMPS", fat);
+  b=round( (((a+importo)*aliva)/100), cifre);
+  fat=change(b, "ALIVA", fat);
+  b=round((a+importo+b), cifre);
+  fat=change(b, "TOTALE", fat);
+  a=round( ((b*alirpef)/100), cifre);
+  fat=change(a, "ALIRPEF", fat);
+  b=round(b-a, cifre);
+  fat=change(b, "CORR", fat);
+};
+
+if (consult eq "Fatture per merce")
+{ var a;
+  fat=change(round(importo, cifre), "IMPORTO", fat);
+  a=round(((importo * aliva)/100), cifre);
+  fat=change(a, "ALIVA", fat);
+  a=round((a+importo), cifre);
+  fat=change(b, "TOTALE", fat);
+};
+
+
+'----------------------------------------------
+
+
+
+fat=change((merce.[<BR>REST]), "MERCE", fat);
+print "fattura: ".fat; end;
+
+fat=change(tipo, "MODOPAG", fat);
+
+inall (cliente, ragsoc eq cragsoc)
+{ fat=change(ragsoc.[<br>
+Part.iva ].piva.[<br>
+].indirizzo.[<br>
+].citta.[<br>], "CRAGSOC", fat);
+};
+
+inall (ditta){};
+fat=change(ragsoc.[<br>
+Part.iva ].piva.[<br>
+].indirizzo.[<br>
+].citta.[<br>
+].telefono.[<br>
+].sito.[ ].mail.[<br>
+], [RAGSOC], fat);
+if (logo ne "")
+{ fat=change([<img src="].logo.[">], "LOGO", fat);
+};
+fat=change("", "LOGO", fat);
+
+b="Conferma fattura;Annulla";
+inf="</b>".fat;
+ask inf:info, b:submit;
+if (b eq "Annulla")
+{ show "Fattura annullata"; end;
+};
+
+'salva e stampa fattura'
+fdir="entrata";
+ftipo=consult;
+inall (cliente, ragsoc eq cragsoc)
+{};
+add fattura;
+show fat.[<br><div align=right><a href="javascript:self.print();"><img
+    src="img/stampa.png" border=0></div></a>];

@@ -1,0 +1,4262 @@
+#!/usr/bin/perl
+my $curr_row=1;
+my $num_row=1;
+
+sub pperror($)
+{ print "EWPP: $curr_file Line \"$curr_row\"\n $_[0]\n";
+  exit -1;
+};
+
+
+sub ppmain($)
+{ $code=$_[0];
+
+
+
+if (substr($code, 0, 2) eq "#!") {$code="'".$code; $num_row=1;};
+  $code=preprocessore($code);
+  return $code;
+};
+
+
+
+sub preprocessore($)
+{ my $code=$_[0];
+  my @defines;
+  my @defs;
+
+  my $path="/usr/lib/ewb/";
+
+  my @code=split("\n", $code);
+  my $i=0;
+  my $l;
+  my $commode=0;
+  my $cr=$curr_row;
+  my $nr=$num_row;
+  foreach $l(@code)
+  {
+    $num_row=$i+1;
+    $curr_row=$l;
+
+    if (substr(ppdelperc($l), 0, 7) eq "#define")
+    { #Qui non cambio il numero di riga.
+      $l=ppdelperc(substr(ppdelperc($l),7));
+      my $name=((split(/ /, $l))[0]);
+      $l=ppdelperc(substr($l, length($name)));
+      my $val=$l;
+      $defs[$#defs+1]=$name."#".$val;
+      $l="";
+      $code[$i]="";
+    }
+    if (substr(ppdelperc($l), 0, 6) eq "#ifdef")
+    { #vediamo se la var. e' definita.
+      $l=substr(ppdelperc($l),6);
+      $l=ppdelperc($l);
+      my $name=((split(/ /, $l))[0]);
+      $commode=1;
+      my $d;
+      foreach $d(@defs)
+      {
+        if (((split("#", $d, ))[0]) eq $name) { $commode=0; }
+      }
+      $l="";
+      $code[$i]="";
+    }
+    if (substr(ppdelperc($l), 0, 7) eq "#ifndef")
+    { #vediamo se la var. e' definita.
+      $l=substr(ppdelperc($l),7);
+      $l=ppdelperc($l);
+      my $name=((split(/ /, $l))[0]);
+      $commode=0;
+      my $d;
+      foreach $d(@defs)
+      { if (((split("#",$d ))[0]) eq $name) { $commode=1; }
+      }
+      $l="";
+      $code[$i]="";
+    }
+    if (substr(ppdelperc($l), 0, 6) eq "#endif")
+    {$commode=0;
+      $l="";
+      $code[$i]="";
+
+    };
+
+    if ($commode) { $l=""; $code[$i]="' ".$l; }
+
+
+    if (substr(ppdelperc($l), 0, 8) eq "#include")
+    { #linea di include di preprocessore.
+
+      $l=ppdelperc(substr(ppdelperc($l), 8));
+
+      my $def="";
+
+      if (substr($l, 0, 1) eq "<")
+      { $def=$path;
+        my ($fn, $rest)=split(">", substr($l,1));
+        if (ppdelperc($rest) ne "")
+        { pperror "Primitiva di preprocessore include errata.";
+        }
+        $def=$def.$fn;
+        $def=join("/", split("//", $def));
+      }
+      elsif (substr($l, 0, 1) eq "\"")
+      { $def="";
+        my ($fn, $rest)=split("\"", substr($l,1));
+        if (ppdelperc($rest) ne "")
+        { pperror "Primitiva di preprocessore include errata.";
+        }
+        $def=$def.$fn;
+      }
+      else
+      { pperror "Primitiva di preprocessore include errata.";
+      }
+
+      my $found=0;
+      my $d;
+      foreach $d(@defines)
+      { if ($d eq $def)
+        { $found=1;
+        }
+      }
+
+      if (!$found)
+      { $defines[$#defines+1]=$def;
+	if (! open (iif, "< ".$def))
+        { pperror "file di include non trovato: ".$def;
+        }
+
+
+        $l=""; $code[$i]="'F_NM:$def\n". join("\n", <iif>)."\n'FEND\n";
+
+        close iif;
+      };
+      $i++;
+    }
+  }
+  $code=join("\n",@code);
+
+  my $a;
+  foreach $a(@defs)
+  { my ($b, $c)=split("#", $a);
+    if ($b ne "")
+    { $code=join( $c, split ($b, $code));
+    }
+  }
+  $curr_row=$cr;
+  $num_row=$nr;
+  return $code;
+}
+
+
+
+sub ppisperc($)
+{ my $code=$_[0];
+  my $a;
+  $a=substr($code, 0, 1);
+  return (($a eq ' ')|| ($a eq "\t") || ($a eq "\n") );
+}
+my @linenums;
+my $currfile=$ARGV[0];
+sub ppdelperc($)
+{ my $code=$_[0];
+  my $a;
+  do
+  { $a=substr($code, 0, 1);
+    if (($a eq " ") || ($a eq "\t") || ($a eq "\n"))
+    { $code=substr($code, 1);
+      if ($a eq "\n") { $curr_row=(split("\n", $code))[0];
+                        if (substr($curr_row,0,5) eq "'F_NM")
+		        { push @linenums,$currfile;
+			  push @linenums,$num_row;
+		          $currfile=substr($curr_row,5);
+			  $code=substr($code, length($curr_row)+1);
+			  $curr_row=(split("\n", $code))[0];
+                          $num_row=0;
+			}
+			if (substr($curr_row,0,5) eq "'FEND")
+			{ $num_row=pop @linenums;
+			  $currfile=pop @linenums;
+			  $code=substr($code, length($curr_row)+1);
+			  $curr_row=(split("\n", $code))[0];
+			}
+			$num_row++;
+			#print "\n##\t".$curr_row."\n";
+		      };
+      $a = "jump";
+    }
+  } while ($a eq "jump");
+  return $code;
+}
+
+
+
+
+sub lnerror($)
+{ print "EWLN: $_[0]\n";
+  exit -1;
+};
+
+sub lnmain($$)
+{ my ($code,$file)=@_;
+  my $toadd="";
+  if (! (open iiif,"< /lib/ewb/$file"))
+  { lnerror "libreria /lib/ewb/$file non trovata.";
+  }
+  my $lbr=join("",<iiif>);
+  close iiif;
+  my $i=0;
+  my $found=0;
+  my $fuc=0;
+  my @lb=split("\nsub ",$lbr);
+  $toadd.=$lb[0];
+  my $userc;
+  do
+  { $found=0;
+    my $allcode=$code.$toadd;
+    for ($i=1; $i<=$#lb; $i++)
+    { $userc="";
+      $name=lngetname($lb[$i]);
+      if (($fuc==0)&&(index($lb[$i],"#<EWB_usercode>\n")>0))
+      { #print "Trovato usercode\n";
+        $userc="\nEWB_EWLN_usercode;\n\n";
+        $fuc=1;
+      };
+      if (($name ne "")&(index($allcode,$name)>0))
+      { print "ins. funzione $name\n";
+        $toadd.="\nsub ".$lb[$i];
+        $lb[$i]="";
+        $found=1;
+      };
+      $toadd=$toadd.$userc;
+    };
+  } while ($found==1); 
+  
+  
+  $toadd=join("\n".$code."\n",split("\nEWB_EWLN_usercode;\n",$toadd));
+  return $toadd;
+};
+
+sub lngetname($)
+{ #torna il nome della variabile. Adattato al nuovo modo.
+  my $code=$_[0];
+  my $name="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a=substr($code, 0, 1);
+  if ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_"))
+  { $name=$name.$a;
+    $code=substr($code, 1);
+    $a=substr($code, 0, 1);
+  }
+  while ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_") || (($a ge "0")&&($a le "9")))
+  { $name=$name.$a;
+    $code=substr($code, 1);
+    $a=substr($code, 0, 1);
+  }
+  return ($code, $name);
+}
+#!/usr/bin/perl
+use strict;
+my $dbg=0;  #debug flag - a 1 per trovare errori nel compilatore.
+
+my $version="Amethyst easyweb v. 5.30(pre 6)  
+Enrico Betti e Paride Dominici
+";
+
+
+
+my $T="\n\t";
+
+my $headlib="dbfiles.lib";
+my $bodylib;
+my $addpar;
+my $debugmode=0;
+my $webmode=1;
+my $convert2unix=1; 
+do
+{ $addpar=0;
+  my $i;
+
+  if ($ARGV[0] eq "-v")
+  { print $version."\n"; exit(0);
+  };
+  if ($ARGV[0] eq "-g")
+  { $debugmode=1;
+    $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+  };
+  if ($ARGV[0] eq "-l")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $webmode=0;
+  };
+  if ($ARGV[0] eq "-nw")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $webmode=0;
+  };
+  if ($ARGV[0] eq "-dbfv")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $headlib="dbfv.lib";
+  };
+  if ($ARGV[0] eq "-dbf")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $headlib="dbfiles.lib";
+  };
+  if ($ARGV[0] eq "-dbmysql")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $headlib="dbmysql.lib";
+  };
+  if ($ARGV[0] eq "-c")
+  { $addpar=1;
+    for ($i=0; $ARGV[$i] ne ""; $i++)
+    { $ARGV[$i]=$ARGV[$i+1];
+    };
+    $convert2unix = 0; 
+  };
+} while ($addpar > 0);
+
+my @variables; my @tables, my @functions;
+my $num_labels=0;
+$variables[0]="template:v";
+$variables[1]="format:v";
+$variables[2]="tabpath:v";
+$variables[3]="sqldbase:v";
+$variables[4]="sqlserver:v";
+$variables[5]="sqluser:v";
+$variables[6]="sqlpassword:v";
+
+my $num_calls=100;
+
+my @stack;
+
+
+sub inblock()
+{ push @stack, (join("\n", @variables));
+  push @stack, (join("\n", @tables));
+  push @stack, (join("\n", @functions));
+}
+sub outblock()
+{ @functions = split("\n", pop @stack);
+  @tables    = split("\n", pop @stack);
+  @variables = split("\n", pop @stack);
+}
+
+
+my $res;
+if ($ARGV[0] eq "")
+{ printf stderr "$version
+Uso ewb [parametri]filename [outfile]
+	parametri:
+  -c        converte in formato dos 
+  -v        mostra la versione corrente. 
+  -g        inserisce codici di debug
+  -nw, -l		nessun motore di accesso web
+  -dbmysql	usa database engine mysql
+  -dbf      usa database su files
+  -dbfv     usa database su files visibili (.txt)
+
+Nota : Se outfile e' omesso viene creato da filename.ewb filename.cgi
+
+"; exit 0;
+};
+if ($ARGV[1] eq "")
+{
+  my @a;
+
+  @a=split(/\./ ,$ARGV[0]);
+  $ARGV[1]= $a[0]."\.cgi";
+};
+
+
+my $code;
+if (open iiif, "<".$ARGV[0])
+{
+         $code=join("", <iiif>);
+         close iiif;
+  open oof, ">".$ARGV[1];
+} else
+{ print "Il file $ARGV[0] non sembra esistere.\nErrore\n"; 
+};
+sub delperc($);
+$code=ppmain($code);
+my $curr_row=(split("\n", $code))[0];
+my $num_row=1;
+
+my $rr;
+($code, $rr)=delperc($code);
+
+($code,$res)=programma($code);
+my $v=join("\n#", split("\n", $version));
+$res.= "\n#$v\n";
+
+
+
+
+if ($webmode!=0)
+{ $res="
+my \@parname;
+my \@parvalue;
+srand(time());
+read_form_buffer();
+if (get_par(\"EWjump\")>0)
+{ jumper(get_par(\"EWjump\"));
+};
+".$res;
+};
+$res=lnmain($res,$headlib);
+
+if ($webmode!=0)
+{ $res="#!/usr/bin/perl
+"."print \"Content-type: text/html\\n\\n\"; \n".$res;
+};
+
+print oof $res;
+close oof;
+if ($convert2unix == 1)
+{ 
+  print "\nConverto il file nel formato UNIX\n";
+  my $convertedline;
+  my @convertedfile;
+  open iif, "<$ARGV[1]" ;
+    @convertedfile = <iif>;
+  close iif;
+  
+  open oof, ">$ARGV[1]" ;
+  binmode oof;
+    foreach $convertedline(@convertedfile)
+    {
+      printf oof "%s%c",join("", split("\n", $convertedline)), 10;
+    };
+  close oof;
+}else{
+  print "\nLascio il file invariato.\n";
+};
+chmod 0755, $ARGV[1];
+exit(0);
+
+
+sub programma($)
+{ my $code=$_[0];
+  my $res;
+  while ($code ne "")
+  { my $r="";
+    ($code, $r)=codice($code);
+    $res.=$r;
+  }
+
+$res="my \$ax,\$bx,\$cx,\$dx,\@as;\n".$res;
+
+  $res.= "exit(0); \n
+sub jumper(\$)
+{ my \$lab=\$_[0];\n";
+  my $i;
+  for($i=1; $i<=$num_labels; $i++)
+  { $res.= "if (\$lab==$i) { goto lab$i; }\n";
+  }
+  $res.= "};\n";
+  return ($code, $res);
+}
+
+sub codice($)
+{ my $code=$_[0];
+  my $res="";
+  my $r;
+  if (substr($code, 0, 1) eq ";") {
+  ($code,$r)=delperc(substr($code, 1));  }
+  $res.=$r;
+
+  if (is_commento($code))
+  { my $r;
+    ($code,$r)=commento($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 5) eq "table") && isnottoken(substr($code, 5)) )
+  { my $r;
+    ($code,$r)=tabdecl($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 3) eq "var") && isnottoken(substr($code, 3)) )
+  { my $r;
+    ($code,$r)=vardecl($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 2) eq "if") && isnottoken(substr($code, 2)) )
+  { my $r;
+    ($code,$r)=ifblock($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 5) eq "while") && isnottoken(substr($code, 5)) )
+  { my $r;
+    ($code,$r)=whileblock($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 7) eq "foreach") && isnottoken(substr($code, 7)) )
+  { my $r;
+    ($code,$r)=foreachblock($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 3) eq "for") && isnottoken(substr($code, 3)) )
+  { my $r;
+    ($code,$r)=forblock($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 2) eq "do") && isnottoken(substr($code, 2)) )
+  { my $r;
+    ($code,$r)=downwhile($code);
+    $res.=$r;
+  }
+  elsif ( (substr($code, 0, 3) eq "sub") && isnottoken(substr($code, 3)) )
+  { my $r;
+    ($code,$r)=fundecl($code);
+    $res.=$r;
+  }
+  else
+  { if (($code ne "") && (substr($code,0,1) ne "}"))
+    { my $r;
+      ($code,$r)=calcexp($code);
+      $res.=$r;
+    }
+  }
+  if (substr($code, 0, 1) eq ";") {
+  ($code,$r)=delperc(substr($code, 1));  }
+  $res.=$r;
+  return ($code,$res);
+}
+
+sub isnottoken($)
+{ my $code=$_[0];
+  my $a;
+  $a=substr($code, 0, 1);
+  return (!( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_") || (($a ge "0")&&($a le "9"))));
+}
+
+sub isperc($)
+{ my $code=$_[0];
+  my $a;
+  $a=substr($code, 0, 1);
+  return (($a eq ' ')|| ($a eq "\t") || ($a eq "\n") );
+}
+my @linenums;
+my $currfile=$ARGV[0];
+sub delperc($)
+{ my $code=$_[0];
+  my $res;
+  my $a;
+  do
+  { $a=substr($code, 0, 1);
+    if (($a eq " ") || ($a eq "\t") || ($a eq "\n"))
+    { $code=substr($code, 1);
+      if ($a eq "\n") { $curr_row=(split("\n", $code))[0];
+                        if (substr($curr_row,0,5) eq "'F_NM")
+		        { push @linenums,$currfile;
+			  push @linenums,$num_row;
+		          $currfile=substr($curr_row,5);
+			  $code=substr($code, length($curr_row)+1);
+			  $curr_row=(split("\n", $code))[0];
+                          $num_row=0;
+			}
+			if (substr($curr_row,0,5) eq "'FEND")
+			{ $num_row=pop @linenums;
+			  $currfile=pop @linenums;
+			  $code=substr($code, length($curr_row)+1);
+			  $curr_row=(split("\n", $code))[0];
+			}
+			$num_row++;
+			# modifica 030424P inizio
+			# aggiungo il numero di riga del sorgente per ritrovarmi meglio
+			#if ($debugmode) { $res.= "\n###".$curr_row.$T; };
+			if ($debugmode) { $res.= "\n###".$num_row."#".$curr_row.$T; };
+			# modifica 030424P fine
+		      };
+      $a = "jump";
+    }
+  } while ($a eq "jump");
+  return ($code,$res);
+}
+
+sub errore($)
+{ my $err=$_[0];
+  my $a=$ARGV[0]; if ($a eq "") { $a="STDIN"; }
+  print stderr "Errore alla linea $num_row\n$curr_row \n$a: $err\n";
+  print "\n#EWB: errore\n";
+  exit(-1);
+}
+sub is_commento($) {my $code=$_[0];
+  return ((substr $code, 0, 1) eq "\'");};
+sub commento($)
+{ my $code=$_[0];
+  my $res="";
+  while ((substr($code, 0,1) ne "\n") && ($code ne ""))
+  { $res.=substr($code,1);
+    $code=substr($code, 1, length($code));
+  }
+  $res.="\n";
+  my ($c,$r)=delperc($code);
+  return ($c,$r);
+}
+
+sub ifblock($)
+{ my $code=$_[0];
+  my $res="";
+  $code=substr($code,3);
+
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$rcd)=calcexp($code); $res.=$rcd;
+  $res.= "if (!(\$ax";
+  $res.= ")) { goto area$num_calls; };$T";
+  my $dest1=$num_calls;
+  ++$num_calls;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo if. "; }
+  inblock();
+
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  { my $rb;
+    ($code, $rb)=codice($code);
+    $res.=$rb;
+
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  $code=substr($code,1);
+  outblock();
+  my $nc=$dest1;
+  $res.= "goto areaend$nc;$T";
+
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\narea$dest1:;$T";
+
+  if (substr($code,0,1) eq ";") { $code=substr($code,1); $res.= ";\n"; }
+
+  else
+  {
+   while (substr($code, 0,6) eq "elseif")
+   { $code=substr($code, 6);
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     my $rb;
+     ($code,$rb)=calcexp($code);
+     $res.=$rb;
+     $res.= "if (!(\$ax";
+     $res.= ")) { goto area$num_calls; };$T";
+     my $dest=$num_calls;
+     ++$num_calls;
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo elseif. "; }
+     inblock();
+     $code=substr($code, 1);
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     while ( substr($code, 0, 1) ne "}")
+     { my $rb;
+       ($code,$rb)=codice($code);
+       $res.=$rb;
+       my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     }
+     $code=substr($code,1);
+     outblock();
+
+     $res.= "goto areaend$nc;$T";
+     $res.= "\narea$dest:;$T";
+
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+   }
+   if (substr($code, 0,4) eq "else")
+   { $code=substr($code, 4);
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo elseif. "; }
+     inblock();
+     $code=substr($code, 1);
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     while ( substr($code, 0, 1) ne "}")
+     { my $rb; ($code,$rb)=codice($code); $res.=$rb;
+       my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+     }
+     $code=substr($code,1);
+     outblock();
+     my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+   }
+   if (substr($code,0,1) ne ";") { errore "Manca ; finale in if.. else (b)"; }
+
+  }
+  $res.= "\nareaend$nc:;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$res);
+}
+
+sub foreachblock($)
+{ #complicato: devo generare una variabile interna e una temporanea di loop.
+  my $code=$_[0];
+  my $res="";
+  my $nc=$num_calls;
+  $num_calls=$num_calls+3; #2 calls, 1 temporanea
+  $code=substr($code, 7);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  inblock();
+
+  $res=$res. $T."my \$";
+  my $name;
+  ($code, $name)=variable($code);
+  checkpredef ($name);
+  $res=$res. "EWB_".$name;
+  $res=$res. ";$T";
+  $variables[$#variables+1]= $name.":v";
+
+  $res=$res."my \$EWB_forblockvar_".$nc.";$T";
+  $variables[$#variables+1]= "forblockvar".$nc.":v";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne "(")
+  { errore "foreach: e' prevista aperta parentesi dopo la variabile.";
+  };
+  $code=substr($code,1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $rb; ($code, $rb)=calcexp($code); $res.=$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) ne ")")
+  { errore "foreach: blocco di codice non corretto.";
+  };
+  $res=$res."my \$EWB_forblockvar".$nc." = \$ax.\" \";$T";
+  $code=substr($code, 1);
+  my $rb; ($code, $rb)=delperc($code); $res.=$rb;
+  $res.= "area".($nc+1).":;$T";
+
+  $res.="if (\$EWB_forblockvar".$nc." eq \"\") { goto area".($nc+2).";};$T";
+
+  $res.="\$EWB_".$name." = getelem(\$EWB_forblockvar".$nc.",0);$T";
+  $res.="\$EWB_forblockvar".$nc."=substr(\$EWB_forblockvar".$nc.", index(\$EWB_forblockvar".$nc.", \" \")+1);$T";
+
+
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo foreach. "; }
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  { my $rb; ($code,$rb)=codice($code); $res.=$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  };
+
+  $code=substr($code,1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne ";") { errore "Manca ; finale in while"; }
+  $code=substr($code,1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.="goto area".($nc+1).";$T";
+  $res.= "area".($nc+2).":;$T";
+
+  outblock();
+  return ($code,$res);
+
+};
+
+sub forblock($)
+{ my $code=$_[0];
+  my $res="";
+  my $nc=$num_calls;
+  $num_calls=$num_calls+4;
+  my $tmp;
+  ($code,$tmp)=delperc(substr($code, 3));
+  if (substr($code, 0,1) ne "(") { errore "necessaria ( dopo for."; }
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);
+  my $rb; ($code,$rb)=codice($code); $res.=$rb;
+  if (substr($code,0,1) ne ",")
+  { errore "for: le condizioni vanno separate da virgola.";
+  }
+  $code=substr($code,1);
+
+  $res.= "\narea".($nc+2).":;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$rb)=codice($code); $res.=$rb;
+  if (substr($code,0,1) ne ",")
+  { errore "for: le condizioni vanno separate da virgola.";
+  }
+  $code=substr($code,1);
+  $res.= "if (\$ax";
+  $res.= ") { goto area".$nc."; };$T";
+  $res.= "goto area".($nc+3).";$T"; #end
+  $res.= "\narea".($nc+1).":;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $rb; ($code,$rb)=codice($code); $res.=$rb;
+  $res.= "goto area".($nc+2).";$T"; #st
+
+  if (substr($code, 0,1) ne ")") { errore "manca )."; }
+  $code=substr($code, 1);
+
+  $res.= "\narea".($nc).":;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo for. "; }
+  inblock();
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  { my $rb;
+    ($code,$rb)=codice($code);
+    $res.=$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  $code=substr($code,1);
+  outblock();
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "goto area".($nc+1).";$T"; #st
+  $res.= "area".($nc+3).":;$T";
+
+
+  if (substr($code,0,1) ne ";") { errore "Manca ; finale in for"; }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  return ($code, $res);
+}
+
+sub whileblock($)
+{ my $code=$_[0];
+  $code=substr($code, 5);
+  my $res="";
+
+  my $nc=$num_calls;
+  $num_calls=$num_calls+2;
+  $res.= "\narea".$nc.":;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $rb; ($code,$rb)=codice($code); $res.=$rb;
+
+  $res.= "if (! (\$ax";
+  $res.= ")) {goto area".($nc+1).";};$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo while. "; }
+  inblock();
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  { my $rb; ($code,$rb)=codice($code); $res.=$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  $code=substr($code,1);
+  outblock();
+  $res.= "goto area$nc;$T";
+  $res.= "\narea".($nc+1).":;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne ";") { errore "Manca ; finale in while"; }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$res);
+}
+
+sub downwhile($)
+{ my $code=$_[0];
+  $code=substr($code, 2);
+  my $nc=$num_calls;
+  $num_calls=$num_calls+1;
+  my $res="";
+
+  $res.= "area".$nc.":;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo do . "; }
+  inblock();
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  { my $rb; ($code,$rb)=codice($code); $res.=$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  $code=substr($code,1);
+
+  outblock();
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0,5) ne "while")
+  { errore "necessario while dopo do {..}"; }
+  $code=substr($code, 5);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $rb; ($code,$rb)=calcexp($code); $res.=$rb;
+  $res.= "if (\$ax";
+  $res.= ") {goto area".$nc.";};$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$res);
+}
+
+sub is_assign($)
+{ #ho un assignamento se trovo "variabile delperc = (e non ==)"
+  my $code=$_[0];
+  my $res=0;
+  my $rb;
+  my $r="";
+  my $a=substr($code, 0, 1);
+  if   ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_") )
+  { $r=$a;
+    $res=0;
+    while ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ( (uc($a)ge "0")&&(uc($a) le "9") ) || ($a eq "_") )
+    { $code=substr($code, 1);
+      $a=substr($code, 0, 1);
+      if (($a ne "=") && ($a ne "[")) { $r.=$a; };
+    };
+    $r=join(//, split(/ /, $r));
+
+
+    my $v;
+    my $found="";
+    foreach $v(@variables)
+    { if ( ((split(":", $v))[0]) eq $r)
+      { $found="var";
+      }
+      };
+    if ($found ne "")
+    {
+      ($code, $rb)=delperc($code);
+      $a=substr($code, 0, 1);
+      if ($a eq "[")
+      { #printf "array ";
+         $code=substr($code, 1);
+         my $dabuttare;
+         ($code, $dabuttare)=calcexp($code);
+         ($code, $dabuttare)=delperc($code);
+         if (substr($code, 0, 1) eq "]")
+         { $code=substr($code, 1);
+           ($code, $dabuttare)=delperc($code);
+           if ((substr($code, 0,1) eq "=") && (substr($code,1,1) ne "=")) { $res=1; };
+         };
+      }
+      else
+      { # printf "semplice ";
+        if ((substr($code, 0, 1) eq "=") && (substr($code, 1, 1) ne "="))
+        {$res=1;} else {$res=0;};
+      };
+    };
+  };
+  return $res;
+};
+
+sub assign($)
+{ my $code=$_[0];
+  my $vn;
+if ($dbg) {printf "assign ".substr($code, 0, 7)."\n";};
+
+  my $res="";
+  ($code, $vn)=variable($code);
+  my $rt; 
+  ($code, $res)=delperc($code);
+
+
+    my $v;
+    my $found="";
+    foreach $v(@variables)
+    { if ( ((split(":", $v))[0]) eq $vn)
+      { $found="var";
+      }
+    };
+    if ($found eq "") { errore "Variabile inesistente $vn\n"; };
+
+
+
+  if (substr($code, 0, 1) ne "[")
+  { #normale variabile. 
+
+    if (substr($code, 0,1) ne "=") 
+    { errore "Errore interno in assign. scusate."; };
+    ($code,$rt)=delperc(substr($code,1)); $res.=$rt; 
+    ($code,$rt)=inexp($code);$res.=$rt; 
+    $res.="\$EWB_".$vn."=\$ax;"; 
+  }
+  else
+  { 
+    ($code,$rt)=delperc(substr($code,1));
+    $res.=$rt; 
+    ($code,$rt)=calcexp($code);
+    $res.=$rt; 
+    ($code,$rt)=delperc($code);
+    $res.=$rt; 
+    $res.="push \@as, \$ax;$T";
+    if (substr($code,0,1) ne "]")
+    { errore "errore di sintassi: mi aspettavo chiusa quadra"; 
+    };
+    $code=substr($code,1);
+    ($code,$rt)=delperc($code);
+    $res.=$rt;
+    if ((substr($code, 0, 1) ne "=") || (substr($code, 1, 1) eq "="))
+    { errore "errore di sintassi: mi aspettavo un uguale";
+    };
+    $code=substr($code,1);
+    ($code,$rt)=delperc($code);
+    $res.=$rt;
+
+ 
+    ($code,$rt)=calcexp($code);
+    $res.=$rt; 
+    ($code,$rt)=delperc($code);
+    $res.=$rt; 
+    $res.="\$bx=pop \@as;$T"."setelem(\$EWB_".$vn.", \$bx,\$ax);$T";    
+    
+  };  
+if ($dbg) {printf "assign ret ".substr($code, 0,7)."\n"; }; 
+
+  return ($code, $res); 
+};
+
+
+sub calcexp($)
+{ my $code=$_[0];
+  if ($dbg) { printf "calcexp ".substr($code, 0, 7)."\n"; };
+  my $res="";
+  my $rb;
+  my $rcd;($code,$rcd)=delperc($code);
+  if (is_assign($code))
+  {   my $rcd;($code,$rcd)=assign($code);$res.=$rcd;
+  }
+  else
+  { ($code,$rcd)=inexp($code);$res.=$rcd;
+  };
+if ($dbg) { printf "calcexp ret\n"; };
+
+  return ($code, $res);
+};
+
+sub inexp($)
+{ my $code=$_[0];
+  my $res="";
+if ($dbg) { printf "inexp ".substr($code, 0, 7)."\n"; };
+  my $rb;
+  my $rcd;($code,$rcd)=delperc($code);
+  my $k=$res;
+  ($code,$rb)=eexp($code);
+  $res.=$rb;
+  my $rcd;($code,$rcd)=delperc($code);
+  while (is_cfr($code))
+  { my $cf; my $rb;
+    my $nmv=substr($res, 4, length($res));
+    my $nmv=substr($nmv, 1, length($nmv)-4);
+    $res.="push \@as,\$ax;$T";
+    ($code,$cf)=cfr($code);
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+      ($code,$rb)=eexp($code);
+      $res.=$rb;
+      $res.="\$bx=pop \@as;$T";
+      $res.="\$ax=(\$bx $cf \$ax);$T";
+  }
+if ($dbg) {printf "inexp ret\n"; }; 
+
+  return ($code,$res);
+}
+
+sub is_cfr($)
+{ my $code=$_[0];
+  my $a=substr($code, 0, 1);
+  my $b=substr($code, 0, 2);
+  return ( ($a eq "<") || ($a eq ">") ||
+           ($b eq "==")|| ($b eq "<=")|| ($b eq ">=")||
+           ($b eq "ge")|| ($b eq "le")|| ($b eq "lt")||
+           ($b eq "gt")||
+           ($b eq "eq")|| ($b eq "ne")|| ($b eq "!="));
+}
+sub cfr($)
+{ my $code=$_[0];
+  my $res;
+
+  my $a=substr($code, 0, 1);
+  my $b=substr($code, 0, 2);
+  if      (($b eq "==")|| ($b eq "<=")|| ($b eq ">=")||
+           ($b eq "ge")|| ($b eq "le")|| ($b eq "lt")||
+           ($b eq "gt")||
+           ($b eq "eq")|| ($b eq "ne")|| ($b eq "!="))
+  { $res= $b; $code=substr($code, 2); }
+  elsif  (($a eq "=") || ($a eq "<") || ($a eq ">"))
+  { $res= "".$a.""; $code=substr($code, 1);
+  }
+  return ($code,$res);
+}
+
+sub eexp($)
+{ my $code=$_[0];
+  my $res;
+if ($dbg) {printf "eexp ".substr($code, 0, 7)."\n";};
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$res)=term_e($code);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0,1) eq ".")
+  { #print ".";
+    my $rb;
+    $res.="push \@as,\$ax;$T";
+    $code=substr($code, 1);
+    ($code,$rb)=eexp($code);
+    $res.=$rb;
+    $res.="\$bx=pop \@as;$T\$ax=\$bx.\$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  }
+if ($dbg) {  printf "eexp ret\n"; }; 
+
+  return ($code,$res);
+}
+
+
+sub term_e($ )
+{ my $code=$_[0];
+  my $res="";
+if ($dbg) {printf "term_e ".substr($code, 0, 7)."\n"; };
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$res)=term_t($code);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0,1) eq "+") || (substr($code, 0,1) eq "-"))
+  { my $op= substr($code, 0, 1);
+    my $rb;
+    $res.="push \@as,\$ax;$T";
+    $code=substr($code, 1);
+    ($code,$rb)=term_e($code);
+    $res.="$rb\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+if ($dbg)  { printf "term_e ret\n"; };
+
+  return ($code,$res);
+}
+
+sub term_t($ )
+{ my $code=$_[0];
+  my $res="";
+if ($dbg) { printf "term_t ".substr($code, 0, 7)."\n"; };
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$res)=term_f($code);
+  if ((substr($code, 0,1) eq "*")
+      || (substr($code, 0,1) eq "/")
+      || (substr($code, 0,1) eq "%"))
+  { my $op= substr($code, 0, 1);
+    $code=substr($code, 1);
+    $res.="push \@as,\$ax;$T";
+    my $rb; ($code,$rb)=term_t($code);
+    $res.=$rb."\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+if ($dbg){  printf "term_t ret\n"; }; 
+  return ($code,$res);
+}
+
+sub term_f($)
+{ my $code=$_[0];
+  my $res;
+if ($dbg) { printf "term_f ".substr($code, 0, 7)."\n"; };
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$res)=term_b($code);
+  if (substr($code, 0,2) eq "||")
+  { my $op= substr($code, 0, 2);
+    $code=substr($code, 2);
+    $res.="push \@as,\$ax;$T";
+    my $rb; ($code,$rb)=term_f($code);
+    $res.=$rb."\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  elsif (substr($code, 0,1) eq "|")
+  { my $op= substr($code, 0, 1);
+    $code=substr($code, 1);
+    $res.="push \@as,\$ax;$T";
+    my $rb; ($code,$rb)=term_f($code);
+    $res.=$rb."\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+if ($dbg) { printf "term_f ret\n"; }; 
+
+  return ($code,$res);
+}
+
+sub term_b($)
+{ my $code=$_[0];
+  my $res="";
+if ($dbg) { printf "term_b ".substr($code, 0, 7)."\n"; };
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  ($code,$res)=term_k($code);
+  if (substr($code, 0,2) eq "&&")
+  { my $op= substr($code, 0, 2);
+    $res.="push \@as,\$ax;$T";
+    $code=substr($code, 2);
+    my $rb; ($code,$rb)=term_b($code);
+    $res.=$rb."\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  }
+  elsif (substr($code, 0,1) eq "&")
+  { my $op= substr($code, 0, 1);
+    $code=substr($code, 1);
+    my $rb;($code,$rb)=term_b($code);
+    $res.=$rb."\$bx=pop \@as;$T\$ax=\$bx $op \$ax;$T";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+if ($dbg) {printf "term_b ret\n"; };
+
+  return ($code,$res);
+}
+
+sub term_k($)
+{ my $code=$_[0];
+  my $rb="";
+if ($dbg) { printf "term_k ".substr($code, 0, 7)."\n";};
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  ($code,$rcd)=term_c($code);$res.=$rcd;
+  if (substr($code,0,1) eq "[")
+  {
+    $code=substr($code,1);
+    ($code,$rcd)=delperc($code);$res.=$rcd;
+    $res=$res."push \@as,\$bx;".$T."push \@as,\$ax;".$T;
+    my $rcd;($code,$rcd)=calcexp($code);$res.=$rcd;
+
+    $res=$res."\$bx=pop \@as;$T\$ax=getelem(\$bx,\$ax);".$T."\$bx=pop \@as;$T";
+    if (substr($code, 0, 1) ne "]")
+    { errore "manca ']' in array.";
+    };
+    $code=substr($code,1);
+    ($code,$rcd)=delperc($code);$res.=$rcd;
+  } else
+  { $res.=$rb;
+  };
+if ($dbg) { printf "term_k ret\n"; };
+  return ($code, $res);
+};
+
+sub term_c($)
+{ my $code=$_[0];
+  my $found=0;
+if ($dbg) { printf "term_c ".substr($code, 0, 7)."\n"; };
+
+  my $rcd;($code,$rcd)=delperc($code);
+  my $res;
+
+  if (substr($code, 0, 1) eq "!")
+  { # "!" - not unario
+
+    my $rest;
+    my $rb;
+    ($code,$rest)=delperc(substr($code,1));
+    ($code,$rb)=inexp($code);
+    $res.="$rb\$ax=!\$ax;$T";
+    $found=1;
+  }
+  elsif ((!$found)&&(substr($code, 0, 1) eq "("))
+  { #parentesi
+
+    $code=substr($code, 1);
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+    ($code,$res)=calcexp($code);
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+    if (substr($code,0, 1) ne ")")
+    { errore "manca parentesi chiusa";
+    }
+    $code=substr($code, 1);
+    $found=1;
+  }
+  elsif ((!$found)&&(is_tabella($code)))
+  { ($code,$res)=tabella($code);
+    $found=1;
+  }
+  elsif ((!$found)&&(is_identifier($code)))
+  {
+    ($code,$res)=identifier($code);
+    $found=1;
+  }
+  elsif ((!$found)&&(is_numvalue($code)))
+  { my $rb;
+    ($code,$rb)=numvalue($code);
+    $res="\$ax=$rb;$T";
+    $found=1;
+  }
+  elsif ((!$found)&&(is_strvalue($code)))
+  { my $rb;
+    ($code,$rb)=strvalue($code);
+    $res="\$ax=$rb;$T";
+    $found=1;
+  }
+  elsif (!$found)
+  { my $t=substr($code, 0, 4);
+    errore "termine sconosciuto [$t ...]. ";
+  }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+if ($dbg) { printf "term_c ret\n"; }; 
+return ($code,$res);
+}
+sub variable($)
+{ #torna il nome della variabile. Adattato al nuovo modo.
+  my $code=$_[0];
+  my $name="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a=substr($code, 0, 1);
+  if ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_"))
+  { $name=$name.$a;
+    $code=substr($code, 1);
+    $a=substr($code, 0, 1);
+  }
+  else
+  { errore "Nome di variabile errato.";
+  }
+
+  while ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_") || (($a ge "0")&&($a le "9")))
+  { $name=$name.$a;
+    $code=substr($code, 1);
+    $a=substr($code, 0, 1);
+  }
+  if (length($name) eq "") { errore "funtore non trovato."; }
+  return ($code, $name);
+}
+
+sub is_identifier($)
+{
+  my $code=$_[0];
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a=substr($code, 0, 1);
+  return ( ((uc($a) ge "A") && ( uc($a) le "Z")) || ($a eq "_"));
+}
+
+
+sub is_numvalue($)
+{ my $code=$_[0];
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a=substr($code, 0, 1);
+  return ( ((uc($a) ge "0") && ( uc($a) le "9")) || ($a eq "-"));
+}
+sub numvalue($)
+{ my $code=$_[0];
+  my $res=""; my $r;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) eq "-")
+  { $res=$res. "-"; my $rest; ($code,$rest)=delperc(substr($code,1));
+  }
+  elsif (substr($code, 0, 2) eq "0x")
+  { $res=$res. "0x"; my $rest; ($code,$rest)=delperc(substr($code,2));
+  }
+  elsif (substr($code, 0, 2) eq "0b")
+  { $res=$res. "0b"; my $rest; ($code,$rest)=delperc(substr($code,2));
+  }
+
+  my $a=substr($code, 0, 1);
+  if ((uc($a) lt "0") || ( uc($a) gt "9"))
+  { errore "mi aspettavo un numero.";
+  }
+  my $r=1;
+  do
+  {
+    my $a=substr($code, 0, 1);
+    if ((uc($a) ge "0") && ( uc($a) le "9"))
+    { $res=$res. $a;
+      $code=substr($code,1);
+    }
+    else {$r=0;}
+  }
+  while ($r!=0);
+  $a=substr($code,0,1);
+
+  if ($a eq ".")
+  { $res.=".";
+    $code=substr($code,1);
+    $a=substr($code,0,1);
+
+    if ((uc($a) lt "0") || ( uc($a) gt "9"))
+    { errore "mi aspettavo un numero.";
+    }
+    do
+    {
+      $a=substr($code, 0, 1);
+      if ((uc($a) ge "0") && ( uc($a) le "9"))
+      { $res=$res. $a;
+        $code=substr($code,1);
+      }
+    }
+    while (($a ge "0") & ( $a le "9"));
+  }
+  return ($code,$res);
+}
+
+sub is_strvalue($)
+{ my $code=$_[0];
+  my $r;
+  ($code, $r)=delperc($code);
+  return (
+    (substr($code, 0, 1) eq "\"" ) ||
+    (substr($code, 0, 1) eq "[" ));
+}
+sub strvalue($)
+{
+  my $res = "";
+  my $code=$_[0];
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0,1) eq "\"")
+  { #stringa con virgolette. Ammette \"
+    $res=$res. "\"";
+    $code=substr($code, 1);
+    do
+    { if (substr($code, 0, 2) eq "\\\"")
+     {  $res=$res. "\\\""; $code=substr($code, 2); }
+      if (substr($code, 0, 1) ne "\"")
+     {  $res=$res. substr($code, 0, 1); $code=substr($code, 1); }
+    }
+    while(($code ne "") && (substr($code, 0, 1) ne "\""));
+    if ($code eq "") { errore "stringa non terminata."; };
+    $res=$res. "\"";
+    $code=substr($code, 1);
+  }
+  elsif (substr($code, 0,1) eq "[")
+  { #stringa con quadre. Ammette \] e "
+    $res=$res. "\"";
+    $code=substr($code, 1);
+    do
+    {
+      if (substr($code, 0, 2) eq "\\\]")
+      {  $res=$res. "]"; $code=substr($code, 2); }
+      if (substr($code, 0, 1) eq "\"")
+      {  $res=$res. "\\\""; $code=substr($code, 1); }
+      elsif (substr($code, 0, 1) ne "]")
+      {  $res=$res. substr($code, 0, 1); $code=substr($code, 1); };
+    }
+    while(($code ne "") && (substr($code, 0, 1) ne "]"));
+    if ($code eq "") { errore "stringa non terminata."; }
+    $res=$res. "\"";
+    $code=substr($code, 1);
+  }
+  else
+  { errore "mi aspettavo una stringa.";
+  }
+  return ($code,$res);
+}
+
+
+sub checkpredef($)
+{ #Controlla che la stringa passata non sia una predefinita.
+  my @names=("if","for","while","do","sub","print","eprint","input","int","abs","cos",
+               "sin","hex","sqr","random","mid","index","change","len","uc","asc",
+               "char", "load", "save", "push", "pop", "getelem", "setelem", "numel", "return",
+               "socket", "server", "accept", "sread", "swrite", "close",
+               "lock", "unlock", "add", "exist", "login", "remove", "in", "inall", "sort",
+               "ask","show","askto","form","showform", "assert", "retreat", "goal", "end", "goto",
+               "format", "template" , "split", "join", "loaddir", "date", "time", "lessdate",
+               "exec", "crypt", "getenvvar", "getremoteaddress", "getquerystring",
+               "update", "del", "file", "loadtab", "savetab");
+
+  my $a=$_[0];
+  my $name;
+  foreach $name(@names)
+  { if ($name eq $a)
+    { errore "Dichiarazione di variabile:nome associato a un token di linguaggio.";
+    };
+  };
+};
+
+sub tabdecl($)
+{ #Qui ho una dichiarazione di tabella.. mi serve solo per l' ambiente.
+  my $code=$_[0];
+  my $res;
+  $code=substr($code, 6);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $name;
+  my @values=();
+  ($code, $name)=variable($code);
+  checkpredef $name;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) ne "=") {  errore "table: mi aspettavo \"=\". "; }
+  $code=substr($code,1);
+  my ($rf,$rg)=delperc($code);
+  $code=",".$rf;
+
+  while (substr($code, 0,1) eq ",")
+  { $code=substr($code, 1);
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    ($code, $values[$#values+1])=variable($code);
+    checkpredef $values[$#values];
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  if (substr($code, 0, 1) ne ";") { errore "manca ; a fine riga."; };
+  $tables[$#tables+1]=$name.":".join(":",@values);
+  $res.="\tmy \$TB_$name=\"".$name.":".join(":",@values)."\";$T";
+  my $v;
+  foreach $v(@values)
+  { my $toadd=1;
+    my $k; foreach $k(@variables)
+    { if ($k eq $v.":v")
+      { $toadd=0; }
+    }
+    if ($toadd)
+    { $res=$res. "my \$EWB_".$v."=\"\"; $T";
+      $variables[$#variables+1]= $v.":t";
+    }
+  }
+  return ($code,$res);
+}
+
+sub vardecl($)
+{ my $code=$_[0];
+  my $res="";
+  $code=substr($code, 3);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  my $first=0;
+  do
+  { if ($first) { my $t; ($code,$t)=delperc(substr($code, 1)); }
+    $first=1;
+    $res=$res. "\nmy \$";
+    my $name;
+    ($code, $name)=variable($code);
+    checkpredef $name;
+    $res=$res. "EWB_".$name;
+    $res=$res. "; if (\$ISASKTO) { \$EWB_$name = get_par(\"$name\"); };$T";
+      $variables[$#variables+1]= $name.":v";
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  while ( substr($code, 0, 1) eq  ",");
+  if (substr($code, 0, 1) ne ";")
+  { errore "manca ; dopo dichiarazione di variabili.";
+  }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  return ($code,$res);
+}
+
+sub fundecl($)
+{ my $code=$_[0];
+  my $res="";
+  my @vvars;
+
+
+  $code=substr($code, 3);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  my ($code, $name)=variable($code);
+
+  $res=$res. "goto ENDEWB".$name.";$T";
+  $res=$res. "\nJMPEWB".$name.":$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+
+  if(substr($code, 0, 1) ne "(")
+  { errore "sono necessari parametri tra parentesi."; }
+  $code=substr($code, 1);
+  inblock();
+
+  my $arity=0;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) ne ')')
+  {
+    $code=",".$code;
+    do
+    { $code=substr($code, 1);
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+      my ($t,$a)=variable($code);
+      push @vvars,$a;
+      push @variables, $a.":v";
+      $code=substr($code, length($a));
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+      $res=$res. "my \$EWB_$a = pop \@varstack;$T";
+      ++$arity;
+    } while (substr($code, 0, 1) eq ",");
+  }
+  if(substr($code, 0, 1) ne ")")
+  { errore "parametro di sub sconosciuto."; }
+  $code=substr($code,1);
+
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) eq "{")
+  { #corpo della funzione
+    $code=substr($code, 1);
+
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    while ( substr($code, 0, 1) ne "}")
+    { my $rb;
+      ($code,$rb)=codice($code);
+      $res=$res.$rb;
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    }
+    $code=substr($code,1);
+
+    $res.="goto (pop \@varstack);$T";
+    $res.= "\nENDEWB".$name.":$T";
+
+  outblock();
+  }
+  $functions[$#functions+1]=$name.":".$arity;
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) ne ";")
+  { errore "manca ; dopo la dichiarazione di funzione.";
+  }
+  $res=$res. ";$T";
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$res);
+}
+
+sub is_tabella($)
+{ my ($code,$n)=delperc($_[0]);
+  my $res=0;
+  if (is_identifier($code))
+  { my ($temp,$n)=variable($code);
+    my $t;
+    foreach $t(@tables)
+    { my @p=split(":", $t);
+      if (($res==0)&&(@p[0] eq $n))
+      { $res=1;
+      };
+    }
+  }
+  return $res;
+}
+sub tabella($)
+{ my ($code,$n)=delperc($_[0]);
+  my $res="\$ax=";
+  ($code, $n)=variable($code);
+  my $t;
+  foreach $t(@tables)
+  { my @p=split(":", $t);
+    if (@p[0] eq $n)
+    { $res=$res. "\"".$t."\";\n";
+    }
+  }
+  return ($code,$res);
+}
+
+sub identifier($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my ($temp,$name)=variable($code);
+
+  my $v;
+  my $found="";
+  foreach $v(@variables)
+  { if ( ((split(":", $v))[0]) eq $name)
+    { $found="var";
+    }
+  };
+
+  if ($found eq	"")
+  { foreach $v(@functions)
+    { if ( ((split(":", $v))[0]) eq $name)
+      { $found="fun";
+      }
+    }
+  }
+  if ($found eq "var")  { my $r;
+			  ($code,$r)=delperc(substr($code, length($name)));
+			  $res=$res.$r."\$ax=\$EWB_$name;$T";
+
+
+  			};
+  if ($found eq "fun")  { ($code,$res)=funzione($code);
+                        };
+
+  if ($found eq "")
+  {
+     my $oldc=$code;
+     my $rb;
+     ($code,$rb)=predeff($code);
+     $res.=$rb;
+     if ($code eq $oldc)
+     { errore "funzione o variabile sconosciuta.";
+     }
+  }
+  return ($code,$res);
+}
+
+sub funzione($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  {
+    my $name;
+    ($code, $name)=variable($code);
+
+    my $nc=$num_calls;
+    $num_calls=$num_calls+1;
+
+    my $addr= "area$nc";
+
+    $res.="push \@varstack, $addr;$T";
+
+
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $t; ($code,$t)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+    my $arity;
+    my $v;
+    foreach $v(@functions)
+    { if ( ((split(":", $v))[0]) eq $name)
+      { $arity=((split(":", $v))[1]);
+      }
+    }
+    my $i;
+    my $temp2;
+    my $temp3="";
+    my $temp="";
+    $temp2="";
+    for($i=0; $i<$arity; $i++)
+    { my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+      my $temp;
+
+      ($code,$temp)=calcexp($code);
+      $temp3=$temp;
+      $temp3.="push \@varstack, \$ax;$T";
+      $temp2=$temp3.$temp2;
+
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+      if ($i<$arity-1)
+      { if (substr($code, 0, 1) ne ",")
+        { errore "$name: manca un parametro.";
+        }
+        $code=substr($code, 1);
+      }
+    }
+    $res.=$temp2;
+
+    if($hp)
+    { if (substr($code,0,1) ne ")")
+      { errore "$name: manca ).";
+      }
+      my $t; ($code,$t)=delperc(substr($code,1));
+    }
+    $res.="goto JMPEWB$name;$T";
+    $res.="\n$addr:$T";
+
+  }
+  return ($code,$res);
+}
+
+sub predeff($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);
+  my ($tmp,$a)=variable($code);
+  if ($a eq "print")
+  { ($code,$res)=PD_print($code);
+  }
+  elsif ($a eq "eprint")
+  { ($code,$res)=PD_eprint($code);
+  }
+  elsif ($a eq "input")
+  { ($code,$res)=PD_input($code);
+  }
+  elsif ($a eq "int")
+  { ($code,$res)=PD_int($code);
+  }
+  elsif ($a eq "abs")
+  { ($code,$res)=PD_abs($code);
+  }
+  elsif ($a eq "cos")
+  { ($code,$res)=PD_cos($code);
+  }
+  elsif ($a eq "sin")
+  { ($code,$res)=PD_sin($code);
+  }
+  elsif ($a eq "hex")
+  { ($code,$res)=PD_hex($code);
+  }
+  elsif ($a eq "sqr")
+  { ($code,$res)=PD_sqr($code);
+  }
+  elsif ($a eq "random")
+  { ($code,$res)=PD_random($code);
+  }
+  elsif ($a eq "mid")
+  { ($code,$res)=PD_mid($code);
+  }
+  elsif ($a eq "index")
+  { ($code,$res)=PD_index($code);
+  }
+  elsif ($a eq "change")
+  { ($code,$res)=PD_change($code);
+  }
+  elsif ($a eq "split")
+  { ($code,$res)=PD_split($code);
+  }
+  elsif ($a eq "join")
+  { ($code,$res)=PD_join($code);
+  }
+  elsif ($a eq "len")
+  { ($code,$res)=PD_len($code);
+  }
+  elsif ($a eq "uc")
+  { ($code,$res)=PD_uc($code);
+  }
+   elsif ($a eq "asc")
+  { ($code,$res)=PD_asc($code);
+  }
+  elsif ($a eq "char")
+  { ($code,$res)=PD_char($code);
+  }
+  elsif ($a eq "load")
+  { ($code,$res)=PD_load($code);
+  }
+  elsif ($a eq "loaddir")
+  { ($code,$res)=PD_loaddir($code);
+  }
+  elsif ($a eq "save")
+  { ($code,$res)=PD_save($code);
+  }
+  elsif ($a eq "push")
+  { ($code,$res)=PD_push($code);
+  }
+  elsif ($a eq "pop")
+  { ($code,$res)=PD_pop($code);
+  }
+  elsif ($a eq "getelem")
+  { ($code,$res)=PD_getelem($code);
+  }
+  elsif ($a eq "setelem")
+  { ($code,$res)=PD_setelem($code);
+  }
+  elsif ($a eq "numel")
+  { ($code,$res)=PD_numel($code);
+  }
+  elsif ($a eq "return")
+  { ($code,$res)=PD_return($code);
+  }
+  elsif ($a eq "end")
+  { ($code,$res)=PD_end($code);
+  }
+  elsif ($a eq "date")
+  { ($code,$res)=PD_date($code);
+  }
+  elsif ($a eq "time")
+  { ($code,$res)=PD_time($code);
+  }
+  elsif ($a eq "crypt")
+  { ($code,$res)=PD_crypt($code);
+  }
+  elsif ($a eq "lessdate")
+  { ($code,$res)=PD_lessdate($code);
+  }
+  elsif ($a eq "getenvvar") #aggiunta dalla 2.10
+  { ($code,$res)=PD_GetEnvVar($code);
+  }
+  elsif ($a eq "getremoteaddress") #aggiunta dalla 2.10
+  { ($code,$res)=PD_GetRemoteAddress($code);
+  }
+  elsif ($a eq "getquerystring") #aggiunta dalla 2.10
+  { ($code,$res)=PD_GetQueryString($code);
+  }
+  elsif ($a eq "exec")
+  { ($code,$res)=PD_exec($code);
+  }
+  else {
+  ($code,$res)=tcpconnect($code);
+  };
+  if (substr($code, 0, 1) eq ";") {
+  my $t; ($code,$t) =delperc(substr($code, 1));  }
+
+  return ($code,$res);
+}
+
+sub PD_print($)
+{ my $code=$_[0];
+  my $res="";
+  my $t; ($code,$t)=delperc $code;
+
+  $code=substr($code, 5);
+  my $hp=0;
+  if(substr($code,0,1) eq "(")
+  { my $t; ($code,$t)=delperc(substr($code,1)); $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if ($hp)
+  { if(substr($code,0,1) ne ")") { errore "print - manca chiusa parentesi."; };
+    my $t;($code,$t)=delperc(substr($code,1));
+  };
+  $res=$res. "print \$ax;$T";
+  return ($code,$res);
+}
+
+sub PD_eprint($)
+{ my $code=$_[0];
+  my $res = "";
+  my $t;($code,$t)=delperc $code;
+
+  $code=substr($code, 6);
+  my $hp=0;
+  if(substr($code,0,1) eq "(")
+  { my $t; ($code,$t)=delperc(substr($code,1)); $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  $res=$res. "printf stderr \$ax;$T";
+my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if ($hp)
+  { if(substr($code,0,1) ne ")") { errore "eprint - manca chiusa parentesi."; };
+    my $t; ($code,$t)=delperc(substr($code,1));
+  };
+
+  return ($code,$res);
+}
+
+sub PD_GetEnvVar($)
+{ my $code=$_[0];
+  my $rcd;
+  my $res;  
+  ($code, $rcd)=delperc(substr($code, 9));
+  $res.=$rcd; 
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rcd)=delperc(substr($code,1));
+    $res.=$rcd;
+    $hp=1;
+  }
+  ($code,$rcd)=calcexp($code);
+  $res.=$rcd; 
+  ($code,$rcd)=delperc($code);
+  $res.=$rcd; 
+
+  $res.= "\$ax=EWgetenvvar(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "envvar: manca ).";
+    }
+    ($code, $rcd)=delperc(substr($code,1));
+    $res.=$rcd;
+  }
+  return ($code, $res);
+};
+
+sub PD_GetRemoteAddress($)
+{ my $code=$_[0];
+  my $res= "\$ax=(EWgetenvvar(\"REMOTE_ADDR\"));$T";
+  my $o; 
+  ($code,$o)=delperc(substr($code, 16));
+  
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$o)=delperc(substr($code,1));
+    $hp=1;   
+  } 
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "remoteaddress: manca ).";
+    }
+    ($code,$o)=delperc(substr($code,1));
+  }
+  
+  return ($code,$res);
+};
+
+sub PD_GetQueryString($)
+{ my $code=$_[0];
+  my $res= "\$ax=(EWgetenvvar(\"QUERY_STRING\"));$T";
+  my $o; 
+  ($code,$o)=delperc(substr($code, 14));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$o)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "querystring: manca ).";
+    }
+    ($code,$o)=delperc(substr($code,1));
+  }
+  
+  return ($code,$res);
+};
+
+sub PD_input($)
+{ my $code=$_[0];
+  my $res="";
+  $code=substr($code, 5);
+  my $t; ($code,$t)=delperc $code;
+  if (! is_identifier($code))
+  { $res=$res."\$ax=(<>);$T";
+  }
+  else
+  {
+  my $v;
+  ($code, $v)= variable($code);
+  $res=$res. "(\$EWB_".$v;
+  $res=$res. "=(<>));$T";
+  };
+  return ($code,$res);
+}
+
+sub PD_int($)
+{ my $code=$_[0];
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $t;($code,$t)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res=$res. "\$ax=int(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    my $t; ($code,$t)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_abs($)
+{ my $code=$_[0];
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $t;($code,$t)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res=$res. "\$ax=abs(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    my $t;($code,$t)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_cos($)
+{ my $code=$_[0];
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $t;($code,$t)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res=$res. "\$ax=cos(\$ax * 0.017453292);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+
+
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_sin($)
+{ my $code=$_[0];
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $rr; ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res=$res. "\$ax=cos(\$ax * 0.017453292);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_hex($)
+{ my $code=$_[0];
+  my $res;
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $rr; ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=(hex \$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_sqr($)
+{ my $code=$_[0];
+
+  $code=substr($code, 3);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { my $rr; ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  my $res=$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=(sqrt (\$ax));$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_random($)
+{ my $code=$_[0];
+  my $res= "\$ax=(rand(1));$T";
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+  if (substr($code, 0,1) eq "(")
+  { my $rr; ($code,$rr)=delperc(substr($code,1));
+    if (substr($code, 0,1) ne ")")
+    { errore "non servono parametri per random.";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_date($)
+{ my $code=$_[0];
+  my $res= "\$ax=(EWdate ());$T";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    if (substr($code, 0,1) ne ")")
+    { errore "non servono parametri per date.";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_time($)
+{ my $code=$_[0];
+  my $res= "\$ax=(EWtime ());$T";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    if (substr($code, 0,1) ne ")")
+    { errore "non servono parametri per time.";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_lessdate($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $res; #= "(EWlessdate(";
+  my $rr; ($code,$rr)=delperc(substr($code, 8));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if (substr($code, 0, 1) ne ',')
+  { errore "lessdate: manca un parametro.";
+  }
+  ($code,$rr)=substr($code,1);
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "lessdate: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+  $res.= "\$bx=pop \@as;$T\$ax=EWlessdate(\$bx,\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_crypt($)
+{ my $code=$_[0];
+  my $res="";
+  my $hp=0;
+  my $rr; ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "crypt: manca un parametro.";
+  }
+  $code=substr($code,1);
+    my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  $res.= "\$bx=pop \@as;$T\$ax=crypt(\$bx,\$ax);$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "crypt: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_return($)
+{ my $code=$_[0];
+  $code=substr($code, 6);
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$res);
+}
+
+sub PD_mid($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $rr; ($code,$rr)=delperc(substr($code, 3));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+    my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "manca un parametro.";
+  }
+  $code=substr($code,1);
+
+    my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) eq ',')
+  {
+    $code=substr($code,1);
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    $res.= "\$bx=pop \@as;$T\$cx=pop\@as;$T\$ax=substr(\$cx,\$bx,\$ax);$T";
+  }
+  else
+  { $res.= "\$bx=pop \@as;$T\$cx=pop\@as;$T\$ax=substr(\$cx,\$bx);$T";
+  };
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "mid: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_index($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $rr; ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "manca un parametro.";
+  }
+  $code=substr($code,1);
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "index: manca ).";
+    }
+    my $rr;  ($code,$rr)=delperc(substr($code,1));
+  }
+  $res.= "\$bx=pop \@as;$T\$ax=index(\$bx,\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_join($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "manca un parametro.";
+  }
+  $code=substr($code,1);
+  ($code,$rb)=(calcexp($code));
+  ($code,$rr)=delperc($code);
+  $res.=$rb;
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "index: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  $res.= "\$bx=pop \@as;$T\$ax=EWjoin(\$bx,\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_split($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $res;#= "(EWsplit (";
+  my $rr; ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "manca un parametro.";
+  }
+  $code=substr($code,1);
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "index: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+  $res.= "\$bx=pop \@as;$T\$ax=EWsplit(\$bx,\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_change($)
+{ my $code=$_[0];
+  my $hp=
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "change - manca un parametro.";
+  }
+  $code=substr($code,1);
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ',')
+  { errore "change - manca un parametro.";
+  }
+  my $rr; ($code,$rr)=delperc(substr($code,1));
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$bx=pop \@as;$T\$cx=pop \@as;$T 
+  \$ax=join(\$cx, split(\$bx,\$ax));$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "change: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_exec($)
+{ my $code=$_[0];
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+  my $res;
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "exec: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+
+  $res.= "\$ax=qx{\$ax};$T";
+  return ($code,$res);
+}
+
+sub PD_len($)
+{ my $code=$_[0];
+  my $res; #= "(length (";
+  my $rr; ($code,$rr)=delperc(substr($code, 3));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "len: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  $res.= "\$ax=length(\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_uc($)
+{ my $code=$_[0];
+  my $res=""; #= "(uc (";
+  my $rr; ($code,$rr)=delperc(substr($code, 2));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=uc(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "uc: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_asc($)
+{ my $code=$_[0];
+  my $res= ""; # "(ord (";
+  my $rr; ($code,$rr)=delperc(substr($code, 3));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=ord(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "asc: manca ).";
+    }
+    ($code,$rr)=delperc(subst($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_end($)
+{ my $code=$_[0];
+  my $res= "exit (0);$T";
+  my $rr; ($code,$rr)=delperc(substr($code, 3));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "end: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_char($)
+{ my $code=$_[0];
+  my $res= "";  # "(chr (";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=chr(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "char: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_load($)
+{ my $code=$_[0];
+  my $res= ""; #"(EWload (";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "load: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  $res.= "\$ax=EWload(\$ax);$T";
+  return ($code,$res);
+}
+
+sub PD_loaddir($)
+{ my $code=$_[0];
+  my $res=""; # "(EWloaddir (";
+  my $rr; ($code,$rr)=delperc(substr($code, 7));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=EWloaddir(\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "loaddir: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_save($)
+{ my $code=$_[0];
+  my $res= ""; #"(EWsave (";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ",")
+  { errore "save: mi aspetto due parametri.";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$bx=pop \@as;$T\$ax=EWsave(\$bx,\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "save: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_numel($)
+{ my $code=$_[0];
+  my $rr;
+  ($code,$rr)=delperc $code;
+  my $res= ""; #"(\"\".(split (/ /,";
+  $code=substr($code, 5);
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=\"\".split(/ /,\$ax);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "numel: manca ).";
+    }
+    my $rr;
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+
+sub PD_push($)
+{ my $code=$_[0];
+  my $hp="";
+  my $res="";
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+ my $n=variable($code);
+  ($code,$rr)=delperc(substr($code,length($n)));
+
+  if (substr($code, 0, 1) ne ",")
+  { errore "push: parametri stack, exp.sorgente.";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="\$EWB_$n=\$EWB_$n.toasc(\$ax).\" \";$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "push: manca ).";
+    }
+    my $rr; ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_setelem($)
+{ my $code=$_[0];
+  my $hp;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 7));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $n;
+  ($code, $n)=variable($code);
+
+  my $res="";
+  if (substr($code, 0, 1) ne ",")
+  { errore "setelem richiede tre parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="push \@as,\$ax;$T";
+  if (substr($code, 0, 1) ne ",")
+  { errore "setelem richiede tre parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="\$bx=pop \@as;$T";
+  $res.= "\$ax=setelem(\$EWB_$n,\$bx, \$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "setelem: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_getelem($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 7));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#"\$ax=(getelem(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "push \@as,\$ax;$T";
+  if (substr($code, 0, 1) ne ",")
+  { errore "getelem richiede due parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="\$bx=pop \@as;";
+  $res.= "\$ax=getelem(\$bx,\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "getelem: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_pop($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 3));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $n;
+  ($code, $n)=variable($code);
+  my $res= "\$ax=stpop(\$EWB_$n);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "pop: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub tcpconnect($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);
+  my ($tmp, $a)=variable($code);
+  if ($a eq "socket")
+  { ($code,$res)=PD_socket($code);
+  }
+  elsif ($a eq "server")
+  { ($code,$res)=PD_server($code);
+  }
+  elsif ($a eq "accept")
+  { ($code,$res)=PD_accept($code);
+  }
+  elsif ($a eq "sread")
+  { ($code,$res)=PD_sread($code);
+  }
+  elsif ($a eq "swrite")
+  { ($code,$res)=PD_swrite($code);
+  }
+  elsif ($a eq "close")
+  { ($code,$res)=PD_close($code);
+  }
+  else
+  { 
+    ($code,$res)=database($code);
+    my $t; ($code, $t)=delperc($code);
+  }
+  return ($code,$res);
+}
+
+sub PD_socket($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#(EWsocket(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "push \@as,\$ax;";
+  if (substr($code, 0, 1) ne ",")
+  { errore "socket richiede due parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$bx=pop \@as;$T";
+  $res.= "\$ax=EWsocket(\$bx,\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "socket: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_swrite($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#"(print ";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "push \@as,\$ax;$T";
+  if (substr($code, 0, 1) ne ",")
+  { errore "swrite richiede due parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$bx=pop \@as;$T";
+  $res.= "\$ax=print \$bx \$ax;$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "swrite: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_accept($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#(EWaccept( ";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=EWaccept(\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "accept: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_server($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 6));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#"(EWserver(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=EWserver(\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "Server socket: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_close($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 5));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#(close(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=close(\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "Close: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub PD_sread($)
+{ my $code=$_[0];
+  my $hp="";
+  my $rr; ($code,$rr)=delperc(substr($code, 5));
+   if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+  my $res= "";#(EWsread(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=EWsread(\$ax);$T";
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "sread: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  return ($code,$res);
+}
+
+sub database($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);
+  my ($tmp,$a)=variable($code);
+  if ($a eq "lock")
+  { 		#ok - porting alla 2.0
+    ($code,$res) =PD_lock($code);
+  }
+  elsif ($a eq "unlock")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_unlock($code);
+  }
+  elsif ($a eq "add")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_add($code);
+  }
+  elsif ($a eq "update")
+  {
+
+printf "update.. inizio codice.\n";
+
+    ($code,$res)=PD_update($code);
+  }
+  elsif ($a eq "exist")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_exist($code);
+  }
+  elsif ($a eq "login")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_login($code);
+  }
+  elsif ($a eq "remove")
+  { 		#ok.. a posto nella 2.0
+    ($code,$res)=PD_remove($code);
+  }
+  elsif ($a eq "sort")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_sort($code);
+  }
+  elsif ($a eq "loadtab")
+  {
+    ($code,$res)=PD_loadtab($code);
+  }
+  elsif ($a eq "savetab")
+  {
+    ($code,$res)=PD_savetab($code);
+  }
+  elsif ($a eq "in")
+  { 		#ok - porting alla 2.0
+    ($code,$res)=PD_in($code);
+  }
+  elsif ($a eq "inall")
+  { ($code,$res)=PD_inall($code);
+  }
+  elsif ($a eq "del")
+  { #analoga alla inall ma cancella i campi che rispettano la condizione.
+    ($code,$res)=PD_del($code);
+  }
+  else
+  {
+    ($code,$res)=webask($code);
+    my $t; ($code, $t)=delperc($code);
+  }
+  return ($code,$res);
+}
+
+sub PD_savetab($)
+{ my $code=$_[0];
+  my $res= ""; #"(EWsave (";
+  my $rr; ($code,$rr)=delperc(substr($code, 7));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb."push \@as,\$ax;$T";
+  $res.= "\$tmp=\$ax;$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ",")
+  { errore "savetab: mi aspetto due parametri.";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "tab_wlock(\$tmp);$T
+          \$bx=pop \@as;$T\$ax=tab_save(\$bx,\$ax);$T
+	  tab_unlock(\$tmp);$T";
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "savetab: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+
+  return ($code,$res);
+}
+
+sub PD_loadtab($)
+{ my $code=$_[0];
+  my $res= ""; #"(EWload (";
+  my $rr; ($code,$rr)=delperc(substr($code, 7));
+
+  my $hp=0;
+  if (substr($code,0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code,1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if($hp)
+  { if (substr($code,0,1) ne ")")
+    { errore "loadtab: manca ).";
+    }
+    ($code,$rr)=delperc(substr($code,1));
+  }
+  $res.= "\$tmp=\$ax; tab_wlock(\$tmp);$T";
+  $res.= "\$ax=join(\"\\n\", tab_read(\$ax));$T";
+  $res.= "tab_unlock(\$tmp);$T";
+  return ($code,$res);
+}
+
+sub PD_lock($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+
+  my $rr; ($code,$rr)=delperc(substr($code, 4));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#(tab_wlock(";
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=tab_wlock(\$ax);$T";
+
+  if (($hp==1) && (substr($code, 0, 1) ne ")"))
+  { errore "lock - parentesi non chiusa.";
+  }
+  if ($hp) { my $rr; ($code,$rr)=delperc(substr($code, 1)); }
+  return ($code,$res);
+}
+
+sub PD_unlock($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 6));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+
+  my $res= "";#"(tab_unlock(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=tab_unlock(\$ax);$T";
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "unlock - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  return ($code, $res);
+}
+
+sub PD_sort($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 4));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#(tab_sort(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (substr($code, 0, 1) ne ",")
+  { errore "sort richiede due parametri..";
+  }
+  ($code,$rr)=delperc(substr($code, 1));
+  $res.= "push \@as,\$ax;$T";
+
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$bx=pop \@as;$T";
+  $res.= "\$ax=tab_sort(\$bx,\$ax);";
+
+  if (($hp==1) && (substr($code, 0, 1) ne ")"))
+  { errore "sort - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  return ($code,$res);
+}
+
+sub PD_add($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $res="";
+  my $rr;
+  my ($code,$rr)=delperc(substr($code, 3));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=calcexp($code);
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "add - parentesi non chiusa.";
+  }
+
+  $res.= "\$ax=ewb_add(\$ax);$T";
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code, $res);
+}
+
+sub PD_update($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $res="";
+  my $rr;
+  my ($code,$rr)=delperc(substr($code, 6));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+
+  my $rb;
+  ($code,$rb)=calcexp($code);
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "update - parentesi non chiusa.";
+  }
+  $res.= "\$bx=(split(\":\", \$ax))[1];$T";
+  $res.= "\$ax=ewb_update(\$ax, eval(\"\\\$EWB_\$bx\"));$T";
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code, $res);
+}
+
+sub PD_exist($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#(ewb_exist(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=ewb_exist(\$ax);$T";
+
+
+
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  return ($code,$res);
+}
+
+sub PD_login($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#(ewb_login(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res=$res."\$ax=ewb_login(\$ax);$T";
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "login - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+  return ($code,$res);
+}
+
+sub PD_remove($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 6));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#ewb_remove(";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$ax=ewb_remove(\$ax);$T";
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "remove - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); };
+  return ($code,$res);
+}
+
+sub PD_in($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 2));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#\n\$tot=";
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+
+  $res.= "  \$tot=\$ax;
+  \$n=((split(\":\",\$tot))[0]);
+  \$ax=join(\"\\n\",\@p);
+  push \@as, \$ax;
+  \@p=split(\":\",substr(\$tot,length(\$n)+1));
+  tab_wlock(\$n);
+
+  \$ax=join(\"\\n\",\@f);
+  push \@as, \$ax;
+  \@f=tab_read(\$tot);
+
+  tab_unlock(\$n);
+  \$ax=join(\"\\n\",\@aa);
+  push \@as, \$ax;
+  push \@as, \$ct;
+  push \@as, \$i;
+  push \@as, \$l; 
+  push \@as, \$g;
+  \$i=0;
+  \$g=0;
+  push \@as, \$k;
+  push \@as, \$found;
+area".$num_calls.":;
+  if (\$g > \$#f) { goto area".($num_calls + 2)."; };
+  \$l=\$f[\$g]; \$l=substr(\$l,0,length(\$l));
+  \$k=0;
+  \$found=0;
+  \$i++;
+  for (\$k=\$i; \$k<=\$#f; \$k++)
+  { if ( ((split( \"#\",\$l))[0]) eq ((split(\"#\",\$f[\$k]))[0]) )
+    { \$found=1; };
+  }
+  if (\$found) { goto area".($num_calls+1).";};
+  ";
+  my $nc=$num_calls; $num_calls=$num_calls+3;
+
+  inblock();
+  $res.= "\@aa=split(\"#\", \$l);
+  \$ct=0;
+  \$code=\"\";
+  foreach \$p(\@p)
+  { \$code=\$code.\"\\\$EWB_\".\$p.\"=addchar(\\\$aa[\$ct]);\n\";
+    \$ct++;
+  };
+  eval(\$code);$T";
+  my $cond=1;
+  if (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    $res.= "";#"\nif (!(";
+
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+    $res.= "if (!(\$ax)) { goto area".($nc+1).";};$T";
+  }
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "ciclo in - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0, 1)) ne "{")
+  { errore "ciclo di in: manca { "; }
+  ($code,$rr)=delperc(substr($code,1));
+
+  while ( substr($code, 0, 1) ne "}")
+  { if (length($code)==0)
+    { errore "Ciclo di in non terminato. Manca }.";
+    };
+    
+    my $rb;
+    ($code,$rb)=(codice($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  ($code,$rr)=delperc(substr($code,1));
+  $res.= "
+area".($nc+1).":;
+  \$g=\$g+1;
+  goto area".($nc).";
+area".($nc+2).":;$T";
+  $res.="
+  \$found=pop \@as;
+  \$k=pop \@as;
+  ";
+  $res.="
+  \$g=pop \@as;
+  \$l=pop \@as; 
+  \$i=pop \@as;
+  \$ct=pop \@as;
+  \$ax=pop \@as;
+  \@aa=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@f=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@p=split(\"\\n\", \$ax);
+";
+	#modifica 030423 fine
+  outblock();
+  return ($code,$res);
+}
+
+sub PD_inall($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 5));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#\n\$tot=";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$tot=\$ax;
+  \$n=((split(\":\",\$tot))[0]);
+  \$ax=join(\"\\n\",\@p);
+  push \@as, \$ax;
+  \@p=split(\":\",substr(\$tot,length(\$n)+1));
+  tab_wlock(\$n);
+  \$ax=join(\"\\n\",\@f);
+  push \@as, \$ax;
+  \@f=tab_read(\$tot);
+  tab_unlock(\$n);
+  \$ax=join(\"\\n\",\@aa);
+  push \@as, \$ax;
+  push \@as, \$ct;
+  push \@as, \$i;
+  push \@as, \$l; 
+  push \@as, \$g;
+  \$i=0;
+  \$g=0;
+  push \@as, \$k;
+area".$num_calls.":;
+  if (\$g > \$#f) { goto area".($num_calls + 2)."; };
+  \$l=\$f[\$g]; \$l=substr(\$l,0,length(\$l));
+  \$k=0;
+  \$i++;
+  ";
+  my $nc=$num_calls; $num_calls=$num_calls+3;
+
+  inblock();
+
+  $res.= "
+  \@aa=split(\"#\", \$l);
+  \$ct=0;
+  \$code=\"\";
+  foreach \$p(\@p)
+  { \$code=\$code.\"\\\$EWB_\".\$p.\"=addchar(\\\$aa[\$ct]);\n\";
+    \$ct++;
+  };
+  eval(\$code);$T";
+
+  my $cond=1;
+  if (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    $res.= "";#\nif (!(";
+
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+
+    $res.= "if (!(\$ax)) { goto area".($nc+1).";};$T";
+  }
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "ciclo in - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0, 1)) ne "{")
+  { errore "ciclo di inall: manca { "; }
+  ($code,$rr)=delperc(substr($code,1));
+
+  while ( substr($code, 0, 1) ne "}")
+  { if (length($code)==0)
+    { errore "Ciclo di inall non terminato. Manca }.";
+    };
+    my $rb;
+    ($code,$rb)=(codice($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  }
+  ($code,$rr)=delperc(substr($code,1));
+  $res.= "
+area".($nc+1).":;
+  \$g=\$g+1;
+  goto area".($nc).";
+area".($nc+2).": ;$T";
+  $res.="
+  \$k=pop \@as;";
+  $res.="
+  \$g=pop \@as;
+  \$l=pop \@as; 
+  \$i=pop \@as;
+  \$ct=pop \@as;
+  \$ax=pop \@as;
+  \@aa=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@f=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@p=split(\"\\n\", \$ax);
+  ";
+  outblock();
+  return ($code,$res);
+}
+
+sub PD_del($)
+{ my $code=$_[0];
+  my $hp=0;
+  my $name;
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 3));
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rr)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  my $res= "";#\n\$tot=";
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "\$tot=\$ax;
+  \$n=((split(\":\",\$tot))[0]);
+  \$ax=join(\"\\n\",\@p);
+  push \@as, \$ax;
+  \@p=split(\":\",substr(\$tot,length(\$n)+1));
+  tab_wlock(\$n);
+  \$ax=join(\"\\n\",\@f);
+  push \@as, \$ax;
+  \@f=tab_read(\$tot);
+  open rof,\"> \".checkpath().\".TB\$n.bkp\";
+  \$ax=join(\"\\n\",\@aa);
+  push \@as, \$ax;
+  push \@as, \$ct;
+  push \@as, \$i;
+  push \@as, \$l; 
+  push \@as, \$g;
+  \$i=0;
+  \$g=0;
+  push \@as, \$k;
+area".$num_calls.":;
+  if (\$g > \$#f) { goto area".($num_calls + 2)."; };
+  \$l=\$f[\$g]; \$l=substr(\$l,0,length(\$l));
+  \$k=0;
+  \$i++;
+  ";
+  my $nc=$num_calls; $num_calls=$num_calls+3;
+
+  inblock();
+
+  $res.= "
+  \@aa=split(\"#\", \$l);
+  \$ct=0;
+  \$code=\"\";
+  foreach \$p(\@p)
+  { \$code=\$code.\"\\\$EWB_\".\$p.\"=addchar(\\\$aa[\$ct]);\n\";
+    \$ct++;
+  };
+  eval(\$code);$T";
+
+  my $cond=1;
+  if (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    $res.= "";#\nif (!(";
+
+    my $rb;
+    ($code,$rb)=(calcexp($code));
+    $res=$res.$rb;
+
+    $res.= "if (\$ax) { goto area".($nc+1).";};$T";
+  }
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "ciclo in - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rr)=delperc(substr($code, 1)); }
+
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  $res.= "print rof \$l.\"\\n\";\n"; #copiala riga nella tabella di backup
+
+
+  $res.= "
+area".($nc+1).":;
+  \$g=\$g+1;
+  goto area".($nc).";
+area".($nc+2).": ;$T";
+  $res.="
+  close rof;  
+  open rif,checkpath().\".TB\$n.bkp\";
+  open rof, \">\".checkpath().\".TB\$n.tab\";
+  my \@fl=<rif>;
+  my \$rw;
+  foreach \$rw(\@fl)
+  { print rof \$rw; };  
+  close rif;
+  close rof;
+  tab_unlock(\$n);
+  \$k=pop \@as;";
+  $res.="
+  \$g=pop \@as;
+  \$l=pop \@as; 
+  \$i=pop \@as;
+  \$ct=pop \@as;
+  \$ax=pop \@as;
+  \@aa=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@f=split(\"\\n\", \$ax);
+  \$ax=pop \@as;
+  \@p=split(\"\\n\", \$ax);
+  ";
+  outblock();
+  return ($code,$res);
+}
+
+sub PD_checktable($)
+{ my $t;
+  my $res=0;
+  foreach $t(@tables)
+  { my $a=((split(":", $t))[0]);
+    if ($a eq $_[0]) { $res=1; };
+  }
+  if (!$res) { errore "Tabella inesistente."; };
+}
+
+sub webask($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a=variable($code);
+  if ($a eq "ask")
+  { ($code,$res)=PD_ask($code);
+  }
+  elsif ($a eq "show")
+  { ($code,$res)=PD_show($code);
+  }
+  elsif ($a eq "askto")
+  { ($code,$res)=PD_askto($code);
+  }
+  elsif ($a eq "form")
+  { ($code,$res)=PD_form($code);
+  }
+  elsif ($a eq "showform")
+  { ($code,$res)=PD_showform($code);
+  }
+
+  else { ($code,$res)=prolog($code); };
+  my $t; ($code,$t)=delperc($code);
+  return ($code, $res);
+}
+
+sub PD_show($)
+{ my $code=$_[0];
+  my $res="";
+  my $rr;
+  ($code,$rr)=delperc $code;
+  $res= "";#print join((";
+  $code=substr($code, 4);
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$ax=print join((\$ax), split(\"<>\",\$EWB_template));$T";
+  return ($code, $res);
+}
+
+sub PD_form($code)
+{ #la funzione che genera un campo per il form.
+  my $code=$_[0];
+  my $rr;
+  my $res; 
+  ($code,$rr)=delperc(substr($code, 4));
+
+  my ($code,$rr)=delperc($code);
+  my $rb;
+  ($code,$rb)=(PD_field($code));
+  $res.=$rb; 
+  my $cnt=0;
+  $res.="\$ax=CreateForm(\$ax,\$bx,\$cx,\$dx);";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  while (substr($code, 0, 1) eq ",")
+  {
+    ($code,$rr)=delperc(substr($code,1));
+    my $rb;
+    ($code,$rb)=(PD_field($code));
+    $res.="push \@as,\$ax;$T";
+    $res.=$rb;
+    $res.="\$ax=CreateForm(\$ax,\$bx,\$cx,\$dx);";
+    $cnt++;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    $res.="\$ax=(pop \@as).\$ax;$T";
+  };
+  return ($code,$res);
+}
+
+sub PD_field($)
+{ #legge un campo da $code e la sua specifica,
+
+  my $code=$_[0];
+  my $type="text";
+  my $res="";
+  my $name=variable($code);
+  my $coso="\"$name\"";
+
+  my $fnd=0; my $ln; 
+  foreach $ln(@variables)
+  { $ln=((split(":", $ln))[0]); 
+    if ($ln eq $name) 
+    {  $fnd=1; 
+    };
+  };
+  if ($fnd==0) { errore "Variabile ".$coso." sconosciuta in richiesta ask.";};
+
+  my $rr; ($code,$rr)=delperc(substr($code, length($name)));
+
+
+  if (substr($code, 0, 1) eq ":")
+  { #e' stato specificato un tipo
+    ($code,$rr)=delperc(substr($code,1));
+    $type=variable($code);
+
+    ($code,$rr)=delperc(substr($code, length($type)));
+    if ( ($type ne "text") && ($type ne "password") &&
+    ($type ne "submit") &&($type ne "textarea") &&
+    ($type ne "links") &&($type ne "option") &&
+    ($type ne "checkbox") &&($type ne "radio") &&
+    ($type ne "hidden") && ($type ne "info") && 
+    ($type ne "checks" )&& ($type ne "options") &&
+    ($type ne "file" )&& ($type ne ""))
+    { errore "Campo a video:specificato tipo sconosciuto.";
+    }
+    if ($type eq "") {$type="text"; };
+
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    if (substr($code,0,1) eq "(")
+    {
+      $code=substr($code,1);
+      my $rb;
+      ($code,$rb)=(calcexp($code));
+      $res=$res.$rb;
+      my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+
+      if (substr($code,0,1) ne ")")
+      { errore "Form: Il campo prevede un solo nome. ";
+      };
+      $coso= "\$ax";
+      ($code,$rr)=delperc(substr($code,1));
+    }else
+    {
+      if ( ($type eq "submit") )
+      {
+        $coso="\"\"";
+      };
+    };
+  } else
+  {
+  };
+  $res.= "push \@as,\"$name\";$T"."push \@as,\$EWB_$name;$T"."push \@as,\"$type\";$T";
+  $res.= "push \@as,$coso;$T";
+      $res.= "\$dx=pop \@as;$T";
+      $res.= "\$cx=pop \@as;$T";
+      $res.= "\$bx=pop \@as;$T";
+      $res.= "\$ax=pop \@as;$T";
+  return ($code, $res);
+}
+
+sub PD_showform($)
+{ #qui la vita si complica. chiamo una funzione nativa.
+  my ($code)=@_[0];
+  my @names;
+  my $res="";
+  my $rr;
+  ($code,$rr)=delperc(substr($code,8));
+  ($code, $names[0])=variable($code);
+
+  $res.= "{ my \$form=";
+  while (substr($code, 0, 1) eq ",")
+  { $code=substr($code, 1);
+    ($code,@names[$#names+1])=variable($code);
+  }
+  my $n;
+  foreach $n(@names)
+  { $res.= "\$EWB_".$n.".";
+  }
+  $res.= "\"\";\n";
+  foreach $n(@names)
+  { $res.= "\$EWB_".$n."=\"\"; ";
+  }
+  foreach $n(@variables)
+  { #se la variabile non appare in form la aggiungo come hidden.
+    $n=((split(":",$n))[0]);
+    $res.="
+    if (index(\$form, \"name=\\\"$n\\\"\") <0)
+     { \$form=\$form.CreateForm(\"$n\", \$EWB_$n, \"hidden\");
+     };";
+  }
+  $res.= "\n\$form=\$form.CreateForm(\"EWjump\", $num_labels+1, \"hidden\"); \n";
+  $res.= "\n\$form=\$form.\"<input type=hidden name=\\\"EWB_Hid_FIELD\\\" value=\\\"".(rand(1))."\\\">\\\n\";\n";
+
+  { $res.= "\$form=\"<form name=\\\"ewb\\\" action=\".\$PROGRAM_NAME.\" method=post enctype=\\\"multipart/form-data\\\">\".\$form.\"</form>\";\n";
+  }
+  $res.= "print join(\$form,split(\"<>\", \$EWB_template)).\"\\\n\\\n\"; exit(0); \n}\n";
+  $res.=PD_addlabel();
+  return ($code,$res);
+}
+
+sub PD_addlabel()
+{
+  ++$num_labels;
+  my $n;
+  my $res="";
+  $res.= "\ngoto retlab$num_labels;";
+  $res.= "\nlab$num_labels:;\n";
+  foreach $n(@variables)
+  { $res.= "\$EWB_$n=get_par(\"$n\"); \n";
+  }
+  $res.= "retlab$num_labels:;\n";
+  return $res;
+}
+
+sub PD_ask($code)
+{ #la funzione che genera un campo per il form.
+  my $code=$_[0];
+  my $dest="";
+  my $rr="";
+  ($code,$rr)=delperc(substr($code, 3));
+  my $res= "my \$form=\"\";$T";
+  $res.= "";#"CreateForm(";
+
+  my $rb;
+  ($code,$rb)=(PD_field($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;
+  $res.= "\$form.=CreateForm(\$ax,\$bx,\$cx,\$dx);$T";
+  while (substr($code, 0, 1) eq ",")
+  { ($code,$rr)=delperc(substr($code,1));
+
+    my $rb;
+    ($code,$rb)=(PD_field($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    $res.= "\$form.=CreateForm(\$ax,\$bx,\$cx,\$dx);$T";
+  }
+  my $n;
+  foreach $n(@variables)
+  { #se la variabile non appare in form la aggiungo come hidden.
+    $n=((split(":", $n))[0]);
+
+    $res.= "
+    if (index(\$form, \"name=\\\"$n\\\"\") <0)
+     { \$form=\$form.CreateForm(\"$n\", \$EWB_$n, \"hidden\");
+     } ";
+  }
+  $res.= "\n\$form=\$form.CreateForm(\"EWjump\", $num_labels+1, \"hidden\"); \n";
+  $res.= "\n\$form=\$form.\"<input type=hidden name=\\\"EWB_Hid_FIELD\\\" value=\\\"".(rand(1))."\\\">\\\n\";\n";
+
+  { $res.= "\$form=\"<form action=\".\$PROGRAM_NAME.\" method=post enctype=\\\"multipart/form-data\\\">\".\$form.\"</form>\";\n";
+  }
+  $res.= "print join(\$form,split(\"<>\", \$EWB_template)); exit(0);$T";
+  $res.=PD_addlabel();
+  return ($code,$res);
+}
+
+sub PD_askto($code)
+{ #la funzione che genera un campo per il form.
+  my $code=$_[0];
+  my $dest="";
+  my $res="";
+  my $rr;
+  ($code,$rr)=delperc(substr($code, 5));
+
+  ($code,$dest)=geturl($code);
+  if (substr($code,0,1) ne ",")
+  {errore "askto: mi aspetto una virgola dopo url.";
+  }
+  ($code,$rr)=delperc(substr($code,1));
+
+  $res.= "my \$form=\"\";$T";
+
+  my $rb;
+  ($code,$rb)=(PD_field($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.= "\$form.=CreateForm(\$ax,\$bx,\$cx,\$dx);$T";
+
+  while (substr($code, 0, 1) eq ",")
+  { ($code,$rr)=delperc(substr($code,1));
+
+    my $rb;
+    ($code,$rb)=(PD_field($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+    $res.= "\$form.=CreateForm(\$ax,\$bx,\$cx,\$dx);$T";
+
+  }
+  my $n;
+  foreach $n(@variables)
+  { #se la variabile non appare in form la aggiungo come hidden.
+    $n=((split(":", $n))[0]);
+
+    $res.= "
+    if (index(\$form, \"name=\\\"$n\\\"\") <0)
+     { \$form=\$form.CreateForm(\"$n\", \$EWB_$n, \"hidden\");
+     } ";
+  }
+  $res.= "\n\$form=\$form.CreateForm(\"EWjump\", 0, \"hidden\"); \n";
+  $res.= "\n\$form=\$form.CreateForm(\"___from_an_ask_to\", \"FROMASKTO\", \"hidden\"); \n";
+
+  $res.= "\n\$form=\$form.\"<input type=hidden name=\\\"EWB_Hid_FIELD\\\" value=\\\"".(rand(1))."\\\">\\\n\";\n";
+
+  { $res.= "\$form=\"<form action=\\\"$dest\\\" method=post enctype=\\\"multipart/form-data\\\">\".\$form.\"</form>\";\n";
+  }
+  $res.= "print join(\$form,split(\"<>\", \$EWB_template)); exit(0);$T";
+  $res.=PD_addlabel();
+  return ($code,$res);
+}
+
+sub geturl($)
+{ #leggo stupidamente tutti i caratteri fino al primo che non puo' farne parte.
+  my ($code,$rr)=delperc($_[0]);
+  my $c; my $url="";
+  $c=substr($code, 0, 1);
+  while (
+    (($c ge "a") && ($c le "z")) ||
+    (($c ge "A") && ($c le "Z")) ||
+    (($c ge "0") && ($c le "9")) ||
+    ($c eq "-") ||
+    ($c eq "_") ||
+    ($c eq "%") ||
+    ($c eq ":") ||
+    ($c eq "/") ||
+    ($c eq "."))
+  { $url=$url.$c;
+    $code=substr($code, 1);
+    $c=substr($code,0,1);
+  }
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  return ($code,$url);
+}
+
+
+sub prolog($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my ($tmp,$a)=variable($code);
+  if ($a eq "assert")
+  { ($code,$res)=PD_assert($code);
+  }
+  elsif ($a eq "retract")
+  { ($code,$res)=PD_retreat($code);
+  }
+  elsif ($a eq "goal")
+  { ($code,$res)=PD_goal($code);
+  }
+  my $t; ($code,$t)=delperc($code);
+  return ($code, $res);
+}
+
+sub PD_assert($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a;
+  ($code, $a)=variable($code);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $hp;
+  $res.= "";#"(EWassert(";
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rcd)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  ($code, $a)=variable($code);
+  checkpredef($a);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0, 1) ne ","))
+  { errore "assert - manca un parametro.";
+  }
+  ($code,$rcd)=delperc(substr($code,1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="\$ax=EWassert(\"$a\",\$ax);$T";
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "assert - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rcd)=delperc(substr($code, 1)); }
+  return ($code,$res);
+}
+
+sub PD_retreat($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  ($code,$a)=variable($code);
+  my $hp;
+  $res.= "";#"(EWretract(";
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rcd)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  ($code, $a)=variable($code);
+  checkpredef($a);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  if ((substr($code, 0, 1) ne ","))
+  { errore "retract - manca un parametro.";
+  }
+  ($code,$rcd)=delperc(substr($code,1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="\$ax=EWretract(\"$a\",\$ax);$T";
+
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "retract - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rcd)=delperc(substr($code, 1)); }
+  $res.= "))";
+  return ($code, $res);
+}
+
+sub PD_goal($)
+{ my $code=$_[0];
+  my $res="";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $a; ($code,$a)=variable($code);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  my $hp;
+  $res.= "my \$rs=EWload(\".RULE";
+  if (substr($code, 0,1) eq "(")
+  { ($code,$rcd)=delperc(substr($code, 1));
+    $hp=1;
+  }
+  ($code,$a)=variable($code);
+  checkpredef($a);
+  $res.= $a.".tab\");
+  \$rlist=\"\"; my \$vars=\"\";$T";
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  if ((substr($code, 0, 1) ne ","))
+  { errore "goal - manca un parametro.";
+  }
+  ($code,$rcd)=delperc(substr($code,1));
+
+  my $rb;
+  ($code,$rb)=(calcexp($code));
+  $res=$res.$rb;
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  $res.="solve(\$ax,";
+  $res.= "\$rs,\$vars);$T"."my \$ipl=0;$T";
+  my $nc=$num_calls;
+  $num_calls=$num_calls+2;
+  $res.= "\narea$nc:;
+my \$va=((split(\"\\n\",\$rlist.\"\\n\"))[\$ipl]);
+if (\$va eq \"\") {goto area".($nc+1).";}
+my \$vars=join(\"\\n\",split(\"\\t\",\$va));
+$T";
+
+  my $vname; my $vn;
+  foreach $vn(@variables)
+  { $vname=((split(":",$vn))[0]);
+    $res.= "if (varval(\"$vname\",\$vars) ne \"<Null>\") { \$EWB_$vname=varval(\"$vname\",\$vars); };\n";
+  }
+  if (($hp) && (substr($code, 0, 1) ne ")"))
+  { errore "goal - parentesi non chiusa.";
+  }
+  if ($hp) { ($code,$rcd)=delperc(substr($code, 1)); }
+  $res.= "$T";
+  if (substr($code,0,1) ne "{") { errore "Necessaria \"{\" dopo goal. "; }
+
+  inblock();
+  $code=substr($code, 1);
+  my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+  while ( substr($code, 0, 1) ne "}")
+  {
+    my $rb;
+    ($code,$rb)=(codice($code));
+    $res=$res.$rb;
+    my $rcd;($code,$rcd)=delperc($code);$res.=$rcd;;
+
+  }
+  ($code,$rcd)=delperc(substr($code,1));
+
+  $res.= "
+  \$ipl++;$T".
+  "goto area".$nc.";
+area".($nc+1).":;
+";
+  outblock();
+  return ($code, $res);
+}
+

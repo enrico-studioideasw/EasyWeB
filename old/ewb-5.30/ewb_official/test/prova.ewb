@@ -1,0 +1,18 @@
+'prova di inclusione in ewb. 
+
+' e prova di define
+#define Ask 3
+
+print Ask;
+
+#include <sendmail.ewb>
+
+#ifdef Ask
+print "ask defined.\n";
+#endif
+#ifndef Ask
+print "ask not defined.\n";
+#else
+print "ask else defined.\n";
+#endif
+

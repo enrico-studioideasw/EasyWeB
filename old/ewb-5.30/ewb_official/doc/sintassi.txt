@@ -1,0 +1,164 @@
+
+ambiente:
+variabili
+funzioni
+dichiarazioni di tabelle
+dichiarazione di template (variabile predefinita template).
+Dichiarazione di formato: variabile predefinita format (height:width:direction)
+
+_________________________________________________________________________________
+
+programma= [codice]
+codice=[ commento | tabdecl | ifblock | whileblock | downwhile | forblock
+         calcexp ; | funzione ;| fundecl]
+
+commento= \' * \n
+
+tabdecl= table name = variable [,variable] ;
+vardecl= var name [,name] ;
+
+' vardecl=var name[:list] [,name[:list]];
+
+'' i cicli devono essere simulati con dei jump...
+'' ora manca la simulazione solo nella in, inall.
+
+ifblock= if calcexp { [codice] }
+        [elseif calcexp { [codice] } ] { else {[codice]} } ;
+forblock= for (calcexp; calcexp; calcexp) { [codice] };
+
+whileblock= while calcexp { [codice] };
+downwhile= do { [codice] } while calcexp;
+
+fundecl= sub name([varname [,varname] ])
+          [ { [codice] } ];
+
+
+calcexp=exp  cfr calcexp | exp
+cfr = \= | == | != | <= | >= | > | < | eq | gt | ge | lt | le
+'nota: se uno dei due el. e' una stringa e' un conf. di stringhe.
+exp=e . exp | e
+e = t+e | t-e | t
+t = f*t | f/t | f%t | f
+f= b\|f | b\|\|f | b
+b= c & b | c && b | c
+c= ! calcexp | numvalue | strvalue | tablename | identifier | (calcexp)
+identifier = variable | funzione
+
+'cambiare qui per usare le liste. 
+
+
+funzione = predef | fname calcexp [,calcexp]
+
+numvalue = [0..9]. [0..9]
+strvalue = \" carattere \" | \[carattere\]
+variable =a..z|A..Z [a..z | A..Z | 1..9 | _ ]
+fname =variabile
+
+_________________________________________________________________________________
+funzioni predefinite
+
+  return variable
+
+standard di I/O per debugging (allo stderr)
+  print variable   scrive su stdout
+  eprint variable  scrive su stderr
+  input variable
+
+  load variable
+  save variable,variable
+  loaddir variable   'carica nella variabile la lista di contenuto della dir. 
+
+di elaborazione numeri
+  int( variable )
+  abs( variable )
+  cos( variable )   nota: seno e coseno sono in gradi.
+  sin( variable )
+  hex( variable )
+  sqr( variable )
+  random()
+  'un numero e' una stringa che sontiene un numero.
+
+di elaborazione stringhe
+  mid(variable, variable, variable)
+  mid(variable, variable)
+  len(variable)
+  uc(variable)   'up case 
+  index( str, substr) ' index di perl. posizione della sottostringa nella stringa.
+  change ( seconda, prima, origine)  'torna origine scambiando prima con seconda. 
+  split( variable, variable_tosplit )  'analoga alla split del linguaggio perl. 
+  join( variable, lista)               'analoga alla join del perl.  
+  date
+  lessdate ( variable, variable )
+
+miscellanee - dal perl
+  asc(variable)
+  char(variable)
+
+per accesso ai database - le variabili sono di ambiente
+  login ( tabella )
+  add ( tabella )
+  exist ( tabella )
+  remove ( tabella )
+  lock ( tabella )
+  unlock ( tabella )
+  in ( tabella [, condizione] ) {  [codice] };
+
+
+per accesso all' interfaccia web
+  ask field [,field]
+  askto url,  field [,field] ' il risultato va ad un altra interfaccia.
+                             ' in questo caso riporto solo le var. della ask.
+  field= variable [:style [ ( espressione ) ]]
+  style= text, password, submit, textarea, links, option, checkbox, radio, hidden
+' la richiesta dipende dal valore definito delle variabili prima della ask.
+' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
+' crescere. Semplicemente la ask puo' portarsi dietro in post tutte le var. di ambiente.
+
+  form  field[, field]
+  showform( variable );
+'crea un form come per la ask ma anziche' mostrarlo con il template lo torna.
+'serve a creare pagine co piu' forms, ciascuno dei quali porta ad un risultato diverso.
+  show (text)
+' mostra il testo contornato dal template. 
+
+per accesso al motore inferenziale SLDNF
+assert ruleset, variable
+retract ruleset, variable
+	primo parametro: gruppo di clausole, secondo: clausola
+goal  ruleset, variabile
+{ [codice] };
+	parametro: il goal. Svolge un ciclo con le var. del goal definite.
+
+________________
+per l' uso di stringhe come liste.
+ho il problema di ripetere la cosa a piu' dimensioni
+mangia ram ma funge.
+
+push stack, exp
+'trasformo exp nel suo codice ascii
+'accodo "exp a var
+
+pop stack
+'recupero da var l' ultimo pezzo con split di " "
+'trasformo da codice ascii a valore.
+
+getelem stack,n
+setelem stack,n ,exp
+
+numel var
+'torno lo split di a per " "
+
+________________
+Per l' uso di sock stream
+
+Ho la necessita' di comunicare con altri programmi con sock stream o a pacchetto...
+Cerco di fare la cosa nel modo piu' spiccio possibile.
+Le sock sono numeri.
+
+int socket host, port  //crea una client socket ipv4
+int server port        //trasforma il programma in un server sulla porta.
+int accept port        //accept.
+sread socket                 //legge una riga dalla porta
+swrite socket,data           //scrive una riga sulla porta
+''''''read port              //legge (se c'e') un pacchetto da una porta
+''''''write host, port       //scrive

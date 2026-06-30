@@ -1,0 +1,4 @@
+var a=load "ewb.l";
+print a; 
+save "ewls", a; 
+

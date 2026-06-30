@@ -1,0 +1,20 @@
+'#include "sendmail.ewb"
+
+'template=load "template/mailinglist.htm";
+
+var button;
+var cosafare;
+var i;
+
+i="Cosa vuoi fare";
+button="Prosegui";
+cosafare="Aggiungermi;Togliermi";
+ask i:info, cosafare:option, button:submit;
+
+show "Cosafare:".cosafare; 
+
+ask button:submit;  
+
+show "Attenzione!!. E-mail non presente nel database : ";
+
+ 

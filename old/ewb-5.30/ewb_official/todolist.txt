@@ -1,0 +1,36 @@
+****************** elenco degli errori rilevati in easyweb 5.26 *******************
+
+1) 06/05/2005 [Corretto il 10/05/2005]
+  Errore con la gestione di push e pop.
+  Se si fa la push e la pop di un valore vuoto il valore viene letto male.
+
+  - Analisi della correzione : Il perl sembrava interpretare male la divisione in stringhe, 
+    ma in realta' il problema sembra dovuto alla procedura che toglie i dati dalla testa
+    dello stack.
+  + Soluzione : Il problema era nella funzione stpop della libreria che interpretava male i 
+    pezzi vuoti.
+    Sostituendo la vecchia procedura con quella nuova il problema viene risolto.
+    E' possibile effettuare un test usando il file errore_pop.ewb nella directory test.
+    Se la libreria è sbagliata i valori prima e dopo il push e pop saranno differenti
+    e verranno segnalati dal test.
+
+2) 06/05/2005
+  Errore con la gestione delle funzioni
+  Quando si entra ed esce da una funzione si perdono i dati originali su cui si stava lavorando.
+  Si dovrebbe mettere una scrittura nello stack di tutte le variabili correntemente utilizzate 
+  o almeno quelle che andaranno usate nella funzione.
+3) 30/06/2005
+  Errore con la funziona askto
+  Non funziona passando come url http://www.uniurb.it/paride/sperimentazione/nuovo_sito/aggiornanovita.cgi
+
+  - Analisi della correzione : Il compilatore sembrava non trovare la virgola invece era
+    un problema della geturl che trovava in modo sbagliato la fine dell'url. Si fermava
+    al carattere _ che non veniva riconosciuto.
+  + Soluzione : Ho aggiunto questo carattere (perfettamente legale) e il % (altro carattere
+    abbastanza comune come caratteri ammessi in un url.
+4) 30/06/2005
+  Errore con la gestione delle quadre.
+  Ci sono dei problemi ad usare le quadre [] al posto di getelem.
+
+
+  

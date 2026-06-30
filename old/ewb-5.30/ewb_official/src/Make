@@ -1,0 +1,14 @@
+echo "compilo"
+
+./genfile ewb.p >ewb 
+chmod 755 ewb 
+cp ewb /bin/.
+ln -sf /bin/ewb /bin/amethyst
+mv ewb ../.
+echo "installo"
+mkdir /lib     2>/dev/null
+mkdir /lib/ewb 2>/dev/null
+#cp ../dbfiles.lib /lib/ewb/.
+cd lib; ./Make; cd ..
+#cp ../dbmysql.lib /lib/ewb/.
+echo "finito. amethyst (ewb) installato in /bin, librerie in /lib/ewb.";

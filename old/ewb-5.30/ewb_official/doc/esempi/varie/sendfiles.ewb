@@ -1,0 +1,7 @@
+var a, b, c, d;
+c="Ok";
+b="coso"; 
+ask a:file, b:text, d:file,  c:submit; 
+show "a vale[".a."]<br>b vale[".b."]<br>c vale[".c."]<br>d vale[".d."]"; 
+
+

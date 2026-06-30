@@ -1,0 +1,9 @@
+*.o
+*.a
+*.so
+*.out
+core
+build/
+tmp/
+.cache/
+

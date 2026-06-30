@@ -1,0 +1,3 @@
+table tb=a,b,c,d;
+add tb; 
+

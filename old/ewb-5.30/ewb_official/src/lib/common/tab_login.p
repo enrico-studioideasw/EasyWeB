@@ -1,0 +1,6 @@
+sub tab_login($$$)
+{ my ($n,$k,$p)=@_;
+  my @r; my @a=tab_exist($n,$k);
+  if ($a[1] eq $p) { @r=@a; }
+  return @r;
+}

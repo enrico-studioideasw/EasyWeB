@@ -1,0 +1,7 @@
+sub len(a)
+{ var res=0; 
+  while (a ne "")
+  { a=mid a,1; res++; 
+  }; 
+  return res; 
+};

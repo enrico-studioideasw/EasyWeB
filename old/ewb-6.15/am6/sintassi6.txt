@@ -1,0 +1,194 @@
+!!!! <- indica le modifiche per la 5.0
+
+
+ambiente:
+variabili
+funzioni
+dichiarazioni di tabelle
+dichiarazione di template (variabile predefinita template).
+Dichiarazione di formato: variabile predefinita format (height:width:direction)
+
+Nota: DA MODIFICARE - Permettere di specificare gli stili per i campi di form.
+                      Permettere di specificare scripts, almeno per i pulsanti.
+      gia' che lo riscrivo facciamolo bene. LA 6.0, se funziona, e' un mostro. 
+_________________________________________________________________________________
+
+programma= [codice]
+!!!! 	codice=[ commento | tabdecl  | ifblock  | whileblock  | downwhile  | foreachblock  | forblock | asmline | 
+ 	        calcexp ; | fundecl]
+
+	commento= \' * \n  'gestito da delperc
+
+	tabdecl= table name = variable [,variable] ;
+666	vardecl= var singlevar [, singlevar] ;  'finalmente dichiarazione con assegnamento di default
+666	singlevar = name [ = inexp ]
+
+'' i cicli devono essere simulati con dei jump...
+'' ora manca la simulazione solo nella in, inall.
+
+	ifblock= if calcexp { [codice] }
+	        [elseif calcexp { [codice] } ] { else {[codice]} }; 
+	forblock= for (calcexp; calcexp; calcexp) { [codice] };
+
+
+!!!! 	foreachblock=foreach varname(calcexp) { [codice] };
+
+	whileblock= while calcexp { [codice] };
+	downwhile= do { [codice] } while calcexp;
+
+	fundecl= sub name([varname [,varname] ])
+        	  [ { [codice] } ];
+
+//Sezione di sub-linguaggio assembler per la machina virtuale
+
+        asmline = alabel | ainstr
+        alabel  = . name : 
+        ainstr  = .opcode [aaddress | aparam] [aparam] ; 
+        aaddress = name
+        aparam   = varname | strvalue
+
+//Utile soprattutto per scrivere le funzioni predefinite e includerle.  
+
+'qui devo ricordare se sono prima o dopo cfr. lo faccio con un flag di stato.
+
+!!!! 	calcexp= assign \= inexp | inexp;       (no ll1 ! attento) 
+!!!! 	assign=variabile[calcexp] | variabile
+!!!! 	inexp=exp  cfr inexp | exp
+	cfr = \= | == | != | <= | >= | > | < | eq | gt | ge | lt | le
+'nota: se uno dei due el. e' una stringa e' un conf. di stringhe.
+	exp=e . exp | e
+	e = t+e | t-e | t
+	t = f*t | f/t | f%t | f
+	f= b\|f | b\|\|f | b
+!!!!	b= k & b | k && b | k
+666	k= variabile [calcexp] | c
+666 	c= ! inexp | numvalue | strvalue | (calcexp) | identifier 
+	identifier = variabile | funzione
+
+'cambiare qui per usare le liste.
+
+
+	funzione = predef | fname calcexp [,calcexp]
+
+'qui mi complico la vita, ma almeno posso definire i numeri in qualunque base e dimensione.. 
+666	numvalue = [+/-] ( bin | hex | oct | dec ) 
+666	bin = 0b [0..1] [. {0..1} ]                                         // [ E [+/-] { 0..1 } ] 
+666	oct = 0o [0..7] [. {0..7} ]                                         // [ E [+/-] { 0..7 } ] 
+666	hex = 0x ([0..1]|[A..F]|[a..f])  [. {([0..1]|[A..F]|[a..f])} ]      // [ E [+/-] { ([0..1]|[A..F]|[a..f]) } ] 
+666	dec = [0..9] [. {0..9} ]                                            // [ E [+/-] { 0..9 } ] 
+	strvalue = \" carattere \" | \[carattere\]
+666	variable =a..z|A..Z | _  [a..z | A..Z | 1..9 | _ ]
+	fname =variabile
+
+_________________________________________________________________________________
+funzioni predefinite
+
+666	return calcexp
+
+standard di I/O per debugging (allo stderr)
+  	print variable    scrive su stdout
+  	eprint variable   scrive su stderr
+>>> 	input             legge da stdin
+
+  	load variabile     'Variabile e' il nome del file
+  	save variable,variable
+  	loaddir variable   'carica nella variabile la lista di contenuto della dir.
+
+di elaborazione numeri
+  	int( variable )
+  	abs( variable )
+ 	cos( variable )   nota: seno e coseno sono in gradi.   SONO ARRIVATO QUI
+  	sin( variable )   
+>  	hex( variable )
+  	sqr( variable )
+  	random()
+  'un numero e' una stringa che sontiene un numero.
+
+miscellanee - dal perl
+  	asc(variable)
+  	char(variable)
+
+di elaborazione stringhe
+  	mid(variable, variable, variable)
+  	mid(variable, variable)
+  	len(variable)
+  	uc(variable)   'up case  (Per ora fa parte della VM, poi semmai la tolgo)
+______________________________________
+  	index(str, substr) ' index di perl. posizione della sottostringa nella stringa.
+  	change ( seconda, prima, origine)  'torna origine scambiando prima con seconda.
+  	split( variable, variable_tosplit )  'analoga alla split del linguaggio perl.
+  	join( variable, lista)               'analoga alla join del perl.
+  	date
+  	lessdate ( variable, variable )
+
+
+
+per accesso ai database - le variabili sono di ambiente
+  login  tabella 
+  add  tabella 
+  exist  tabella 
+  remove  tabella 
+  lock  tabella 
+  unlock  tabella 
+  in ( tabella [, condizione] ) {  [codice] };
+  inall ( tabella [, condizione] ) {  [codice] };
+  delete ( tabella [, condizione] );
+
+per accesso all' interfaccia web
+ 	 ask field [,field]
+ 	 askto url,  field [,field] ' il risultato va ad un altra interfaccia.
+                             ' in questo caso riporto solo le var. della ask.
+ 	 field= variable [:style [ ( espressione ) ]]
+ 	 style= text, password, submit, textarea, links, option, checkbox, radio, hidden
+' la richiesta dipende dal valore definito delle variabili prima della ask.
+' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
+' crescere. Semplicemente la ask puo' portarsi dietro in post tutte le var. di ambiente.
+
+  	form  field[, field]
+  	showform( variable );
+'crea un form come per la ask ma anziche' mostrarlo con il template lo torna.
+'serve a creare pagine co piu' forms, ciascuno dei quali porta ad un risultato diverso.
+  	show (text)
+' mostra il testo contornato dal template.
+
+per accesso al motore inferenziale SLDNF
+	assert ruleset, variable
+	retract ruleset, variable
+primo parametro: gruppo di clausole, secondo: clausola
+	goal  ruleset, variabile
+	{ [codice] };
+parametro: il goal. Svolge un ciclo con le var. del goal definite.
+
+________________
+per l' uso di stringhe come liste.
+ho il problema di ripetere la cosa a piu' dimensioni
+mangia ram ma funge.
+
+	push stack, exp
+'trasformo exp nel suo codice ascii
+'accodo "exp a var
+
+	pop stack
+'recupero da var l' ultimo pezzo con split di " "
+'trasformo da codice ascii a valore.
+
+	getelem stack,n
+	setelem stack,n ,exp
+
+	numel var
+'torno lo split di a per " "
+
+________________
+Per l' uso di sock stream
+
+Ho la necessita' di comunicare con altri programmi con sock stream o a pacchetto...
+Cerco di fare la cosa nel modo piu' spiccio possibile.
+Le sock sono numeri.
+
+	int socket host, port  //crea una client socket ipv4
+	int server port        //trasforma il programma in un server sulla porta.
+	int accept port        //accept.
+	sread socket                 //legge una riga dalla porta
+	swrite socket,data           //scrive una riga sulla porta
+''''''read port              //legge (se c'e') un pacchetto da una porta
+''''''write host, port       //scrive

@@ -1,0 +1,7 @@
+var a=1; 
+var b=42;
+var c="ccc"; 
+print a+3-b; 
+print "\t"; 
+print (a/2) * 3; 
+print "\n"; 

@@ -1,0 +1,24 @@
+'aggiunta di un utente per posta. 
+#include "tabelle.inc"
+table idnum=id; 
+
+var b;
+b="invia"; 
+ask ip, hostname, nomehost:text("descrizione"), sistop, proprietario, b:submit; 
+
+if (len(ip)<12) {show "ip non valido"; end;  };
+
+
+lock(idnum); 
+id=load "id.dat"; 
+id=id +1; 
+save "id.dat", id; 
+unlock(idnum); 
+chiaveprog=id; 
+
+add(host); 
+show "Host : inserito 
+&nbsp;".ip." 
+&nbsp;".hostname."
+&nbsp;".sistop."
+<br>"; 

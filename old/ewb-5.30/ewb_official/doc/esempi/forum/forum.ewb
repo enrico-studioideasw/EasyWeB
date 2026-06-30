@@ -1,0 +1,23 @@
+table messaggi=autore, titolo, messaggio, data; 
+var v, b;
+
+format="20:8:h";
+template=load "forum.html";  
+while (1)
+{ b=[Inserisci];
+  v=form b:submit; 
+  inall (messaggi)
+  { v=v.[<b>].autore.[: ].titolo.[, ].data.[</b><br>].messaggio.[<br><br>]; 
+  };
+  showform v; 
+
+  if (b eq "Inserisci")
+  { 
+autore=""; titolo=""; messaggio=""; 
+    ask autore, titolo, messaggio:textarea, b:submit; 
+    data=date();
+    if ((autore ne "") && (titolo ne ""))
+    { add messaggi;
+    } else { show "Errore<br>Autore e titolo non indicati."; }; 
+  };
+};
