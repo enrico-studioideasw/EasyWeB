@@ -1,0 +1,86 @@
+Problema:
+
+context aaa(nome,cognome);
+inall (aaa)
+{  
+  ask nome;
+  delete(aaa,persona=nome); 
+};
+
+La ask spezza il flusso della IN e perdo l'accesso al db.
+
+quindi quando ho in in() devo sapere a che record sono arrivato, aprire una connessione, leggere solo il successivo, richiuderla. 
+Se non c'e' salto alla fine della in. 
+Idealmente ho due funzioni: dimmi quanti elementi ha questa query e dammi l'elemento N di questa query. 
+In entrambi i casi devo specificare un ordinamento.. se non c'e' order by devo metterci id. 
+Se c'e' devo aggiungere id in coda perchè potrebbe non essere completo.
+
+SOLUZIONE:
+
+QLIST decide l’insieme.
+QBYID recupera il record.
+position scorre solo la lista salvata nello stack.
+Mai usare position come OFFSET SQL.
+
+---------------------------------------------------
+
+ids = QLIST(query normalizzata ORDER BY ..., id)
+
+push context query order ids position = 0
+loop:
+  pop position
+  pop ids
+  id = ids[position]
+
+  se id non esiste: fine in
+
+  pop context, query, order, id 
+  record = QBYID(context, query, order, id)
+  position++
+  salvo in stack: context query order ids position
+  se record non esiste più:
+      torna a loop
+  esegui corpo
+
+
+string qlist(string context, string query, string orderby);
+string qbyid(string context, string query, string orderby, string id);
+
+code:
+    push context
+    push query
+    push order
+    push 0 'position
+    QLIST
+    push ids 'list of id
+loop:
+    POP ids
+    pop position
+    ids[position] 'A=id
+    jz end
+    push context
+    push query
+    push order
+    push id
+    QBYID
+    position++
+    push position
+    push ids
+    record=A
+    jz loop    
+    { corpo IN }
+end: 
+    { resto del programma }
+        
+
+
+
+DELETE o INSERT sono invece atomiche 
+Per la vm: 
+string query(string q);
+string fastquery(string q); 
+
+per il linguggio: 
+string qlist(string context, string query, string orderby);
+string qbyid(string context, string query, string orderby, string id);
+run_query(context,query,order); order solo per insert, se insert ritorna 1 o 0, se delete mysql_affected_rows altrimenti è una fastquery.

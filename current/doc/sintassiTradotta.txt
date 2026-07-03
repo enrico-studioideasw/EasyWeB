@@ -19,7 +19,7 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
   ** push SP
   campidataset= "{" [campodataset [, campodataset] ] "}" 
   campodataset = [id|idz|ut|pw|idm|idmz _ ] singlevar ["=" campidataset]
-  ** addsymtable "singlevar", SP
+  ** addsymtable "singlevar", SP 
   ** push SP 
 
   taskdecl= task name [ "(" varname [,varname] ")" ]  "{" [codice] "}"

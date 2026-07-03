@@ -979,8 +979,17 @@ int main(int argc, char **argv)
 
     fd_set rfds;
     FD_ZERO(&rfds);
-    FD_SET(listen_fd,&rfds);
-    int maxfd=listen_fd;
+    int maxfd=-1;
+    int can_accept=0;
+
+    for (int i=0; i<g_num_resp; i++)
+      if (!g_resp[i].busy) can_accept=1;
+    if (g_num_resp<g_max_resp) can_accept=1;
+
+    if (can_accept)
+    { FD_SET(listen_fd,&rfds);
+      maxfd=listen_fd;
+    }
 
     for (int i=0; i<g_num_resp; i++)
     {
