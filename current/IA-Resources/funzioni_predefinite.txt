@@ -1,0 +1,57 @@
+Funzioni e costrutti predefiniti noti.
+
+I/O:
+  print valore
+  eprint valore
+  input
+
+File:
+  load file
+  save file,valore
+  loaddir dir
+
+Numeri:
+  int valore
+  abs valore
+  cos valore
+  sin valore
+  hex valore
+  sqr valore
+  random
+
+Stringhe:
+  asc valore
+  char valore
+  mid testo,inizio,lunghezza
+  mid testo,inizio
+  len testo
+  uc testo
+  index testo,sottostringa
+  change nuova,vecchia,testo
+  split separatore,testo
+  join separatore,lista
+  date
+  lessdate data1,data2
+
+Database/context:
+  login variabile
+  add variabile
+  exist variabile
+  remove variabile
+  lock variabile
+  unlock variabile
+  in (variabile, condizione) { codice }
+  inall (variabile) { codice }
+  delete (variabile, condizione)
+
+Web:
+  ask campo,campo
+  askto url,campo,campo
+  form campo,campo
+  showform variabile
+  show variabile
+
+Logica:
+  assert dataset, clausola
+  retract dataset, clausola
+  goal dataset, goal { codice }

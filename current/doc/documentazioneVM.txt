@@ -204,13 +204,51 @@ una ask e la ripresa da entry point. La complessita' SQL e i diversi backend
 sono confinati in db_interface.cpp.
 
 context
+_______
   E' un URI di destinazione DB, per esempio:
 
     mysql://ewb
     mysql://clienti:3307
     postgres://analytics:5432
 
-  DEFAULTENGINE vale mysql://ewb.
+context contiene, oltre ai campi della tabella dichiarati dall'utente: 
+_url
+_user
+_password
+_status
+Quindi posso accedere a _url o a contestoprova._url in ogni punto dopo aver letto la dichiarazione di contesto.
+Non vedo tutti i campi della tabella, solo quelli che ho dichiarato. E'una specie di vista.
+Se ho più contesti che contengono _url enon specifico quale mi interessa vedrò l'ultimo.
+Posso avere dichiarazioni annidate e quindi dichiarare un DB in un unico contesto. 
+
+Per la cardinalita e le relazioni:
+context clienti = {
+  nome,
+  codice_fiscale,
+  indirizzi = {
+    via,
+    citta 
+  },
+  via
+};
+Per i campi non serve specificare la cardinalità, dentro un a in può controllare il linguaggio.
+Per la "relazione" tra clienti e indirizzi si crea/usa id_indirizzi in clienti 
+Per la visibilità, nel caso sopra:
+I contesti possonno essere globali o locali. Semplicemente se locali spariscono quando a fine blocco/funzione piallo lo stack. 
+memorizzo come variabile in stack al termine della lettura dell'intero costrutto context, quindi richiamandolo ad albero: 
+SP  
+0- indirizzi.id
+1- indirizzi.via
+2- indirizzi.citta
+3- clienti.nome
+4- clienti.codicefiscale
+5- clienti.idz_cliente
+6- clienti.via
+Se nella VM devo risolvere findvar("via") cerco la prima variabile che dopo il punto contenga via, scorrendo lo stack al contrario quindi 6
+Se nella VM devo risolvere findvar("indirizzi.via") cerco la prima variabile che dopo il punto contenga "idirizzi.via" (ci teniamo livelli per il futuro?).. quindi 1.
+In generale, cerco sempre a ritroso nello stack e se la ricerca è approssimativa trovo il primo dato che fa match, Questa è una regola geneale di visibilità.
+
+DEFAULTENGINE vale mysql://ewb.
 
 QLIST
   POP(order), POP(query), POP(context).

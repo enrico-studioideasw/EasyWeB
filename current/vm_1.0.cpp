@@ -1,11 +1,22 @@
 /* VM EWB 2026 */
 
+
+
+/* Cose mancanti
+   - implementare opcode CRON 
+
+
+*/
+
+
+
 #include <string>
 #include <iostream>
 #include <vector>
 #include <cstdlib>
 #include <time.h>
 #include <cctype>
+#include "opcodes.h"
 using namespace std;
 
 #define MAXSTACK 10000
@@ -22,6 +33,10 @@ int     symtpos[MAXVAR];
 int ST=0;                     //Symbol table pointer.
 int IDF=0;
 string code[MAXLINES];
+string codearg[MAXLINES];
+EWBOpcode codeop[MAXLINES];
+int codeLines=0;
+int RUNNING=1; 
 
 #include "vm_parts.h"
 #include "db_interface.h"
@@ -39,22 +54,14 @@ string escapeStack()
 };
 void addCron(string EP, string interval)
 { string x;
-
   if (interval=="")
-  { run_query(DEFAULTENGINE,
-      "delete from _cron where nometask=" + db_quote(EP),
-      "");
+  { run_query(DEFAULTENGINE, "delete from _cron where nometask=" + db_quote(EP), "");
     return;
   }
-
-  x=run_query(DEFAULTENGINE,
-    "update _cron set cron=" + db_quote(interval) + " where nometask=" + db_quote(EP),
-    "");
+  x=run_query(DEFAULTENGINE, "update _cron set cron=" + db_quote(interval) + " where nometask=" + db_quote(EP), "");
 
   if (ewbIntValue(x)==0)
-  { run_query(DEFAULTENGINE,
-      "insert into _cron (nometask, cron) values (" + db_quote(EP) + ", " + db_quote(interval) + ")",
-      "");
+  { run_query(DEFAULTENGINE, "insert into _cron (nometask, cron) values (" + db_quote(EP) + ", " + db_quote(interval) + ")", "");
   }
 }; //Parte della VM. Se non va bene, eccezione.
 
@@ -62,16 +69,24 @@ void addCron(string EP, string interval)
 void err(string e)
 { cerr << "Vm error at:  " << PC << "\nCode:\n";
   if (PC>0) cerr << (PC-1) << ":  " << code[PC-1] << "\n"; 
-  cerr << (PC) << ":  " << code[PC] << "\n";
-  cerr << (PC+1) << ":  " << code[PC+1] << "\n";
+  if (PC>=0 && PC<codeLines) cerr << (PC) << ":  " << code[PC] << "\n";
+  if (PC+1<codeLines) cerr << (PC+1) << ":  " << code[PC+1] << "\n";
   cerr << "Error: " << e << "\n";
   cerr <<"Stack: \n"; 
   for (int i=1; i<6 && SP-i>=0; i++) cerr << (SP-i) << ":  [" << stack[SP-i] << "]\n";   
-  exit(-1);
+  RUNNING=-1; 
 };
 //Dato il nome di una variabile restituisce la posizione in stack del dato.
 int findvar(string varname) 
-{ int i; for (i=ST-1; i>=0; i--) { if (varname==symtname[i]) return symtpos[i];}; 
+{ int i; 
+  string n;
+  for (i=ST-1; i>=0; i--) 
+  { n=symtname[i];
+    if (varname==n) return symtpos[i];
+    if (n.size()>varname.size() && n[n.size()-varname.size()-1]=='.')
+    { if (n.substr(n.size()-varname.size())==varname) return symtpos[i];
+    };
+  }; 
   return -1; //Non trovata 
 };
 //Questa fa comodo che diventi una funzione.. dovessimo segnalare qualcosa da sistema.. 
@@ -80,15 +95,13 @@ void raise()
   if (x>-1) 
   { PC=x; //Vado all'indirizzo che c'e' dentro X. Quello dell'error handler. 
   } else //Gestione interna: segnalo l'errore e mi fermo.  
-  { string e; POP(e); err(e);
+  { string e; POP(e); err(e);  
   };
 };
 
 void raiseerr(string e)
-{ PUSH(e);
-  raise();
+{ PUSH(e); raise();
 };
-
 
 string setpath(string s, string value, vector<string> key)
 { if (key.size() == 0) return value;
@@ -97,37 +110,31 @@ string setpath(string s, string value, vector<string> key)
   string hk = hexEncode(k);
   string old = "";
   int found = -1;
-
   for (int i=0; i<(int)v.size(); i++)
   { vector<string> p = split(v[i], ':');
     if (p.size() >= 2 && p[0] == hk)
     { found = i;
       old = hexDecode(p[1]);
       break;
-    }
-  }
-
+    };
+  };
   if (key.size() == 1)  
   { old = value;
-  }
-  else 
+  } else 
   { vector<string> keyb(key.begin() + 1, key.end());
     old = setpath(old, value, keyb);
-  }
-
+  };
   if (found >= 0)
   { v[found] = hk + ":" + hexEncode(old);
-  }
-  else
-  { v.push_back(hk + ":" + hexEncode(old));
-  }
-
+  } else v.push_back(hk + ":" + hexEncode(old));
   return join(v, " ");
 }
-string opcode(string IR)
+EWBOpcode opcode(string IR)
 { string op="";
   for (int i=0; i<(int)IR.size() && IR[i]!=' '; i++) op += tolower((unsigned char)IR[i]);
-  return op;
+  int i=find_vm_instr(op.c_str());
+  if (i<0) return OPCODE_INVALID;
+  return vm_instr_table[i].opcode;
 }
 
 string getpath(string s, vector<string> key)
@@ -148,69 +155,86 @@ string getpath(string s, vector<string> key)
   return getpath(found, keyb);
 }
 
-void resume(int xPC,int xSP)
+int resume(int xPC,int xSP)
 { PC=xPC; SP=xSP;//Program counter e stack pointer
   string A="";   //Accumulatore 
   string x,y;    //x e y diventano registri, come sul 6502.. 
-  string IR;     //Istruction register
-  string OP;     //Opcode normalizzato
+  EWBOpcode OP;  //Opcode normalizzato
   string varname, vartype, varvalue; //Uso anche questi troppo spesso per non metterli qui. 
+  RUNNING=1; 
   for (;;)
-  { if (PC<0 || PC>=MAXLINES || code[PC]=="") raiseerr("PC out of code");
-    IR=code[PC];  //Comando, parametri.
-    OP=opcode(IR);
-    if (OP=="sum")
+  { if (PC<0 || PC>=codeLines) raiseerr("PC out of code");
+    if (RUNNING!=1) return RUNNING; 
+    OP=codeop[PC];
+    if (OP==OPCODE_INVALID)
+    { raiseerr("Unknown opcode");
+    } else if (OP==OP_SUM)
     { POP(y); POP (x); A=ewbSum(x,y);
-    } else if (OP=="concat")
+    } else if (OP==OP_CONCAT)
     { POP(y); POP(x); A = x + y; 
-    } else if (OP=="sub")
+    } else if (OP==OP_SUB)
     { POP(y); POP(x); A=ewbSum(x,ewbNegative(y));
-    } else if (OP=="mul")
+    } else if (OP==OP_MUL)
     { POP(y); POP(x); A=ewbMul(x,y);
-    } else if (OP=="div")
+    } else if (OP==OP_DIV)
     { POP(y); POP(x); A=ewbDiv(x,y);
-    } else if (OP=="or")
+    } else if (OP==OP_MOD)
+    { POP(y); POP(x); A=ewbMod(x,y);
+    } else if (OP==OP_OR)
     { POP(y); POP(x); A=ewbOr(x,y);
-    } else if (OP=="and")
+    } else if (OP==OP_AND)
     { POP(y); POP(x); A=ewbAnd(x,y);
-    } else if (OP=="andb")
+    } else if (OP==OP_ANDB)
     { POP(y); POP(x); A=ewbBitwiseAnd(x,y);
-    } else if (OP=="orb")
+    } else if (OP==OP_ORB)
     { POP(y); POP(x); A=ewbBitwiseOr(x,y);
-    } else if (OP=="not")
+    } else if (OP==OP_NOT)
     { POP(x); A=ewbNot(x);
-    } else if (OP=="notb")
+    } else if (OP==OP_NOTB)
     { POP(x); A=ewbBitwiseNot(x);
-    } else if ((OP=="gt" || OP=="lt" || OP=="eq" || OP=="neq" || OP=="ge" || OP=="le"))
-    { POP(y); POP(x); A=ewbCompare(x, y, OP); 
-    } else if (OP=="jz")
+    } else if (OP==OP_GT || OP==OP_LT || OP==OP_EQ || OP==OP_NEQ || OP==OP_GE || OP==OP_LE ||
+               OP==OP_SGT || OP==OP_SLT || OP==OP_SEQ || OP==OP_SNEQ || OP==OP_SGE || OP==OP_SLE)
+    { POP(y); POP(x); A=ewbCompare(x, y, vm_instr_table[vm_instr(OP)].name); 
+    } else if (OP==OP_JZ)
     { POP(x); if (A=="0" || A=="") PC=ewbIntValue(x)-1; 
-    } else if (OP=="jnz")
+    } else if (OP==OP_JNZ)
     { POP(x); if (A!="0" && A!="") PC=ewbIntValue(x)-1; 
-    } else if (OP=="call")
-    { PUSH(ewbInt(PC)); PC=ewbIntValue(A)-1;  //E sono saltato..  
-    } else if (OP=="ret")
+    } else if (OP==OP_CALL)
+    { POP(x); 
+      int tmp=SP;
+      SP = SP - ewbIntValue(x) + 1;
+      PUSH(codearg[PC]);    //Metto PC in posizione SP-(arity+1). Ho gia preparato il "buco".
+      SP=tmp; 
+      PC=ewbIntValue(A)-1;  //E sono saltato..  
+    } else if (OP==OP_RET)
     { POP(x); PC=ewbIntValue(x)-1;             //E  sono tornato..
-    } else if (OP=="mova")                   //Unica istruzione con parametri.. Mi adeguo.. prendo il dato dallo stack.  
-    { A=togliVirgolette(IR.substr(5));                  //Metto il valore in accumulatore.
-    } else if (OP=="pusha")
+    } else if (OP==OP_MOVA)                   //Unica istruzione con parametri.. Mi adeguo.. prendo il dato dallo stack.  
+    { A=codearg[PC];                  //Metto il valore in accumulatore.
+    } else if (OP==OP_PUSHA)
     { PUSH(A); 
-    } else if (OP=="push") //Push diretto evita di fare MOVA val, PUSH val e lascia intatti i registri.
-    { string t=togliVirgolette(IR.substr(5));
-      PUSH(t); 
-    } else if (OP=="popa")
+    } else if (OP==OP_PUSH) //Push diretto evita di fare MOVA val, PUSH val e lascia intatti i registri.
+    { PUSH(codearg[PC]); 
+    } else if (OP==OP_POPA)
     { POP(A);  
-    } else if (OP=="addsymtable") //Aggiunge la variabile alla smbol table. Va seguita da un push del valore. 
-    { symtname[ST]=A; 
+    } else if (OP==OP_ADDSYMTABLE) //Aggiunge la variabile alla symbol table. Va seguita da un push del valore. 
+    { symtname[ST]=codearg[PC]; 
       symtpos[ST]=SP; 
       ST++; if (ST>=MAXVAR) err("Vars overflow");
-    } else if (OP=="startform")
+    } else if (OP==OP_DELSYMTABLE)
+    { int n=ewbIntValue(codearg[PC]);
+      ST=ST-n;
+      if (ST<0) err("Vars underflow");
+    } else if (OP==OP_DECSP)
+    { int n=ewbIntValue(codearg[PC]);
+      SP=SP-n;
+      if (SP<0) err("Stack underflow");
+    } else if (OP==OP_STARTFORM)
     { cout << "<form method=post id=__form" << IDF << " enctype=multipart/form-data>";
       IDF++;  
-    } else if (OP=="starttarget")
+    } else if (OP==OP_STARTTARGET)
     { cout << "<form style=visibility:hidden id=__form" << IDF << " method=post enctype=multipart/form-data>"; 
       IDF++; 
-    } else if (OP=="addtoform")
+    } else if (OP==OP_ADDTOFORM)
     { POP(varvalue); POP(vartype); POP(varname);
       if (vartype=="input" || vartype=="date" || vartype=="numeric")
       { if (vartype=="numeric") vartype="number"; 
@@ -220,16 +244,16 @@ void resume(int xPC,int xSP)
       } else  //Gli altri tipi.. ancora da fare.
       {
       };
-    } else if (OP=="sendform")
+    } else if (OP==OP_SENDFORM)
     { //Aggiungo al form lo stack 
       cout << "<textarea name=__stack   id=__stack     >" << escapeStack() << "</textarea>\n"; 
       cout << "<input name=__entrypoint id=__entrypoint value=\"" << (PC + 1) << "\">\n"; 
       cout << "<input name=__stackpos   id=__stackpos   value=\"" << SP << "\">\n"; 
       cout << "<input name=__signature  id=__signature  value=\"" << signature(ewbInt(SP) + " " + ewbInt(PC+1) + " " + escapeStack()) << "\">\n"; 
       cout << "</form>\n";
-    } else if (OP=="stop")
-    { exit(0); //In attesa di rientrare dall'entry point PC 
-    } else if (OP=="runtarget") //run TARGET - come STOP - Mi faccio passare l'entry point
+    } else if (OP==OP_STOP)
+    { RUNNING=0; //In attesa di rientrare dall'entry point PC 
+    } else if (OP==OP_RUNTARGET) //run TARGET - come STOP - Mi faccio passare l'entry point
     { string interval;
       POP(interval); POP(varname); 
       string EP=stack[findvar(varname)]; //posizione del target. 
@@ -239,59 +263,74 @@ void resume(int xPC,int xSP)
       cout << "<input name=__signature  id=__signature  value=\"" << signature(ewbInt(SP) + " " + EP + " " + escapeStack()) << "\">\n"; 
       cout << "</form>\n";
       cout << "<script>runtarget(" << (IDF-1) << "," << interval << ");</script>\n";  
-    } else if (OP=="crontask") //cron task 
-    { string interval;
-      POP(interval); POP(varname);
-      string EP=stack[findvar(varname)];    //posizione del task. 
-      addCron(EP, interval);                //Funzione interna, devo gestire un CRON a minuti o a secondi. 
-    } 
-// ZENO: da qui intoccabile finche non diventa software definitivo //
-      else if (OP=="task" || OP=="target")    //Punto di inizio di una procedura asincrona.
+    } else if (OP==OP_CRONTASK) //cron task 
+    { int arity=ewbIntValue(codearg[PC]);
+      string cronstring, taskname;
+      POP(cronstring);
+      string s=""; 
+      for (i=0; i<arity; i++)
+      { pop(x); 
+        string p=i; 
+        vector <string> v; v.push_back(p); 
+        setpath(s,x,v); 
+      };
+      POP(taskname);
+         //Funzione interna, devo gestire un CRON a minuti o a secondi. 
+      if (cronstring=='')
+      { run_query(DEFAULTENGINE,  
+          "remove from _crontab where task='" + taskname + "'"); 
+      } else  
+      { if (!validCronString(cronstring)) err("Invalid cronstring"); 
+        run_query(DEFAULTENGINE,  
+          "insert into _crontab (task, parameters, cronstring) values ('" + taskname + "','" + s + "','" + cronstring + "')", "");
+      };
+    } else if (OP==OP_TASK || OP==OP_TARGET)    //Punto di inizio di una procedura asincrona.
     { POP(varname); //Se gia running impedisco la sovrapposizione
+      string tasktype="task";
+      if (OP==OP_TARGET) tasktype="target";
       x=run_query(DEFAULTENGINE,  
-        "update _" + OP + "s set status='running', starttime=" + to_string(time(NULL)) + " where name='" + varname + "' and status<>'running'", "");
+        "update _" + tasktype + "s set status='running', starttime=" + to_string(time(NULL)) + " where name='" + varname + "' and status<>'running'", "");
       if  (ewbIntValue(x)==0) 
       { x=run_query(DEFAULTENGINE,  
-        "insert into _" + OP + "s (name, status, starttime) values ('" + varname + "', 'running', " + to_string(time(NULL)) + ")", "");
+        "insert into _" + tasktype + "s (name, status, starttime) values ('" + varname + "', 'running', " + to_string(time(NULL)) + ")", "");
       };
-      if  (ewbIntValue(x)==0) exit(0); //niente sovrapposizione
+      if  (ewbIntValue(x)==0) RUNNING=0; //niente sovrapposizione
       PUSH(varname); //Cosi è gia pronto per la ENDTASK
-    } else if (OP=="endtask" || OP=="endtarget")    //Punto di inizio di una procedura asincrona.
+    } else if (OP==OP_ENDTASK || OP==OP_ENDTARGET)    //Punto di inizio di una procedura asincrona.
     { POP(varname);
-      string tasktype=OP;
-      tasktype=tasktype.substr(3);
+      string tasktype="task";
+      if (OP==OP_ENDTARGET) tasktype="target";
       run_query(DEFAULTENGINE, "update _" + tasktype + "s set status='stopped', starttime=" + to_string(time(NULL)) + " where name='" + varname + "'", "");
-    } else if (OP=="qlist")  //vedi cicloInEDatabase.txt in doc/
+    } else if (OP==OP_QLIST)  //vedi cicloInEDatabase.txt in doc/
     { string order, query, context; 
       POP(order); 
       POP(query);
       POP(context);
       A=qlist(context, query, order);
-    } else if (OP=="qbyid")  //vedi cicloInEDatabase.txt in doc/
+    } else if (OP==OP_QBYID)  //vedi cicloInEDatabase.txt in doc/
     { string order, query, context, id; 
       POP(id);
       POP(order); 
       POP(query);
       POP(context);
       A=qbyid(context, query, order, id);
-    } else if (OP=="query")
+    } else if (OP==OP_QUERY)
     { string order, query, context; 
       POP(order); 
       POP(query);
       POP(context);
       A=run_query(context, query, order);
     } 
-// ZENO: fino a qui intoccabile finche non diventa software definitivo //
-      else if (OP=="onerror") //Visibilità, sempre l'ultima in ricorsione.  
+    else if (OP==OP_ONERROR) //Visibilità, sempre l'ultima in ricorsione.  
     { POP(varname); 
       symtname[ST]="__on_error"; 
       symtpos[ST]=ewbIntValue(varname); 
       ST++; if (ST>=MAXVAR) err("Vars overflow");
-    } else if (OP=="raise") //c'e' l'errore. 
+    } else if (OP==OP_RAISE) //c'e' l'errore. 
     { raise();    
-    } else if (OP=="setpath") //Nasconde nelle stringhe la complessità degli array
+    } else if (OP==OP_SETPATH) //Nasconde nelle stringhe la complessità degli array
     { /* PUSH "a"; PUSH "3"; PUSH "5"; PUSH "pippo"; SETPATH 2; */
-      int numlev=ewbIntValue(IR.substr(8));
+      int numlev=ewbIntValue(codearg[PC]);
       POP(x); //Value
       //pop array di livelli
       vector <string> v; 
@@ -299,9 +338,9 @@ void resume(int xPC,int xSP)
       POP(varname);
       A=stack[findvar(varname)];
       stack[findvar(varname)] = setpath(A, x, v);  
-    } else if (OP=="getpath") //Nasconde nelle stringhe la complessità degli array
+    } else if (OP==OP_GETPATH) //Nasconde nelle stringhe la complessità degli array
     { /* PUSH "a"; PUSH "3"; PUSH "5"; GETPATH 2; */
-      int numlev=ewbIntValue(IR.substr(8));
+      int numlev=ewbIntValue(codearg[PC]);
       vector <string> v; 
       for (int i=0; i<numlev; i++) { POP(A); v.push_back(A); };
       POP(varname);
@@ -311,63 +350,92 @@ void resume(int xPC,int xSP)
   };
 };
 
-
-void start() 
-{ resume(0,0);
-};
-
-static void resetVm()
-{ PC=0;
-  SP=0;
-  ST=0;
-  IDF=0;
-  for (int i=0; i<MAXLINES; i++) code[i]="";
+// Estrae l'eventuale argomento dalla riga testuale gia' isolata dal loader.
+static string textArg(string IR)
+{ int i=0;
+  while (i<(int)IR.size() && IR[i]!=' ') i++;
+  while (i<(int)IR.size() && IR[i]==' ') i++;
+  if (i>=(int)IR.size()) return "";
+  string a=IR.substr(i);
+  if (a.size()>0 && a[0]=='"') return togliVirgolette(a);
+  return a;
 }
 
-static void loadProgram(const char *program)
+// Inserisce una istruzione normalizzata: opcode numerico, argomento e testo debug.
+static void addCode(int line, EWBOpcode op, string arg, string debug)
+{ if (line>=MAXLINES) err("Code overflow");
+  codeop[line]=op;
+  codearg[line]=arg;
+  code[line]=debug;
+}
+
+// Loader testuale: una riga non vuota corrisponde a una istruzione VM.
+static void loadProgramText(const char *program)
 { string text;
   if (program) text=program;
-
-  int line=0;
   string IR;
+  codeLines=0;
   for (int i=0; i<=(int)text.size(); i++)
   { if (i==(int)text.size() || text[i]=='\n')
     { if (IR!="")
-      { code[line]=IR;
-        line++;
-        if (line>=MAXLINES) raiseerr("Code overflow");
+      { EWBOpcode op=opcode(IR);
+        addCode(codeLines, op, textArg(IR), IR);
+        codeLines++;
       }
       IR="";
-    }
-    else if (text[i]!='\r')
-    { IR += text[i];
-    }
+    } else if (text[i]!='\r') IR += text[i];
   }
+  SP=0; IDF=0; ST=0; 
+}
+
+// Loader binario v1: 0x00, versione 0x01, poi opcode >=0x80 e argomenti.
+static void loadProgramBinary(const unsigned char *program, size_t len)
+{ if (len<2 || program[0]!=0 || program[1]!=1) err("Bad binary header");
+  size_t pos=2;
+  codeLines=0;
+  while (pos<len)
+  { EWBOpcode op=(EWBOpcode)program[pos];
+    pos++;
+    int instr=vm_instr(op);
+    if (instr<0) err("Bad binary opcode");
+    string arg="";
+    if (argtype==ARG_INT) arg=readBinaryInt(program,len,&pos);
+    else if (argtype==ARG_STRING) arg=readBinaryString(program,len,&pos);
+    else if (argtype==ARG_INT_OR_STRING)
+    { if (pos<len && program[pos]=='"') arg=readBinaryString(program,len,&pos);
+      else arg=readBinaryInt(program,len,&pos);
+    };
+    addCode(codeLines, op, arg, vm_instr_table[instr].name + string(" ") + arg);
+    codeLines++;
+  }
+  SP=0; IDF=0; ST=0; 
+}
+
+// Se il primo byte e' 0x00 usa il formato binario, altrimenti il testo.
+static void loadProgram(const char *program, size_t len)
+{ if (!program) err("No program");
+  if (len>0 && ((const unsigned char*)program)[0]==0)
+  { loadProgramBinary((const unsigned char*)program, len);
+  } else loadProgramText(program);
 }
 
 static void loadStack(const char *encoded_stack, int stackpos)
-{ SP=0;
-  if (encoded_stack && encoded_stack[0])
-  { vector<string> v=split(encoded_stack, ' ');
-    for (int i=0; i<(int)v.size(); i++)
-    { if (v[i]!="")
-      { stack[SP]=hexDecode(v[i]);
-        SP++;
-        if (SP>=MAXSTACK) raiseerr("Stack overflow");
-      }
-    }
-  }
-
-  if (stackpos>=0) SP=stackpos;
-  if (SP<0 || SP>=MAXSTACK) raiseerr("Stack pointer");
+{ SP=0; string A; 
+  vector<string> v=split(encoded_stack, ' ');
+  for (int i=0; i<(int)v.size(); i++) if (v[i]!="") { A=hexDecode(v[i]); PUSH(A); };
+  SP=stackpos; 
 }
 
 extern "C" int ewb_run_text(const char *program, int entrypoint, int stackpos, const char *encoded_stack)
-{ resetVm();
-  loadProgram(program);
+{ loadProgram(program, program ? strlen(program) : 0);
   loadStack(encoded_stack, stackpos);
+  if (entrypoint<0) err("Wrong EP");
+  return resume(entrypoint,SP);
+}
 
-  if (entrypoint<0) entrypoint=0;
-  resume(entrypoint,SP);
-  return 0;
+extern "C" int ewb_run_buffer(const char *program, size_t len, int entrypoint, int stackpos, const char *encoded_stack)
+{ loadProgram(program, len);
+  loadStack(encoded_stack, stackpos);
+  if (entrypoint<0) err("Wrong EP");
+  return resume(entrypoint,SP);
 }

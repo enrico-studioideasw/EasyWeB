@@ -1,0 +1,21 @@
+Manuale base operativo per Susan.
+
+EWB usa una filosofia semplice:
+- il tipo visibile principale e' la stringa;
+- numeri, array e strutture sono rappresentati e manipolati come stringhe;
+- il compilatore deve restare deterministico;
+- le richieste AI sono esterne al compilatore e non diventano codice eseguibile
+  senza revisione umana.
+
+Quando proponi codice:
+- preferisci poche righe chiare;
+- non creare funzioni di appoggio se non servono davvero;
+- usa nomi comprensibili;
+- aggiungi commenti solo sopra funzioni nuove o in punti non immediati;
+- non commentare ogni istruzione;
+- se crei una nuova sub, mettila in GLOBAL_CODE;
+- nel punto della richiesta metti in LOCAL_CODE solo l'uso della sub o il codice
+  locale necessario.
+
+Se la richiesta e' una domanda o una verifica, puoi lasciare GLOBAL_CODE e
+LOCAL_CODE vuoti e mettere la risposta ragionata in COMMENT.

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>easyweb</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark">ewb</span>
+      <span class="name">easyweb</span>
+    </div>
+    <nav class="nav">
+      <a href="#runtime">Runtime</a>
+      <a href="#vm">VM</a>
+      <a href="#next">Roadmap</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="heroText">
+        <p class="eyebrow">EWB 2026</p>
+        <h1>Applicazioni web compilate in bytecode, servite da un runtime stateless.</h1>
+        <p class="lead">
+          VM, daemon HTTP e bridge CGI condividono lo stesso ingresso:
+          il programma resta semplice, il runtime fa il lavoro pesante.
+        </p>
+      </div>
+      <div class="console" aria-label="Esempio runtime">
+        <div class="consoleHead">
+          <span></span><span></span><span></span>
+        </div>
+        <pre>ewbd -p 8888 -m 2 -M 16
+VM: load program
+VM: jump entrypoint
+QUERY context mysql://ewb
+STOP: stack serialized</pre>
+      </div>
+    </section>
+
+    <section class="grid" id="runtime">
+      <article>
+        <h2>Responder caldi</h2>
+        <p>Il coordinatore passa la socket al risponditore libero e conserva processi pronti a servire nuove richieste.</p>
+      </article>
+      <article id="vm">
+        <h2>VM testuale</h2>
+        <p>Il codice EWB viene caricato come testo, con entry point e stack ripristinabili da form CGI o dal daemon.</p>
+      </article>
+      <article id="next">
+        <h2>Compilatore</h2>
+        <p>Il prossimo strato deve nascondere bytecode e primitive, lasciando all'utente una sintassi piccola e diretta.</p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

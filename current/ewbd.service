@@ -1,0 +1,14 @@
+[Unit]
+Description=EWB daemon
+After=network.target
+
+[Service]
+Type=simple
+User=noc
+WorkingDirectory=/home/noc/EWB2026/current
+ExecStart=/usr/local/bin/ewbd -p 8888 -m 2 -M 16 --www /home/noc/EWB2026/current/www
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -35,11 +35,12 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "cgi_parser.h"
+#include "vm_1.0.h"
+
 #define EWBD_MAX_RESPONDERS 1024
 #define EWBD_REQBUF 16384
 #define EWBD_MAX_POST (10*1024*1024)
-#define EWBD_MAX_FIELDS 512
-#define EWBD_MAX_FILES 128
 
 typedef struct responder
 {
@@ -48,43 +49,6 @@ typedef struct responder
   int busy;
   int generation;
 } responder;
-
-typedef struct ewb_field
-{
-  char *name;
-  char *value;
-  size_t size;
-} ewb_field;
-
-typedef struct ewb_file
-{
-  char *name;
-  char *filename;
-  char *content_type;
-  char tmp_path[512];
-  size_t size;
-} ewb_file;
-
-typedef struct ewb_request
-{
-  char method[16];
-  char path[1024];
-  char content_type[256];
-  char boundary[256];
-  char *body;
-  size_t body_len;
-
-  ewb_field fields[EWBD_MAX_FIELDS];
-  int nfields;
-  ewb_file files[EWBD_MAX_FILES];
-  int nfiles;
-
-  char *entrypoint;
-  char *stackpos;
-  char *stack;
-  size_t stack_size;
-  char *signature;
-} ewb_request;
 
 static volatile sig_atomic_t g_hup=0;
 static volatile sig_atomic_t g_chld=0;
@@ -205,31 +169,6 @@ static int send_status(int sock, char tag)
   return send_fd_msg(sock,tag,-1,gen);
 }
 
-static char *xstrndup(const char *s, size_t n)
-{
-  char *out=(char*)malloc(n+1);
-  if (!out) die("out of memory");
-  memcpy(out,s,n);
-  out[n]=0;
-  return out;
-}
-
-static void free_request(ewb_request *r)
-{
-  for (int i=0; i<r->nfields; i++)
-  { free(r->fields[i].name);
-    free(r->fields[i].value);
-  }
-  for (int i=0; i<r->nfiles; i++)
-  { if (r->files[i].tmp_path[0]) unlink(r->files[i].tmp_path);
-    free(r->files[i].name);
-    free(r->files[i].filename);
-    free(r->files[i].content_type);
-  }
-  free(r->body);
-  memset(r,0,sizeof(*r));
-}
-
 static int read_http_request(int fd, char *buf, size_t bufsz)
 {
   size_t used=0;
@@ -270,7 +209,13 @@ static int header_value(const char *headers, const char *name, char *out, size_t
   {
     const char *line=p;
     const char *e=strstr(line,"\n");
-    size_t len=e ? (size_t)(e-line) : strlen(line);
+    size_t len;
+    if (e)
+    { len=(size_t)(e-line);
+    }
+    else
+    { len=strlen(line);
+    }
     while (len>0 && (line[len-1]=='\r' || line[len-1]=='\n')) len--;
 
     if (len>nlen && !strncasecmp(line,name,nlen) && line[nlen]==':')
@@ -348,179 +293,6 @@ static void parse_request_line(const char *req, char *method, size_t msz, char *
   path[psz-1]=0;
 }
 
-static int extract_boundary(const char *content_type, char *boundary, size_t bsz)
-{
-  const char *p=strstr(content_type,"boundary=");
-  if (!p) return 0;
-  p+=9;
-
-  if (*p=='"')
-  {
-    p++;
-    size_t i=0;
-    while (*p && *p!='"' && i+1<bsz) boundary[i++]=*p++;
-    boundary[i]=0;
-    return i>0;
-  }
-
-  size_t i=0;
-  while (*p && *p!=';' && *p!=' ' && *p!='\t' && i+1<bsz) boundary[i++]=*p++;
-  boundary[i]=0;
-  return i>0;
-}
-
-static char *mem_find(const char *hay, size_t haylen, const char *needle, size_t nlen)
-{
-  if (nlen==0 || haylen<nlen) return NULL;
-  for (size_t i=0; i+nlen<=haylen; i++)
-  { if (!memcmp(hay+i,needle,nlen)) return (char*)(hay+i);
-  }
-  return NULL;
-}
-
-static int header_param(const char *line, const char *name, char *out, size_t outsz)
-{
-  char pattern[128];
-  snprintf(pattern,sizeof(pattern),"%s=",name);
-  const char *p=strstr(line,pattern);
-  if (!p) return 0;
-  p+=strlen(pattern);
-
-  if (*p=='"')
-  {
-    p++;
-    size_t i=0;
-    while (*p && *p!='"' && i+1<outsz) out[i++]=*p++;
-    out[i]=0;
-    return i>0;
-  }
-
-  size_t i=0;
-  while (*p && *p!=';' && *p!=' ' && *p!='\t' && i+1<outsz) out[i++]=*p++;
-  out[i]=0;
-  return i>0;
-}
-
-static int part_header_value(const char *headers, const char *name, char *out, size_t outsz)
-{
-  return header_value(headers,name,out,outsz);
-}
-
-static void add_field(ewb_request *r, const char *name, const char *value, size_t size)
-{
-  if (r->nfields>=EWBD_MAX_FIELDS) return;
-  ewb_field *f=&r->fields[r->nfields++];
-  f->name=xstrndup(name,strlen(name));
-  f->value=xstrndup(value,size);
-  f->size=size;
-
-  if (!strcmp(name,"__entrypoint")) r->entrypoint=f->value;
-  else if (!strcmp(name,"__stackpos")) r->stackpos=f->value;
-  else if (!strcmp(name,"__stack"))
-  { r->stack=f->value;
-    r->stack_size=f->size;
-  }
-  else if (!strcmp(name,"__signature")) r->signature=f->value;
-}
-
-static int add_file(ewb_request *r, const char *name, const char *filename,
-                    const char *content_type, const char *data, size_t size)
-{
-  if (r->nfiles>=EWBD_MAX_FILES) return -1;
-
-  char tmp_path[512];
-  snprintf(tmp_path,sizeof(tmp_path),"/tmp/ewbd-upload-XXXXXX");
-  int fd=mkstemp(tmp_path);
-  if (fd<0) return -1;
-
-  size_t done=0;
-  while (done<size)
-  {
-    ssize_t n=write(fd,data+done,size-done);
-    if (n<0)
-    {
-      if (errno==EINTR) continue;
-      close(fd);
-      unlink(tmp_path);
-      return -1;
-    }
-    done+=(size_t)n;
-  }
-  close(fd);
-
-  ewb_file *f=&r->files[r->nfiles++];
-  f->name=xstrndup(name,strlen(name));
-  f->filename=xstrndup(filename,strlen(filename));
-  f->content_type=xstrndup(content_type,strlen(content_type));
-  snprintf(f->tmp_path,sizeof(f->tmp_path),"%s",tmp_path);
-  f->size=size;
-  return 0;
-}
-
-static int parse_multipart(ewb_request *r)
-{
-  char marker[320];
-  snprintf(marker,sizeof(marker),"--%s",r->boundary);
-  size_t marker_len=strlen(marker);
-
-  char *p=mem_find(r->body,r->body_len,marker,marker_len);
-  if (!p) return -1;
-
-  char *end_body=r->body+r->body_len;
-
-  for (;;)
-  {
-    p+=marker_len;
-    if (p+2<=end_body && p[0]=='-' && p[1]=='-') break;
-    if (p+2<=end_body && p[0]=='\r' && p[1]=='\n') p+=2;
-    else if (p<end_body && p[0]=='\n') p++;
-    else break;
-
-    char *headers_end=mem_find(p,(size_t)(end_body-p),"\r\n\r\n",4);
-    int sep_len=4;
-    if (!headers_end)
-    { headers_end=mem_find(p,(size_t)(end_body-p),"\n\n",2);
-      sep_len=2;
-    }
-    if (!headers_end) return -1;
-
-    char *part_data=headers_end+sep_len;
-    char *next=mem_find(part_data,(size_t)(end_body-part_data),marker,marker_len);
-    if (!next) return -1;
-
-    char *part_end=next;
-    if (part_end-2>=part_data && part_end[-2]=='\r' && part_end[-1]=='\n') part_end-=2;
-    else if (part_end-1>=part_data && part_end[-1]=='\n') part_end-=1;
-
-    size_t headers_len=(size_t)(headers_end-p);
-    char *headers=xstrndup(p,headers_len);
-    char disp[1024];
-    char name[256];
-    char filename[512];
-    char ctype[256];
-
-    disp[0]=name[0]=filename[0]=ctype[0]=0;
-    part_header_value(headers,"Content-Disposition",disp,sizeof(disp));
-    part_header_value(headers,"Content-Type",ctype,sizeof(ctype));
-    header_param(disp,"name",name,sizeof(name));
-    header_param(disp,"filename",filename,sizeof(filename));
-    if (ctype[0]==0) strcpy(ctype,"application/octet-stream");
-
-    if (name[0])
-    {
-      if (filename[0])
-        add_file(r,name,filename,ctype,part_data,(size_t)(part_end-part_data));
-      else
-        add_field(r,name,part_data,(size_t)(part_end-part_data));
-    }
-
-    free(headers);
-    p=next;
-  }
-
-  return 0;
-}
-
 static void write_all(int fd, const char *s)
 {
   size_t left=strlen(s);
@@ -564,7 +336,15 @@ static int is_static_path(const char *path)
          !strcmp(ext,".png")  || !strcmp(ext,".jpg") ||
          !strcmp(ext,".jpeg") || !strcmp(ext,".gif") ||
          !strcmp(ext,".webp") || !strcmp(ext,".svg") ||
-         !strcmp(ext,".ico")  || !strcmp(ext,".txt");
+         !strcmp(ext,".ico")  ||
+         !strcmp(ext,".txt");
+}
+
+static int is_evm_path(const char *path)
+{
+  const char *ext=strrchr(path,'.');
+  if (!ext) return 0;
+  return !strcmp(ext,".evm");
 }
 
 static int unsafe_path(const char *path)
@@ -583,6 +363,36 @@ static void strip_query(const char *path, char *out, size_t outsz)
     i++;
   }
   out[i]=0;
+}
+
+static void default_index_path(const char *path, char *out, size_t outsz)
+{
+  char clean[1024];
+  char full[8192];
+  struct stat st;
+
+  strip_query(path,clean,sizeof(clean));
+
+  if (strcmp(clean,"/"))
+  { snprintf(out,outsz,"%s",path);
+    return;
+  }
+
+  snprintf(full,sizeof(full),"%s/index.html",g_www_root);
+  if (!stat(full,&st) && S_ISREG(st.st_mode))
+  { strncpy(out,"/index.html",outsz-1);
+    out[outsz-1]=0;
+    return;
+  }
+
+  snprintf(full,sizeof(full),"%s/index.evm",g_www_root);
+  if (!stat(full,&st) && S_ISREG(st.st_mode))
+  { strncpy(out,"/index.evm",outsz-1);
+    out[outsz-1]=0;
+    return;
+  }
+
+  snprintf(out,outsz,"%s",path);
 }
 
 static void http_error(int fd, int code, const char *text)
@@ -666,15 +476,116 @@ static int serve_static_file(int client_fd, const char *request_path)
   return 1;
 }
 
+// Legge un file programma preservando eventuali byte 0x00 del formato binario.
+static char *read_program_file(const char *full, size_t *len_out)
+{
+  int f=open(full,O_RDONLY);
+  struct stat st;
+  char *buf;
+  size_t done=0;
+
+  *len_out=0;
+  if (f<0) return NULL;
+  if (fstat(f,&st)<0 || !S_ISREG(st.st_mode))
+  { close(f);
+    return NULL;
+  }
+
+  buf=(char*)malloc((size_t)st.st_size + 1);
+  if (!buf)
+  { close(f);
+    return NULL;
+  }
+
+  while (done<(size_t)st.st_size)
+  {
+    ssize_t n=read(f,buf+done,(size_t)st.st_size-done);
+    if (n<0)
+    {
+      if (errno==EINTR) continue;
+      free(buf);
+      close(f);
+      return NULL;
+    }
+    if (n==0) break;
+    done+=(size_t)n;
+  }
+
+  close(f);
+  buf[done]=0;
+  *len_out=done;
+  return buf;
+}
+
+// Esegue un programma .evm e manda l'output della VM sul socket HTTP.
+static int serve_evm_program(int client_fd, const char *request_path, ewb_form *form)
+{
+  char clean[1024];
+  char full[8192];
+  char header[256];
+  char *program;
+  size_t program_len=0;
+  const char *stack="";
+  int entrypoint=0;
+  int stackpos=0;
+  int saved_stdout;
+  int rc;
+
+  strip_query(request_path,clean,sizeof(clean));
+  if (!is_evm_path(clean)) return 0;
+
+  if (unsafe_path(clean))
+  { http_error(client_fd,403,"Forbidden");
+    return 1;
+  }
+
+  snprintf(full,sizeof(full),"%s%s",g_www_root,clean);
+  program=read_program_file(full,&program_len);
+  if (!program)
+  { http_error(client_fd,404,"Not Found");
+    return 1;
+  }
+
+  if (form)
+  { if (form->entrypoint) entrypoint=atoi(form->entrypoint);
+    if (form->stackpos) stackpos=atoi(form->stackpos);
+    if (form->stack) stack=form->stack;
+  }
+
+  snprintf(header,sizeof(header),
+           "HTTP/1.0 200 OK\r\n"
+           "Content-Type: text/html; charset=utf-8\r\n"
+           "Connection: close\r\n"
+           "\r\n");
+  write_all(client_fd,header);
+
+  saved_stdout=dup(STDOUT_FILENO);
+  if (saved_stdout<0 || dup2(client_fd,STDOUT_FILENO)<0)
+  { if (saved_stdout>=0) close(saved_stdout);
+    free(program);
+    return 1;
+  }
+
+  rc=ewb_run_buffer(program,program_len,entrypoint,stackpos,stack);
+  fflush(stdout);
+  dup2(saved_stdout,STDOUT_FILENO);
+  close(saved_stdout);
+
+  if (rc<0) warnx("VM returned %d for %s",rc,clean);
+  free(program);
+  return 1;
+}
+
 static void handle_client(int client_fd, int generation, int *loaded_generation)
 {
   char req[EWBD_REQBUF];
   int req_len=0;
   char method[16];
   char path[1024];
+  char resolved_path[1024];
   char body[4096];
   char header[512];
-  ewb_request er;
+  ewb_form er;
 
   if (*loaded_generation!=generation)
   {
@@ -690,37 +601,53 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
 
   if (method[0]==0) strcpy(method,"?");
   if (path[0]==0) strcpy(path,"/");
+  default_index_path(path,resolved_path,sizeof(resolved_path));
 
-  if ((!strcmp(method,"GET") || !strcmp(method,"HEAD")) && serve_static_file(client_fd,path))
+  if (!strcmp(method,"GET") || !strcmp(method,"HEAD"))
+  { if (!strcmp(method,"GET") && serve_evm_program(client_fd,resolved_path,NULL)) return;
+    if (serve_static_file(client_fd,resolved_path)) return;
+    http_error(client_fd,404,"Not Found");
     return;
+  }
 
   if (!strcmp(method,"POST"))
   {
-    snprintf(er.method,sizeof(er.method),"%s",method);
-    snprintf(er.path,sizeof(er.path),"%s",path);
-    header_value(req,"Content-Type",er.content_type,sizeof(er.content_type));
+    char content_type[256];
+    char *post_body=NULL;
+    size_t post_body_len=0;
+    content_type[0]=0;
+    header_value(req,"Content-Type",content_type,sizeof(content_type));
 
-    if (strncmp(er.content_type,"multipart/form-data",19))
+    if (strncmp(content_type,"multipart/form-data",19) &&
+        strncmp(content_type,"application/x-www-form-urlencoded",33))
     { http_error(client_fd,415,"Unsupported Media Type");
       return;
     }
 
-    if (!extract_boundary(er.content_type,er.boundary,sizeof(er.boundary)))
-    { http_error(client_fd,400,"Missing multipart boundary");
-      return;
-    }
-
-    if (read_http_body(client_fd,req,req_len,&er.body,&er.body_len)<0)
+    if (read_http_body(client_fd,req,req_len,&post_body,&post_body_len)<0)
     { http_error(client_fd,400,"Bad POST body");
-      free_request(&er);
       return;
     }
 
-    if (parse_multipart(&er)<0)
-    { http_error(client_fd,400,"Bad multipart body");
-      free_request(&er);
+    if (ewb_form_parse(&er,content_type,post_body,post_body_len)<0)
+    { http_error(client_fd,400,"Bad form body");
+      ewb_form_free(&er);
       return;
     }
+
+    if (serve_evm_program(client_fd,resolved_path,&er))
+    { ewb_form_free(&er);
+      return;
+    }
+
+    const char *entrypoint="";
+    const char *stackpos="";
+    const char *signature="";
+    unsigned long stack_size=0;
+    if (er.entrypoint) entrypoint=er.entrypoint;
+    if (er.stackpos) stackpos=er.stackpos;
+    if (er.signature) signature=er.signature;
+    if (er.stack) stack_size=(unsigned long)er.stack_size;
 
     char extra[2048];
     snprintf(extra,sizeof(extra),
@@ -734,10 +661,10 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
              er.content_type,
              er.nfields,
              er.nfiles,
-             er.entrypoint ? er.entrypoint : "",
-             er.stackpos ? er.stackpos : "",
-             er.stack ? (unsigned long)er.stack_size : 0,
-             er.signature ? er.signature : "");
+             entrypoint,
+             stackpos,
+             stack_size,
+             signature);
 
     snprintf(body,sizeof(body),
              "<html><body>"
@@ -748,7 +675,7 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
              "<p>path: %s</p>"
              "%s"
              "</body></html>\n",
-             (long)getpid(),generation,method,path,extra);
+             (long)getpid(),generation,method,resolved_path,extra);
 
     snprintf(header,sizeof(header),
              "HTTP/1.0 200 OK\r\n"
@@ -760,7 +687,7 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
 
     write_all(client_fd,header);
     write_all(client_fd,body);
-    free_request(&er);
+    ewb_form_free(&er);
     return;
   }
 
@@ -772,7 +699,7 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
            "<p>method: %s</p>"
            "<p>path: %s</p>"
            "</body></html>\n",
-           (long)getpid(),generation,method,path);
+           (long)getpid(),generation,method,resolved_path);
 
   snprintf(header,sizeof(header),
            "HTTP/1.0 200 OK\r\n"

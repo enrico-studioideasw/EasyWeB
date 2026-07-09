@@ -93,6 +93,11 @@ string ewbDiv(string x, string y)
   if (b == 0) raiseerr("Div zero");
   return ewbNumber(ewbValue(x) / b);
 }
+string ewbMod(string x, string y)
+{ int b = ewbIntValue(y);
+  if (b == 0) raiseerr("Div zero");
+  return ewbInt(ewbIntValue(x) % b);
+}
 
 string ewbOr(string x, string y)
 { return ewbBool(ewbIntValue(x) || ewbIntValue(y));
@@ -119,16 +124,23 @@ string ewbBitwiseNot(string x)
 }
 
 string ewbCompare(string x, string y, string cmp)
-{ double a = ewbValue(x);
-  double b = ewbValue(y);
-
-  if (cmp == "gt")  return ewbBool(a > b);
-  if (cmp == "lt")  return ewbBool(a < b);
-  if (cmp == "ge")  return ewbBool(a >= b);
-  if (cmp == "le")  return ewbBool(a <= b);
-  if (cmp == "eq")  return ewbBool(a == b);
-  if (cmp == "neq") return ewbBool(a != b);
-
+{ if (cmp[0]=='s')
+  { if (cmp == "sgt")  return ewbBool(x > y);
+    if (cmp == "slt")  return ewbBool(x < y);
+    if (cmp == "sge")  return ewbBool(x >= y);
+    if (cmp == "sle")  return ewbBool(x <= y);
+    if (cmp == "seq")  return ewbBool(x == y);
+    if (cmp == "sneq") return ewbBool(x != y);
+  } else
+  { double a = ewbValue(x);
+    double b = ewbValue(y);
+    if (cmp == "gt")  return ewbBool(a > b);
+    if (cmp == "lt")  return ewbBool(a < b);
+    if (cmp == "ge")  return ewbBool(a >= b);
+    if (cmp == "le")  return ewbBool(a <= b);
+    if (cmp == "eq")  return ewbBool(a == b);
+    if (cmp == "neq") return ewbBool(a != b);
+  };
   raiseerr("Compare");
   return "0";
 }
@@ -151,6 +163,37 @@ string togliVirgolette(string s)
       }
     }
     else r += s[i];
+  }
+  return r;
+}
+
+// Legge una stringa binaria quotata e delega gli escape a togliVirgolette().
+string readBinaryString(const unsigned char *program, size_t len, size_t *pos)
+{ string r;
+  if (*pos>=len || program[*pos]!='"') raiseerr("Bad binary string");
+  r += '"';
+  (*pos)++;
+  while (*pos<len)
+  { unsigned char c=program[*pos];
+    r += (char)c;
+    (*pos)++;
+    if (c=='\\')
+    { if (*pos>=len) raiseerr("Bad binary escape");
+      r += (char)program[*pos];
+      (*pos)++;
+    } else if (c=='"') return togliVirgolette(r);
+  }
+  raiseerr("Unclosed binary string");
+  return "";
+}
+
+// Legge un intero binario: solo cifre ASCII, senza delimitatore.
+string readBinaryInt(const unsigned char *program, size_t len, size_t *pos)
+{ string r;
+  if (*pos>=len || program[*pos]<'0' || program[*pos]>'9') raiseerr("Bad binary int");
+  while (*pos<len && program[*pos]>='0' && program[*pos]<='9')
+  { r += (char)program[*pos];
+    (*pos)++;
   }
   return r;
 }

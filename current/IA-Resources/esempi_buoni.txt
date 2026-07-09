@@ -1,0 +1,35 @@
+Esempio di risposta valida.
+
+BEGIN_AI_RESPONSE
+
+COMMENT:
+Controllo diretto tra aa e bb. Se aa e' minore di bb segnalo errore; niente
+acrobazie, le mele restano lontane dalle pere.
+
+GLOBAL_CODE:
+sub confronto_aa_bb(aa,bb)
+{
+  if aa < bb
+  {
+    print "Errore: aa minore di bb";
+  };
+};
+
+LOCAL_CODE:
+confronto_aa_bb(aa,bb);
+
+END_AI_RESPONSE
+
+Esempio di risposta valida senza codice.
+
+BEGIN_AI_RESPONSE
+
+COMMENT:
+La richiesta descrive un dubbio architetturale. Non propongo codice perche'
+manca il formato dei dati in ingresso.
+
+GLOBAL_CODE:
+
+LOCAL_CODE:
+
+END_AI_RESPONSE

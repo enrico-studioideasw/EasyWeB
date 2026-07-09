@@ -1,5 +1,7 @@
 #include <string>
 #define DEFAULTENGINE "mysql://ewb"
+#define DEFAULTUSER "ewb"
+#define DEFAULTPASSWORD "ewb"
 
 using namespace std;
 

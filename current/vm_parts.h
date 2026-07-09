@@ -25,6 +25,7 @@ string ewbSub(string x, string y);
 string ewbNegative(string x);
 string ewbMul(string x, string y);
 string ewbDiv(string x, string y);
+string ewbMod(string x, string y);
 string ewbOr(string x, string y);
 string ewbAnd(string x, string y);
 string ewbNot(string x);
@@ -34,6 +35,8 @@ string ewbBitwiseNot(string x);
 string ewbCompare(string x, string y, string cmp);
 string togliVirgolette(string s); //Prende un dato tra virgolette ed elimina eventuali escape interni.
 string mettiVirgolette(string s);
+string readBinaryString(const unsigned char *program, size_t len, size_t *pos);
+string readBinaryInt(const unsigned char *program, size_t len, size_t *pos);
 string signature(string s);
 string escapeTag(string s);
 vector<string> split(string s, char sep);

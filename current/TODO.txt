@@ -1,0 +1,20 @@
+Prossimi passi di progetto e appunti
+
+1 - la VM termina con EXIT(). Male.deve terminare con un return(0) in caso di normale termine o return (-1) in caso di eccezione. 
+    Non è la VM che deve fermare il risponditore. Deve solo fare la sua parte e tornare.
+
+2 - ewb_cgi.c    
+    Definiamo un meccanismo per leggere e decomprimere il post duale a quello gia usato per comprimerlo.
+    Lo usiamo per definire una CGI in ewb.
+
+3 - Completiamo il web server.
+    Deve poter chiamare la VM ed eseguire il codice quando serve.
+
+--FATTO--
+
+4 - Trasferire al nuovo ewb il parser di espressioni di amethist
+
+5 - modificare la gestione degli array
+
+6 - Aggiungere i nuovi costrutti 
+

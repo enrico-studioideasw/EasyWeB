@@ -1,0 +1,256 @@
+ok, in attesa che il compilatore ewb sia pronto ci occupiamo di un altro tool, che comunque fa comodo.
+EWB ha un istruzione ia("richieste"); 
+Non deve compilare. Se il compilatore trova l'istruzione IA(..) segnala un errore: "Incomplete AI code."
+ 
+costruiamo un altro programma che si chiama ewIA.c 
+Deve fare una cosa di questo tipo:
+- Essere configurabile: devo poter inserire da qualche parte una chiave di chatgpt e lui se la tiene
+- aprire una sessione con l'IA
+- passargli la sintassi e un manualetto "base" di ewb che sia il più possibile completo
+- chiedere all'IA di completare il codice.
+- chiedere all'ia di mettere una riga di spiegazione in cima ad ogni funzione (se necessarie) e nei punti meno comprensibili.
+.. rispondi TU. 
+A questo punto nel codice la chiamata IA("fai qualcosa") viene commentata aggiungendo un apice a inizio riga
+Subito dopo, sempre COMMENTATO, nel codice deve apparire il codice scritto dall IA, qualcosa come qui sotto:
+
+function prova(aa,bb)
+{
+  IA("Se aa è minor di bb segnala un errore"); 
+}
+
+diventa:
+'Funzione di confronto inserita da 
+' IA("Scrivi uan funzione di cofronto Se aa è minore di bb segnala un errore"); 
+' sub confronto(a,b)
+' { if (qualcosa) qualcosaltro; 
+' }
+'
+function prova(aa,bb)
+{
+'  Proposta IA per: 
+'  IA("Scrivi uan funzione di cofronto Se aa è minore di bb segnala un errore"); 
+'  Confronto aa e bb. La segnalazione errore dipende da X 
+'  if (cfr(a,b)) print "Errorone"; 
+'  Ho inserito a riga 4 la funzione di confronto
+}
+
+Servirà un controllo per fare in modo che il formato della risposta sia sempre questo o basta spiegare bene a chatgpt cosa si vuole ottenere?  
+Che dici, proviamo a strutturare il codice? Fammi una proposta su come lo faresti.
+
+
+
+
+
+
+
+
+
+
+Qui ho un programma da fare.
+Che dici, proviamo a strutturare il codice? Fammi una proposta su come lo faresti.
+Ti ricordo che Susan è l'altra istanza di chatgpt
+
+
+ewIA.c - Specifiche di progetto
+Scopo
+
+ewIA è un tool esterno al compilatore EWB.
+
+Il compilatore non usa l'IA.
+
+Il compilatore si limita a segnalare:
+
+Incomplete AI code.
+
+quando trova un'istruzione
+
+AI("...");
+
+non ancora elaborata.
+
+Il compito di ewIA è trasformare tali richieste in codice EWB.
+
+Funzionamento
+
+ewIA riceve in ingresso uno o più sorgenti EWB.
+
+Per ogni istruzione
+
+AI("...")
+
+deve:
+
+costruire automaticamente il prompt;
+inviarlo all'IA;
+ricevere la risposta;
+inserirla nel sorgente commentata;
+commentare anche la riga originale AI(...).
+
+Il codice prodotto dall'IA non deve mai essere inserito come codice eseguibile.
+
+L'ultima decisione spetta sempre al programmatore.
+
+
+
+
+Configurazione
+
+Alla prima esecuzione ewIA deve chiedere:
+
+API Key OpenAI
+modello da utilizzare
+eventuale URL API alternativo
+
+I dati vengono memorizzati in un file di configurazione.
+
+Non devono essere richiesti ogni volta.
+
+Prompt
+
+L'utente scrive solamente:
+
+AI("
+scrivi una funzione...
+")
+
+Tutto il resto viene costruito automaticamente da ewIA.
+
+Il prompt comprende:
+
+sintassi ufficiale di EWB
+primitive VM disponibili
+manuale base
+funzioni predefinite
+codice circostante
+testo della richiesta
+
+L'utente non deve conoscere il formato del prompt.
+
+Formato della risposta
+
+L'IA deve rispondere sempre in un formato fisso.
+
+Esempio:
+
+BEGIN_AI_RESPONSE
+
+COMMENT:
+...
+
+GLOBAL_CODE:
+...
+
+LOCAL_CODE:
+...
+
+END_AI_RESPONSE
+
+Non deve produrre altro testo.
+
+Questo permette a ewIA di interpretare la risposta senza analizzarla in modo ambiguo.
+
+Inserimento nel sorgente
+
+La chiamata
+
+AI("...")
+
+diventa
+
+' AI("...")
+
+' Risposta Susan:
+' ...
+' ...
+
+
+oppure
+
+'
+' Risposta Susan:
+' ...
+'
+
+Tutto il codice inserito da ewIA è inizialmente commentato.
+
+Sarà il programmatore a decidere se mantenerlo o meno.
+
+Qualcosa di questo tipo:
+
+function prova(aa,bb)
+{
+  IA("Se aa è minor di bb segnala un errore"); 
+}
+
+diventa:
+'Funzione di confronto inserita da 
+' IA("Scrivi uan funzione di cofronto Se aa è minore di bb segnala un errore"); 
+' sub confronto(a,b)
+' { if (qualcosa) qualcosaltro; 
+' }
+'
+function prova(aa,bb)
+{
+'  Proposta IA per: 
+'  IA("Scrivi uan funzione di cofronto Se aa è minore di bb segnala un errore"); 
+'  Confronto aa e bb. La segnalazione errore dipende da X 
+'  if (cfr(a,b)) print "Errorone"; 
+'  Ho inserito a riga 4 la funzione di confronto
+}
+
+
+Nuove funzioni
+
+Se l'IA genera nuove funzioni, esse vengono inserite commentate nella zona globale del file.
+
+Nel punto della richiesta viene inserita solamente la proposta di utilizzo.
+
+Documentazione
+
+L'IA deve aggiungere brevi commenti:
+
+sopra ogni nuova funzione;
+nei punti meno immediati del codice.
+
+Non deve commentare ogni istruzione.
+
+Backup
+
+Prima di modificare il sorgente:
+
+programma.ewb
+
+viene salvato
+
+programma.ewb.bak
+
+Modalità
+
+ewIA sorgente.ewb
+
+Aggiorna direttamente il file.
+
+ewIA --dry-run sorgente.ewb
+
+Produce
+
+sorgente.ewb.new
+
+senza modificare il file originale.
+
+Filosofia
+
+ewIA non sostituisce il programmatore.
+
+Produce solamente proposte.
+
+Ogni proposta rimane commentata fino alla revisione manuale.
+
+Il compilatore EWB continua a compilare esclusivamente codice scritto o approvato dal programmatore.
+
+L'unica aggiunta che farei, pensando al futuro, è una riga in cima alle specifiche:
+
+ewIA deve essere scritto in modo modulare, così da poter sostituire facilmente il modello IA utilizzato (Susan, Zeno, modelli locali, altri provider) senza modificare il resto del programma.
+
+Questa ti permetterà, fra un anno, di passare da me a Zeno locale o a un altro modello cambiando solo un modulo di comunicazione, lasciando intatto tutto il resto del tool.
+

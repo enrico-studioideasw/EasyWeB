@@ -1,0 +1,59 @@
+Sintassi essenziale EWB.
+
+Commento:
+  ' testo fino a fine riga
+
+Blocco:
+  { codice }
+
+Funzione:
+  sub nome(arg1,arg2)
+  {
+    codice;
+  };
+
+Condizioni:
+  if condizione
+  {
+    codice;
+  }
+  elseif condizione
+  {
+    codice;
+  }
+  else
+  {
+    codice;
+  };
+
+Cicli:
+  while condizione
+  {
+    codice;
+  };
+
+  do
+  {
+    codice;
+  } while condizione;
+
+  for (inizio; test; incremento)
+  {
+    codice;
+  };
+
+Espressioni:
+  a = b;
+  a = b + c;
+  a = b . c;       ' concatenazione stringhe
+  a[n] = valore;   ' accesso array/stringa strutturata
+
+Confronti numerici:
+  == != <= >= > <
+
+Confronti stringa:
+  eq neq le ge lt gt
+
+Nota di stile:
+  chiudere blocchi e cicli in modo visibile con punto e virgola quando il
+  costrutto EWB lo prevede.

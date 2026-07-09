@@ -1,0 +1,54 @@
+contesto_e_scope.txtzcontext
+_______
+  E' un URI di destinazione DB, per esempio:
+
+    mysql://ewb
+    mysql://clienti:3307
+    postgres://analytics:5432
+
+context contiene, oltre ai campi della tabella dichiarati dall'utente: 
+_url
+_user
+_password
+_status
+Quindi posso accedere a _url o a contestoprova._url in ogni punto dopo aver letto la dichiarazione di contesto.
+Non vedo tutti i campi della tabella, solo quelli che ho dichiarato. E'una specie di vista.
+Se ho più contesti che contengono _url enon specifico quale mi interessa vedrò l'ultimo.
+Posso avere dichiarazioni annidate e quindi dichiarare un DB in un unico contesto. 
+
+Per la cardinalita e le relazioni:
+context clienti = {
+  nome,
+  codice_fiscale,
+  indirizzi = {
+    via,
+    citta 
+  },
+  via
+};
+Per i campi non serve specificare la cardinalità, dentro un a in può controllare il linguaggio.
+Per la "relazione" tra clienti e indirizzi si crea/usa id_indirizzi in clienti 
+Per la visibilità, nel caso sopra:
+I contesti possonno essere globali o locali. Semplicemente se locali spariscono quando a fine blocco/funzione piallo lo stack. 
+memorizzo come variabile in stack al termine della lettura dell'intero costrutto context, quindi richiamandolo ad albero: 
+SP  
+0-  indirizzi._url
+1-  indirizzi._user
+2-  indirizzi._password
+3-  indirizzi._status
+4-  indirizzi.id
+5-  indirizzi.via
+6-  indirizzi.citta
+7-  clienti._url
+8-  clienti._user
+9-  clienti._password
+10- clienti._status
+11- clienti.nome
+12- clienti.codicefiscale
+13- clienti.id_cliente
+14- clienti.via
+Se nella VM devo risolvere findvar("via") cerco la prima variabile che dopo il punto contenga via, scorrendo lo stack al contrario quindi 14
+Se nella VM devo risolvere findvar("indirizzi.via") cerco la prima variabile che dopo il punto contenga "idirizzi.via" (ci teniamo livelli per il futuro?).. quindi 5.
+In generale, cerco sempre a ritroso nello stack e se la ricerca è approssimativa trovo il primo dato che fa match, Questa è una regola geneale di visibilità.
+Come default per utente e password mi tento sempre "ewb" e "ewb" 
+

@@ -1,0 +1,54 @@
+Primitive VM disponibili, viste dal livello basso.
+
+La VM lavora su stringhe, stack e accumulatore A.
+
+Valori:
+  mova "testo"
+  push "testo"
+  pusha
+  popa
+
+Aritmetica:
+  sum sub mul div
+
+Stringhe:
+  concat
+  getpath
+  setpath
+
+Logica:
+  or and not
+  orb andb notb
+
+Confronti numerici:
+  gt lt ge le eq neq
+
+Confronti stringa:
+  sgt slt sge sle seq sneq
+
+Controllo:
+  jz
+  jnz
+  call
+  ret
+  stop
+
+Errori:
+  onerror
+  raise
+
+Symbol table / stack:
+  addsymtable "nome"
+  delsymtable numero
+  decsp numero
+
+Database stateless:
+  qlist
+  qbyid
+  query
+
+Form/web:
+  startform
+  starttarget
+  addtoform
+  sendform

@@ -1,0 +1,68 @@
+EWB – Perché esiste
+
+La filosofia
+
+EWB (Embedded Web Builder) nasce da un’idea semplice: scrivere
+applicazioni web come programmi lineari, senza costringere il
+programmatore a costruire manualmente una macchina a stati.
+
+L’obiettivo non è sostituire PHP, ma risolvere un problema diverso.
+
+Il problema
+
+Le applicazioni web sono stateless. Ogni richiesta ricostruisce il
+contesto e termina.
+
+Quando un workflow diventa lungo (wizard, pratiche, onboarding,
+approvazioni) il codice tende a frammentarsi.
+
+L’idea
+
+Il programmatore scrive:
+
+    ask nome;
+    ask cognome;
+    ask documento;
+    attiva_servizio;
+
+La VM salva automaticamente program counter, stack e contesto e riprende
+l’esecuzione alla richiesta successiva.
+
+Scalabilità
+
+Nessun processo rimane vivo.
+
+Ogni richiesta può essere eseguita da un server diverso purché disponga
+di:
+
+-   programma
+-   stack serializzato
+-   contesto
+
+Modello cloud
+
+Lo sviluppatore distribuisce il programma una sola volta.
+
+Ogni richiesta viene eseguita sul primo nodo disponibile.
+
+La piattaforma gestisce persistenza e distribuzione.
+
+Integrazione
+
+EWB si integra con database SQL, object storage, code di messaggi e
+servizi REST.
+
+Perché usarlo
+
+-   Programmazione lineare.
+-   Workflow persistenti.
+-   Ripresa automatica.
+-   Scalabilità naturale.
+-   Separazione tra logica e infrastruttura.
+-   Stesso programma eseguibile come CGI, servizio dedicato o nodo
+    cloud.
+
+Obiettivo
+
+Permettere al programmatore di concentrarsi sulla logica applicativa
+lasciando alla piattaforma persistenza, distribuzione e scalabilità.
