@@ -37,6 +37,7 @@ string codearg[MAXLINES];
 EWBOpcode codeop[MAXLINES];
 int codeLines=0;
 int RUNNING=1; 
+string PROGRAM_URL="";
 
 #include "vm_parts.h"
 #include "db_interface.h"
@@ -52,19 +53,6 @@ string escapeStack()
   };
   return r; 
 };
-void addCron(string EP, string interval)
-{ string x;
-  if (interval=="")
-  { run_query(DEFAULTENGINE, "delete from _cron where nometask=" + db_quote(EP), "");
-    return;
-  }
-  x=run_query(DEFAULTENGINE, "update _cron set cron=" + db_quote(interval) + " where nometask=" + db_quote(EP), "");
-
-  if (ewbIntValue(x)==0)
-  { run_query(DEFAULTENGINE, "insert into _cron (nometask, cron) values (" + db_quote(EP) + ", " + db_quote(interval) + ")", "");
-  }
-}; //Parte della VM. Se non va bene, eccezione.
-
 //Gestione interna errore. Al momento lo sputo sullo STDERR. 
 void err(string e)
 { cerr << "Vm error at:  " << PC << "\nCode:\n";
@@ -266,32 +254,45 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_CRONTASK) //cron task 
     { int arity=ewbIntValue(codearg[PC]);
       string cronstring, taskname;
+      string stacktext;
       POP(cronstring);
       string s=""; 
-      for (i=0; i<arity; i++)
-      { pop(x); 
-        string p=i; 
+      for (int i=0; i<arity; i++)
+      { POP(x); 
+        string p=ewbInt(i); 
         vector <string> v; v.push_back(p); 
-        setpath(s,x,v); 
+        s=setpath(s,x,v); 
       };
       POP(taskname);
+      stacktext=escapeStack();
+      string url=stack[findvar("ewb._url")];
+      string user=stack[findvar("ewb._user")];
+      string password=stack[findvar("ewb._password")];
+      create_base_tables(url,user,password);
          //Funzione interna, devo gestire un CRON a minuti o a secondi. 
-      if (cronstring=='')
-      { run_query(DEFAULTENGINE,  
-          "remove from _crontab where task='" + taskname + "'"); 
+      if (cronstring=="")
+      { run_query(url,user,password,
+          "delete from _crontab where task='" + taskname + "'", ""); 
       } else  
       { if (!validCronString(cronstring)) err("Invalid cronstring"); 
-        run_query(DEFAULTENGINE,  
-          "insert into _crontab (task, parameters, cronstring) values ('" + taskname + "','" + s + "','" + cronstring + "')", "");
+        run_query(url,user,password,
+          "delete from _crontab where task='" + taskname + "'", "");
+        run_query(url,user,password,
+          "insert into _crontab (task, program_url, stack, parameters, cronstring) values ('" + 
+          taskname + "','" + PROGRAM_URL + "','" + stacktext + "','" + s + "','" + cronstring + "')", "");
       };
     } else if (OP==OP_TASK || OP==OP_TARGET)    //Punto di inizio di una procedura asincrona.
     { POP(varname); //Se gia running impedisco la sovrapposizione
       string tasktype="task";
       if (OP==OP_TARGET) tasktype="target";
-      x=run_query(DEFAULTENGINE,  
+      string url=stack[findvar("ewb._url")];
+      string user=stack[findvar("ewb._user")];
+      string password=stack[findvar("ewb._password")];
+      create_base_tables(url,user,password);
+      x=run_query(url,user,password,
         "update _" + tasktype + "s set status='running', starttime=" + to_string(time(NULL)) + " where name='" + varname + "' and status<>'running'", "");
       if  (ewbIntValue(x)==0) 
-      { x=run_query(DEFAULTENGINE,  
+      { x=run_query(url,user,password,
         "insert into _" + tasktype + "s (name, status, starttime) values ('" + varname + "', 'running', " + to_string(time(NULL)) + ")", "");
       };
       if  (ewbIntValue(x)==0) RUNNING=0; //niente sovrapposizione
@@ -300,26 +301,72 @@ int resume(int xPC,int xSP)
     { POP(varname);
       string tasktype="task";
       if (OP==OP_ENDTARGET) tasktype="target";
-      run_query(DEFAULTENGINE, "update _" + tasktype + "s set status='stopped', starttime=" + to_string(time(NULL)) + " where name='" + varname + "'", "");
+      string url=stack[findvar("ewb._url")];
+      string user=stack[findvar("ewb._user")];
+      string password=stack[findvar("ewb._password")];
+      create_base_tables(url,user,password);
+      run_query(url,user,password,
+        "update _" + tasktype + "s set status='stopped', starttime=" + to_string(time(NULL)) + " where name='" + varname + "'", "");
     } else if (OP==OP_QLIST)  //vedi cicloInEDatabase.txt in doc/
-    { string order, query, context; 
-      POP(order); 
-      POP(query);
+    { string context, filter;
+      POP(filter);
       POP(context);
-      A=qlist(context, query, order);
+      PUSH(context);
+      string url=stack[findvar(context+"._url")];
+      string user=stack[findvar(context+"._user")];
+      string password=stack[findvar(context+"._password")];
+      string orderby=stack[findvar(context+"._orderby")];
+      vector<string> fields;
+      for (int i=ST-1; i>=0; i--)
+      { if (symtname[i].compare(0,context.length()+1,context+".")==0)
+        { string field=symtname[i].substr(context.length()+1);
+          if (field!="_status") fields.push_back(field);
+        }
+      }
+      A=qlist(url,user,password,context,fields,filter,orderby);
     } else if (OP==OP_QBYID)  //vedi cicloInEDatabase.txt in doc/
-    { string order, query, context, id; 
+    { string context, filter, id;
       POP(id);
-      POP(order); 
-      POP(query);
+      POP(filter);
       POP(context);
-      A=qbyid(context, query, order, id);
+      string url=stack[findvar(context+"._url")];
+      string user=stack[findvar(context+"._user")];
+      string password=stack[findvar(context+"._password")];
+      string orderby=stack[findvar(context+"._orderby")];
+      vector<string> fields;
+      vector<int> positions;
+      for (int i=ST-1; i>=0; i--)
+      { if (symtname[i].compare(0,context.length()+1,context+".")==0)
+        { string field=symtname[i].substr(context.length()+1);
+          if (field=="_status") continue;
+          fields.push_back(field);
+          positions.push_back(symtpos[i]);
+        }
+      }
+      vector<string> record=qbyid(url,user,password,context,fields,filter,
+                                  orderby,id);
+      for (size_t i=0; i<positions.size(); i++)
+      { stack[positions[i]]="";
+        if (i<record.size()) stack[positions[i]]=record[i];
+      }
+      A="";
+      if (!record.empty()) A="1";
     } else if (OP==OP_QUERY)
-    { string order, query, context; 
-      POP(order); 
+    { string query, context;
       POP(query);
       POP(context);
-      A=run_query(context, query, order);
+      string url=stack[findvar(context+"._url")];
+      string user=stack[findvar(context+"._user")];
+      string password=stack[findvar(context+"._password")];
+      string orderby=stack[findvar(context+"._orderby")];
+      vector<string> fields;
+      for (int i=ST-1; i>=0; i--)
+      { if (symtname[i].compare(0,context.length()+1,context+".")==0)
+        { string field=symtname[i].substr(context.length()+1);
+          if (field!="_status") fields.push_back(field);
+        }
+      }
+      A=run_query(url,user,password,context,fields,query,orderby);
     } 
     else if (OP==OP_ONERROR) //Visibilità, sempre l'ultima in ricorsione.  
     { POP(varname); 
@@ -426,15 +473,20 @@ static void loadStack(const char *encoded_stack, int stackpos)
   SP=stackpos; 
 }
 
-extern "C" int ewb_run_text(const char *program, int entrypoint, int stackpos, const char *encoded_stack)
-{ loadProgram(program, program ? strlen(program) : 0);
+extern "C" int ewb_run_text(const char *program, const char *program_url, int entrypoint, int stackpos, const char *encoded_stack)
+{ if (program_url) PROGRAM_URL=program_url;
+  else PROGRAM_URL="";
+  if (program) loadProgram(program, strlen(program));
+  else loadProgram(program, 0);
   loadStack(encoded_stack, stackpos);
   if (entrypoint<0) err("Wrong EP");
   return resume(entrypoint,SP);
 }
 
-extern "C" int ewb_run_buffer(const char *program, size_t len, int entrypoint, int stackpos, const char *encoded_stack)
-{ loadProgram(program, len);
+extern "C" int ewb_run_buffer(const char *program, size_t len, const char *program_url, int entrypoint, int stackpos, const char *encoded_stack)
+{ if (program_url) PROGRAM_URL=program_url;
+  else PROGRAM_URL="";
+  loadProgram(program, len);
   loadStack(encoded_stack, stackpos);
   if (entrypoint<0) err("Wrong EP");
   return resume(entrypoint,SP);

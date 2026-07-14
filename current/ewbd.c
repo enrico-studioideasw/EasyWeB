@@ -36,11 +36,20 @@
 #include <unistd.h>
 
 #include "cgi_parser.h"
+#include "cron_db.h"
+#include "cron_parser.h"
 #include "vm_1.0.h"
 
 #define EWBD_MAX_RESPONDERS 1024
 #define EWBD_REQBUF 16384
 #define EWBD_MAX_POST (10*1024*1024)
+#define EWBD_CTRL_PAYLOAD_MAX 4096
+
+typedef struct control_msg
+{ int generation;
+  int payload_len;
+  char tag;
+} control_msg;
 
 typedef struct responder
 {
@@ -97,21 +106,29 @@ static int set_cloexec(int fd)
   return fcntl(fd,F_SETFD,flags|FD_CLOEXEC);
 }
 
-static int send_fd_msg(int sock, char tag, int fd_to_send, int generation)
+static int send_ctrl_msg(int sock, char tag, int fd_to_send, int generation, const char *payload, int payload_len)
 {
-  char data[1 + sizeof(int)];
-  struct iovec iov;
+  control_msg hdr;
+  struct iovec iov[2];
   struct msghdr msg;
   char control[CMSG_SPACE(sizeof(int))];
 
-  data[0]=tag;
-  memcpy(data+1,&generation,sizeof(int));
+  hdr.generation=generation;
+  hdr.payload_len=payload_len;
+  hdr.tag=tag;
 
   memset(&msg,0,sizeof(msg));
-  iov.iov_base=data;
-  iov.iov_len=sizeof(data);
-  msg.msg_iov=&iov;
+  iov[0].iov_base=&hdr;
+  iov[0].iov_len=sizeof(hdr);
+  msg.msg_iov=iov;
   msg.msg_iovlen=1;
+
+  if (payload_len>0)
+  {
+    iov[1].iov_base=(void*)payload;
+    iov[1].iov_len=(size_t)payload_len;
+    msg.msg_iovlen=2;
+  }
 
   if (fd_to_send>=0)
   {
@@ -126,19 +143,22 @@ static int send_fd_msg(int sock, char tag, int fd_to_send, int generation)
     memcpy(CMSG_DATA(cmsg),&fd_to_send,sizeof(int));
   }
 
-  if (sendmsg(sock,&msg,0)!=(ssize_t)sizeof(data)) return -1;
+  if (sendmsg(sock,&msg,0)!=(ssize_t)(sizeof(hdr)+payload_len)) return -1;
   return 0;
 }
 
-static int recv_fd_msg(int sock, char *tag, int *fd_out, int *generation)
+static int recv_ctrl_msg(int sock, char *tag, int *fd_out, int *generation, char *payload, int payload_sz, int *payload_len)
 {
-  char data[1 + sizeof(int)];
+  char data[sizeof(control_msg)+EWBD_CTRL_PAYLOAD_MAX];
+  control_msg hdr;
   struct iovec iov;
   struct msghdr msg;
   char control[CMSG_SPACE(sizeof(int))];
+  ssize_t n;
 
   *fd_out=-1;
   *generation=0;
+  *payload_len=0;
 
   memset(&msg,0,sizeof(msg));
   memset(control,0,sizeof(control));
@@ -149,12 +169,24 @@ static int recv_fd_msg(int sock, char *tag, int *fd_out, int *generation)
   msg.msg_control=control;
   msg.msg_controllen=sizeof(control);
 
-  ssize_t n=recvmsg(sock,&msg,0);
+  n=recvmsg(sock,&msg,0);
   if (n<=0) return -1;
-  if (n<(ssize_t)sizeof(data)) return -1;
+  if (n<(ssize_t)sizeof(hdr)) return -1;
 
-  *tag=data[0];
-  memcpy(generation,data+1,sizeof(int));
+  memcpy(&hdr,data,sizeof(hdr));
+  if (hdr.payload_len<0 || hdr.payload_len>EWBD_CTRL_PAYLOAD_MAX) return -1;
+  if (hdr.payload_len>=payload_sz) return -1;
+  if (n<(ssize_t)(sizeof(hdr)+hdr.payload_len)) return -1;
+
+  *tag=hdr.tag;
+  *generation=hdr.generation;
+  *payload_len=hdr.payload_len;
+  if (hdr.payload_len>0)
+  {
+    memcpy(payload,data+sizeof(hdr),(size_t)hdr.payload_len);
+    payload[hdr.payload_len]=0;
+  }
+  else if (payload_sz>0) payload[0]=0;
 
   struct cmsghdr *cmsg=CMSG_FIRSTHDR(&msg);
   if (cmsg && cmsg->cmsg_level==SOL_SOCKET && cmsg->cmsg_type==SCM_RIGHTS)
@@ -165,8 +197,7 @@ static int recv_fd_msg(int sock, char *tag, int *fd_out, int *generation)
 
 static int send_status(int sock, char tag)
 {
-  int gen=0;
-  return send_fd_msg(sock,tag,-1,gen);
+  return send_ctrl_msg(sock,tag,-1,0,NULL,0);
 }
 
 static int read_http_request(int fd, char *buf, size_t bufsz)
@@ -517,18 +548,103 @@ static char *read_program_file(const char *full, size_t *len_out)
   return buf;
 }
 
+static int count_stack_items(const char *stack)
+{
+  int count=0;
+  const char *p=stack;
+  int in_token=0;
+
+  if (!p) return 0;
+  while (*p)
+  {
+    if (*p==' ')
+    {
+      if (in_token)
+      {
+        count++;
+        in_token=0;
+      }
+    }
+    else in_token=1;
+    p++;
+  }
+  if (in_token) count++;
+  return count;
+}
+
+static int run_evm_program_to_fd(int out_fd, const char *clean_path, int entrypoint, int stackpos, const char *stack)
+{
+  char full[8192];
+  char *program;
+  size_t program_len=0;
+  int saved_stdout;
+  int rc;
+
+  snprintf(full,sizeof(full),"%s%s",g_www_root,clean_path);
+  program=read_program_file(full,&program_len);
+  if (!program) return 0;
+
+  saved_stdout=dup(STDOUT_FILENO);
+  if (saved_stdout<0 || dup2(out_fd,STDOUT_FILENO)<0)
+  {
+    if (saved_stdout>=0) close(saved_stdout);
+    free(program);
+    return 0;
+  }
+
+  rc=ewb_run_buffer(program,program_len,clean_path,entrypoint,stackpos,stack);
+  fflush(stdout);
+  dup2(saved_stdout,STDOUT_FILENO);
+  close(saved_stdout);
+  free(program);
+
+  if (rc<0) warnx("VM returned %d for %s",rc,clean_path);
+  return 1;
+}
+
+static void handle_cron_task(const char *task, int generation, int *loaded_generation)
+{
+  ewb_cron_job job;
+  int rc;
+  int devnull;
+  int entrypoint;
+  int stackpos;
+  const char *stack="";
+
+  if (*loaded_generation!=generation)
+  {
+    *loaded_generation=generation;
+  }
+
+  rc=ewb_cron_load_job(task,&job);
+  if (rc<=0) return;
+  if (!job.program_url || !job.program_url[0] || !job.task || !job.task[0])
+  {
+    ewb_cron_job_free(&job);
+    return;
+  }
+
+  entrypoint=atoi(job.task);
+  if (job.stack) stack=job.stack;
+  stackpos=count_stack_items(stack);
+  devnull=open("/dev/null",O_WRONLY);
+  if (devnull>=0)
+  {
+    run_evm_program_to_fd(devnull,job.program_url,entrypoint,stackpos,stack);
+    close(devnull);
+  }
+
+  ewb_cron_job_free(&job);
+}
+
 // Esegue un programma .evm e manda l'output della VM sul socket HTTP.
 static int serve_evm_program(int client_fd, const char *request_path, ewb_form *form)
 {
   char clean[1024];
-  char full[8192];
   char header[256];
-  char *program;
-  size_t program_len=0;
   const char *stack="";
   int entrypoint=0;
   int stackpos=0;
-  int saved_stdout;
   int rc;
 
   strip_query(request_path,clean,sizeof(clean));
@@ -536,13 +652,6 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
 
   if (unsafe_path(clean))
   { http_error(client_fd,403,"Forbidden");
-    return 1;
-  }
-
-  snprintf(full,sizeof(full),"%s%s",g_www_root,clean);
-  program=read_program_file(full,&program_len);
-  if (!program)
-  { http_error(client_fd,404,"Not Found");
     return 1;
   }
 
@@ -558,21 +667,8 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
            "Connection: close\r\n"
            "\r\n");
   write_all(client_fd,header);
-
-  saved_stdout=dup(STDOUT_FILENO);
-  if (saved_stdout<0 || dup2(client_fd,STDOUT_FILENO)<0)
-  { if (saved_stdout>=0) close(saved_stdout);
-    free(program);
-    return 1;
-  }
-
-  rc=ewb_run_buffer(program,program_len,entrypoint,stackpos,stack);
-  fflush(stdout);
-  dup2(saved_stdout,STDOUT_FILENO);
-  close(saved_stdout);
-
-  if (rc<0) warnx("VM returned %d for %s",rc,clean);
-  free(program);
+  rc=run_evm_program_to_fd(client_fd,clean,entrypoint,stackpos,stack);
+  if (!rc) http_error(client_fd,404,"Not Found");
   return 1;
 }
 
@@ -722,14 +818,23 @@ static void responder_loop(int control_fd)
     char tag=0;
     int client_fd=-1;
     int generation=0;
+    char payload[EWBD_CTRL_PAYLOAD_MAX+1];
+    int payload_len=0;
 
-    if (recv_fd_msg(control_fd,&tag,&client_fd,&generation)<0) exit(0);
+    if (recv_ctrl_msg(control_fd,&tag,&client_fd,&generation,payload,sizeof(payload),&payload_len)<0) exit(0);
 
     if (tag=='Q') exit(0);
 
     if (tag=='H')
     {
       loaded_generation=0;
+      send_status(control_fd,'I');
+      continue;
+    }
+
+    if (tag=='C')
+    {
+      handle_cron_task(payload,generation,&loaded_generation);
       send_status(control_fd,'I');
       continue;
     }
@@ -751,7 +856,7 @@ static int spawn_responder(void)
 {
   int sv[2];
   if (g_num_resp>=g_max_resp) return -1;
-  if (socketpair(AF_UNIX,SOCK_STREAM,0,sv)<0) return -1;
+  if (socketpair(AF_UNIX,SOCK_SEQPACKET,0,sv)<0) return -1;
 
   pid_t pid=fork();
   if (pid<0)
@@ -839,11 +944,64 @@ static void mark_hup(void)
   {
     g_resp[i].generation=0;
     if (!g_resp[i].busy)
-    { send_fd_msg(g_resp[i].fd,'H',-1,g_generation);
+    { send_ctrl_msg(g_resp[i].fd,'H',-1,g_generation,NULL,0);
       g_resp[i].generation=g_generation;
       g_resp[i].busy=1;
     }
   }
+}
+
+static void dispatch_cron_task(const char *task)
+{
+  int idx;
+  int len;
+
+  if (!task || !task[0]) return;
+  idx=choose_responder();
+  if (idx<0)
+  {
+    warnx("cron skipped, no responder available");
+    return;
+  }
+
+  len=(int)strlen(task);
+  g_resp[idx].busy=1;
+  g_resp[idx].generation=g_generation;
+  if (send_ctrl_msg(g_resp[idx].fd,'C',-1,g_generation,task,len)<0)
+  {
+    g_resp[idx].busy=0;
+    warnx("cannot pass cron task to responder");
+  }
+}
+
+static void cron_tick(void)
+{
+  static long last_minute=-1;
+  ewb_cron_row *rows=NULL;
+  int count=0;
+  time_t now;
+  long minute_now;
+  struct tm tmv;
+
+  now=time(NULL);
+  minute_now=(long)(now/60);
+  if (minute_now==last_minute) return;
+  last_minute=minute_now;
+
+  if (!localtime_r(&now,&tmv)) return;
+  if (ewb_cron_list(&rows,&count)<0) return;
+
+  for (int i=0; i<count; i++)
+  {
+    ewb_cron cron;
+    char err[128];
+
+    if (!rows[i].task || !rows[i].cronstring) continue;
+    if (!cron_parse(rows[i].cronstring,&cron,err,sizeof(err))) continue;
+    if (cron_match(&cron,&tmv)) dispatch_cron_task(rows[i].task);
+  }
+
+  ewb_cron_list_free(rows,count);
 }
 
 static void usage(const char *argv0)
@@ -890,6 +1048,8 @@ int main(int argc, char **argv)
 
   for (;;)
   {
+    cron_tick();
+
     if (g_hup)
     {
       g_hup=0;
@@ -924,7 +1084,10 @@ int main(int argc, char **argv)
       if (g_resp[i].fd>maxfd) maxfd=g_resp[i].fd;
     }
 
-    int rc=select(maxfd+1,&rfds,NULL,NULL,NULL);
+    struct timeval tv;
+    tv.tv_sec=1;
+    tv.tv_usec=0;
+    int rc=select(maxfd+1,&rfds,NULL,NULL,&tv);
     if (rc<0)
     {
       if (errno==EINTR) continue;
@@ -938,7 +1101,9 @@ int main(int argc, char **argv)
         char tag=0;
         int fd=-1;
         int gen=0;
-        if (recv_fd_msg(g_resp[i].fd,&tag,&fd,&gen)<0)
+        char payload[EWBD_CTRL_PAYLOAD_MAX+1];
+        int payload_len=0;
+        if (recv_ctrl_msg(g_resp[i].fd,&tag,&fd,&gen,payload,sizeof(payload),&payload_len)<0)
         {
           close(g_resp[i].fd);
           kill(g_resp[i].pid,SIGTERM);
@@ -952,7 +1117,7 @@ int main(int argc, char **argv)
         if (tag=='I')
         {
           if (g_resp[i].generation!=g_generation)
-          { send_fd_msg(g_resp[i].fd,'H',-1,g_generation);
+          { send_ctrl_msg(g_resp[i].fd,'H',-1,g_generation,NULL,0);
             g_resp[i].generation=g_generation;
             g_resp[i].busy=1;
           }
@@ -987,7 +1152,7 @@ int main(int argc, char **argv)
 
       g_resp[idx].busy=1;
       g_resp[idx].generation=g_generation;
-      if (send_fd_msg(g_resp[idx].fd,'R',client_fd,g_generation)<0)
+      if (send_ctrl_msg(g_resp[idx].fd,'R',client_fd,g_generation,NULL,0)<0)
       {
         g_resp[idx].busy=0;
         warnx("cannot pass client fd to responder");

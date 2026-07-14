@@ -216,6 +216,7 @@ _url
 _user
 _password
 _status
+_orderby
 Quindi posso accedere a _url o a contestoprova._url in ogni punto dopo aver letto la dichiarazione di contesto.
 Non vedo tutti i campi della tabella, solo quelli che ho dichiarato. E'una specie di vista.
 Se ho più contesti che contengono _url enon specifico quale mi interessa vedrò l'ultimo.
@@ -251,8 +252,10 @@ In generale, cerco sempre a ritroso nello stack e se la ricerca è approssimativ
 DEFAULTENGINE vale mysql://ewb.
 
 QLIST
-  POP(order), POP(query), POP(context).
-  Ritorna in A una lista serializzata di id.
+  POP(query), POP(context).
+  order=context._orderby 
+  push(context)
+  Ritorna in A una lista serializzata di id. Rimette in stack il context.
   Le query sono rese deterministiche dalla libreria DB:
     - se order e' vuoto viene aggiunto order by id
     - se order e' presente viene completato con ", id"

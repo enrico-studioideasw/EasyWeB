@@ -1,4 +1,5 @@
 #include "db_interface.h"
+#include "cron_db.h"
 
 //Database mysql
 #define EWB_DB_WITH_MYSQL 1
@@ -17,7 +18,6 @@
  *   code:
  *       push context
  *       push query
- *       push order
  *       push 0          'position
  *       QLIST
  *       push ids        'list of id
@@ -28,7 +28,6 @@
  *       jz end
  *       push context
  *       push query
- *       push order
  *       push id
  *       QBYID
  *       position++
@@ -40,7 +39,7 @@
  *   end:
  *       { resto del programma }
  *
- * run_query(context, query, orderby):
+ * run_query(url, user, password, query, orderby):
  *   - select/with/show: ritorna il primo record
  *   - insert: ritorna l'insert id dove il backend lo consente
  *   - update/delete: ritorna il numero di righe modificate
@@ -74,6 +73,15 @@ struct DbUri
   string database;
   unsigned int port;
 };
+
+static string checked_name(string name)
+{ if (name=="") raiseerr("Empty DB name");
+  for (size_t i=0; i<name.size(); i++)
+  { unsigned char c=(unsigned char)name[i];
+    if (!isalnum(c) && c!='_') raiseerr("Invalid DB name: "+name);
+  }
+  return name;
+}
 
 static string trim(string s)
 { size_t a=0;
@@ -200,7 +208,8 @@ static string by_id_query(string query, string orderby, string id)
   }
 
   if (query.find(sid)==string::npos)
-  { query += has_where(query) ? " and id=" : " where id=";
+  { if (has_where(query)) query += " and id=";
+    else query += " where id=";
     query += sid;
   }
 
@@ -223,7 +232,69 @@ static string mysql_error_string(MYSQL *db)
   return string("MySQL ")+e;
 }
 
-static MYSQL *mysql_open(DbUri u)
+static MYSQL *mysql_open(DbUri u, string user, string pass)
+{ if (user=="") user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
+  string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
+
+  MYSQL *db=mysql_init(nullptr);
+  if (!db) raiseerr("MySQL init");
+
+  if (!mysql_real_connect(db,host.c_str(),user.c_str(),pass.c_str(),
+                          u.database.c_str(),u.port,nullptr,0))
+  { mysql_close(db);
+    db=mysql_init(nullptr);
+    if (!db) raiseerr("MySQL init");
+    if (!mysql_real_connect(db,host.c_str(),user.c_str(),pass.c_str(),
+                            nullptr,u.port,nullptr,0))
+    { string e=mysql_error_string(db);
+      mysql_close(db);
+      raiseerr(e);
+    }
+    string database=checked_name(u.database);
+    string sql="create database if not exists `"+database+"`";
+    if (mysql_query(db,sql.c_str()) || mysql_select_db(db,database.c_str()))
+    { string e=mysql_error_string(db);
+      mysql_close(db);
+      raiseerr(e);
+    }
+  }
+  return db;
+}
+
+static void mysql_ensure_schema(MYSQL *db, string table, vector<string> fields)
+{ table=checked_name(table);
+  string qtable="`"+table+"`";
+  string sql="create table if not exists "+qtable+
+             " (`id` int unsigned not null auto_increment primary key)";
+  if (mysql_query(db,sql.c_str())) raiseerr(mysql_error_string(db));
+  sql="alter table "+qtable+
+      " add column if not exists `id` int unsigned not null auto_increment primary key first";
+  if (mysql_query(db,sql.c_str())) raiseerr(mysql_error_string(db));
+  for (size_t i=0; i<fields.size(); i++)
+  { string field=checked_name(fields[i]);
+    if (field=="id") continue;
+    sql="alter table "+qtable+" add column if not exists `"+field+"` text";
+    if (mysql_query(db,sql.c_str())) raiseerr(mysql_error_string(db));
+  }
+}
+
+static MYSQL *mysql_open_noerr(DbUri u)
+{ string user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
+  string pass=env_or("EWB_MYSQL_PASS","EWB_DB_PASS","");
+  string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
+
+  MYSQL *db=mysql_init(nullptr);
+  if (!db) return NULL;
+
+  if (!mysql_real_connect(db,host.c_str(),user.c_str(),pass.c_str(),
+                          u.database.c_str(),u.port,nullptr,0))
+  { mysql_close(db);
+    return NULL;
+  }
+  return db;
+}
+
+static MYSQL *mysql_open_bootstrap(DbUri u)
 { string user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
   string pass=env_or("EWB_MYSQL_PASS","EWB_DB_PASS","");
   string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
@@ -232,7 +303,7 @@ static MYSQL *mysql_open(DbUri u)
   if (!db) raiseerr("MySQL init");
 
   if (!mysql_real_connect(db,host.c_str(),user.c_str(),pass.c_str(),
-                          u.database.c_str(),u.port,nullptr,0))
+                          nullptr,u.port,nullptr,0))
   { string e=mysql_error_string(db);
     mysql_close(db);
     raiseerr(e);
@@ -240,24 +311,30 @@ static MYSQL *mysql_open(DbUri u)
   return db;
 }
 
-static string mysql_first_record(MYSQL *db)
+static vector<string> mysql_first_row(MYSQL *db)
 { MYSQL_RES *res=mysql_store_result(db);
-  if (!res) return "";
+  vector<string> out;
+  if (!res) return out;
 
   MYSQL_ROW row=mysql_fetch_row(res);
   if (!row)
   { mysql_free_result(res);
-    return "";
+    return out;
   }
 
   unsigned int n=mysql_num_fields(res);
   unsigned long *len=mysql_fetch_lengths(res);
-  vector<string> out;
   for (unsigned int i=0; i<n; i++)
-    out.push_back(row[i] ? string(row[i],len[i]) : "");
+  { if (row[i]) out.push_back(string(row[i],len[i]));
+    else out.push_back("");
+  }
 
   mysql_free_result(res);
-  return join_record(out);
+  return out;
+}
+
+static string mysql_first_record(MYSQL *db)
+{ return join_record(mysql_first_row(db));
 }
 
 static string mysql_list_ids(MYSQL *db)
@@ -270,7 +347,8 @@ static string mysql_list_ids(MYSQL *db)
   while ((row=mysql_fetch_row(res)))
   { len=mysql_fetch_lengths(res);
     if (out!="") out+="\n";
-    out+=row[0] ? string(row[0],len[0]) : "";
+    if (row[0]) out+=string(row[0],len[0]);
+    else out+="";
   }
 
   mysql_free_result(res);
@@ -278,10 +356,166 @@ static string mysql_list_ids(MYSQL *db)
 }
 #endif
 
+void create_base_database(void)
+{ DbUri u=parse_context(DEFAULTENGINE);
+
+  if (u.engine=="mysql")
+  {
+#if EWB_DB_WITH_MYSQL
+    MYSQL *db=mysql_open_bootstrap(u);
+    string sql="create database if not exists `"+u.database+"`";
+    if (mysql_query(db,sql.c_str()))
+    { string e=mysql_error_string(db);
+      mysql_close(db);
+      raiseerr(e);
+    }
+    mysql_close(db);
+    return;
+#else
+    raiseerr("MySQL support not compiled");
+#endif
+  }
+
+  if (u.engine=="postgres")
+  { raiseerr("Postgres bootstrap not implemented");
+  }
+
+  raiseerr("DB engine");
+}
+
+static char *dup_field(const char *s, unsigned long len)
+{ char *out;
+  out=(char*)malloc((size_t)len+1);
+  if (!out) return NULL;
+  memcpy(out,s,len);
+  out[len]=0;
+  return out;
+}
+
+extern "C" int ewb_cron_list(ewb_cron_row **rows_out, int *count_out)
+{ DbUri u=parse_context(DEFAULTENGINE);
+  MYSQL *db;
+  MYSQL_RES *res;
+  MYSQL_ROW row;
+  unsigned long *len;
+  ewb_cron_row *rows;
+  int count;
+  int i;
+
+  if (!rows_out || !count_out) return -1;
+  *rows_out=NULL;
+  *count_out=0;
+  if (u.engine!="mysql") return -1;
+#if !EWB_DB_WITH_MYSQL
+  return -1;
+#else
+  db=mysql_open_noerr(u);
+  if (!db) return -1;
+  if (mysql_query(db,"select task, cronstring from _crontab order by task"))
+  { mysql_close(db);
+    return -1;
+  }
+  res=mysql_store_result(db);
+  if (!res)
+  { mysql_close(db);
+    return -1;
+  }
+  count=(int)mysql_num_rows(res);
+  if (count<=0)
+  { mysql_free_result(res);
+    mysql_close(db);
+    return 0;
+  }
+  rows=(ewb_cron_row*)calloc((size_t)count,sizeof(ewb_cron_row));
+  if (!rows)
+  { mysql_free_result(res);
+    mysql_close(db);
+    return -1;
+  }
+  i=0;
+  while ((row=mysql_fetch_row(res)))
+  { len=mysql_fetch_lengths(res);
+    if (row[0]) rows[i].task=dup_field(row[0],len[0]);
+    if (row[1]) rows[i].cronstring=dup_field(row[1],len[1]);
+    i++;
+  }
+  mysql_free_result(res);
+  mysql_close(db);
+  *rows_out=rows;
+  *count_out=i;
+  return 0;
+#endif
+}
+
+extern "C" void ewb_cron_list_free(ewb_cron_row *rows, int count)
+{ int i;
+  if (!rows) return;
+  for (i=0; i<count; i++)
+  { free(rows[i].task);
+    free(rows[i].cronstring);
+  }
+  free(rows);
+}
+
+extern "C" int ewb_cron_load_job(const char *task, ewb_cron_job *job)
+{ DbUri u=parse_context(DEFAULTENGINE);
+  MYSQL *db;
+  MYSQL_RES *res;
+  MYSQL_ROW row;
+  unsigned long *len;
+  string sql;
+  string qtask;
+
+  if (!task || !job) return -1;
+  memset(job,0,sizeof(*job));
+  if (u.engine!="mysql") return -1;
+#if !EWB_DB_WITH_MYSQL
+  return -1;
+#else
+  db=mysql_open_noerr(u);
+  if (!db) return -1;
+  qtask=mysql_escape(db,task);
+  sql="select task, program_url, stack, parameters, cronstring from _crontab where task="+qtask;
+  if (mysql_query(db,sql.c_str()))
+  { mysql_close(db);
+    return -1;
+  }
+  res=mysql_store_result(db);
+  if (!res)
+  { mysql_close(db);
+    return -1;
+  }
+  row=mysql_fetch_row(res);
+  if (!row)
+  { mysql_free_result(res);
+    mysql_close(db);
+    return 0;
+  }
+  len=mysql_fetch_lengths(res);
+  if (row[0]) job->task=dup_field(row[0],len[0]);
+  if (row[1]) job->program_url=dup_field(row[1],len[1]);
+  if (row[2]) job->stack=dup_field(row[2],len[2]);
+  if (row[3]) job->parameters=dup_field(row[3],len[3]);
+  if (row[4]) job->cronstring=dup_field(row[4],len[4]);
+  mysql_free_result(res);
+  mysql_close(db);
+  return 1;
+#endif
+}
+
+extern "C" void ewb_cron_job_free(ewb_cron_job *job)
+{ if (!job) return;
+  free(job->task);
+  free(job->program_url);
+  free(job->stack);
+  free(job->parameters);
+  free(job->cronstring);
+  memset(job,0,sizeof(*job));
+}
+
 #if EWB_DB_WITH_POSTGRES
-static PGconn *pg_open(DbUri u)
-{ string user=env_or("EWB_PG_USER","EWB_DB_USER","");
-  string pass=env_or("EWB_PG_PASS","EWB_DB_PASS","");
+static PGconn *pg_open(DbUri u, string user, string pass)
+{ if (user=="") user=env_or("EWB_PG_USER","EWB_DB_USER","");
   string host=env_or("EWB_PG_HOST","EWB_DB_HOST","localhost");
 
   ostringstream ss;
@@ -291,11 +525,66 @@ static PGconn *pg_open(DbUri u)
 
   PGconn *db=PQconnectdb(ss.str().c_str());
   if (PQstatus(db)!=CONNECTION_OK)
-  { string e=PQerrorMessage(db);
+  { PQfinish(db);
+    ostringstream admin;
+    admin << "host=" << host << " dbname=postgres port=" << u.port;
+    if (user!="") admin << " user=" << user;
+    if (pass!="") admin << " password=" << pass;
+    db=PQconnectdb(admin.str().c_str());
+    if (PQstatus(db)!=CONNECTION_OK)
+    { string e=PQerrorMessage(db);
+      PQfinish(db);
+      raiseerr("Postgres "+e);
+    }
+    string database=checked_name(u.database);
+    PGresult *res=PQexec(db,("create database \""+database+"\"").c_str());
+    if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+    { const char *state=PQresultErrorField(res,PG_DIAG_SQLSTATE);
+      bool exists=false;
+      if (state && string(state)=="42P04") exists=true;
+      if (!exists)
+      { string e=PQerrorMessage(db);
+        PQclear(res);
+        PQfinish(db);
+        raiseerr("Postgres "+e);
+      }
+    }
+    PQclear(res);
     PQfinish(db);
-    raiseerr("Postgres "+e);
+    db=PQconnectdb(ss.str().c_str());
+    if (PQstatus(db)!=CONNECTION_OK)
+    { string e=PQerrorMessage(db);
+      PQfinish(db);
+      raiseerr("Postgres "+e);
+    }
   }
   return db;
+}
+
+static void pg_ensure_schema(PGconn *db, string table, vector<string> fields)
+{ table=checked_name(table);
+  string qtable="\""+table+"\"";
+  string sql="create table if not exists "+qtable+
+             " (\"id\" serial primary key)";
+  PGresult *res=PQexec(db,sql.c_str());
+  if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+  { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
+  PQclear(res);
+  sql="alter table "+qtable+
+      " add column if not exists \"id\" serial primary key";
+  res=PQexec(db,sql.c_str());
+  if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+  { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
+  PQclear(res);
+  for (size_t i=0; i<fields.size(); i++)
+  { string field=checked_name(fields[i]);
+    if (field=="id") continue;
+    sql="alter table "+qtable+" add column if not exists \""+field+"\" text";
+    res=PQexec(db,sql.c_str());
+    if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+    { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
+    PQclear(res);
+  }
 }
 
 static string pg_escape(PGconn *db, string v)
@@ -307,13 +596,19 @@ static string pg_escape(PGconn *db, string v)
   return r;
 }
 
-static string pg_first_record(PGresult *res)
-{ if (PQntuples(res)<1) return "";
+static vector<string> pg_first_row(PGresult *res)
+{ if (PQntuples(res)<1) return vector<string>();
 
   vector<string> out;
   for (int i=0; i<PQnfields(res); i++)
-    out.push_back(PQgetisnull(res,0,i) ? "" : PQgetvalue(res,0,i));
-  return join_record(out);
+  { if (PQgetisnull(res,0,i)) out.push_back("");
+    else out.push_back(PQgetvalue(res,0,i));
+  }
+  return out;
+}
+
+static string pg_first_record(PGresult *res)
+{ return join_record(pg_first_row(res));
 }
 
 static string pg_list_ids(PGresult *res)
@@ -326,15 +621,20 @@ static string pg_list_ids(PGresult *res)
 }
 #endif
 
-string qlist(string context, string query, string orderby)
-{ DbUri u=parse_context(context);
-  string sql=with_order(query,orderby);
+string qlist(string url, string user, string password, string table,
+             vector<string> fields, string filter, string orderby)
+{ DbUri u=parse_context(url);
+  string sql="select id from "+table;
+  filter=trim(filter);
+  if (filter!="" && filter!="true") sql+=" where "+filter;
+  sql=with_order(sql,orderby);
   (void)sql;
 
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u);
+    MYSQL *db=mysql_open(u,user,password);
+    mysql_ensure_schema(db,table,fields);
     if (mysql_query(db,sql.c_str()))
     { string e=mysql_error_string(db);
       mysql_close(db);
@@ -351,7 +651,8 @@ string qlist(string context, string query, string orderby)
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u);
+    PGconn *db=pg_open(u,user,password);
+    pg_ensure_schema(db,table,fields);
     PGresult *res=PQexec(db,sql.c_str());
     if (PQresultStatus(res)!=PGRES_TUPLES_OK)
     { string e=PQerrorMessage(db);
@@ -372,16 +673,24 @@ string qlist(string context, string query, string orderby)
   return "";
 }
 
-string qbyid(string context, string query, string orderby, string id)
-{ DbUri u=parse_context(context);
-  (void)query;
-  (void)orderby;
-  (void)id;
+vector<string> qbyid(string url, string user, string password, string table,
+                     vector<string> fields, string filter, string orderby,
+                     string id)
+{ DbUri u=parse_context(url);
+  string query="select ";
+  for (size_t i=0; i<fields.size(); i++)
+  { if (i>0) query+=",";
+    query+=fields[i];
+  }
+  query+=" from "+table;
+  filter=trim(filter);
+  if (filter!="" && filter!="true") query+=" where "+filter;
 
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u);
+    MYSQL *db=mysql_open(u,user,password);
+    mysql_ensure_schema(db,table,fields);
     string sql=by_id_query(query,orderby,id);
     size_t p=sql.find(sql_string(id));
     if (p!=string::npos) sql.replace(p,sql_string(id).size(),mysql_escape(db,id));
@@ -390,7 +699,7 @@ string qbyid(string context, string query, string orderby, string id)
       mysql_close(db);
       raiseerr(e);
     }
-    string r=mysql_first_record(db);
+    vector<string> r=mysql_first_row(db);
     mysql_close(db);
     return r;
 #else
@@ -401,7 +710,8 @@ string qbyid(string context, string query, string orderby, string id)
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u);
+    PGconn *db=pg_open(u,user,password);
+    pg_ensure_schema(db,table,fields);
     string sql=by_id_query(query,orderby,id);
     size_t p=sql.find(sql_string(id));
     if (p!=string::npos) sql.replace(p,sql_string(id).size(),pg_escape(db,id));
@@ -412,7 +722,69 @@ string qbyid(string context, string query, string orderby, string id)
       PQfinish(db);
       raiseerr("Postgres "+e);
     }
-    string r=pg_first_record(res);
+    vector<string> r=pg_first_row(res);
+    PQclear(res);
+    PQfinish(db);
+    return r;
+#else
+    raiseerr("Postgres support not compiled");
+#endif
+  }
+
+  raiseerr("DB engine");
+  return vector<string>();
+}
+
+string run_query(string url, string user, string password, string query,
+                 string orderby)
+{ DbUri u=parse_context(url);
+  string op=lower_word(query);
+  string sql=query;
+  if (op=="select" || op=="with" || op=="show") sql=with_order(query,orderby);
+
+  if (u.engine=="mysql")
+  {
+#if EWB_DB_WITH_MYSQL
+    MYSQL *db=mysql_open(u,user,password);
+    if (mysql_query(db,sql.c_str()))
+    { string e=mysql_error_string(db);
+      mysql_close(db);
+      raiseerr(e);
+    }
+    string r;
+    if (op=="select" || op=="with" || op=="show") r=mysql_first_record(db);
+    else if (op=="insert") r=to_string((unsigned long long)mysql_insert_id(db));
+    else r=to_string((unsigned long long)mysql_affected_rows(db));
+    mysql_close(db);
+    return r;
+#else
+    raiseerr("MySQL support not compiled");
+#endif
+  }
+
+  if (u.engine=="postgres")
+  {
+#if EWB_DB_WITH_POSTGRES
+    PGconn *db=pg_open(u,user,password);
+    PGresult *res=PQexec(db,sql.c_str());
+    ExecStatusType st=PQresultStatus(res);
+    string r;
+    if (st==PGRES_TUPLES_OK) r=pg_first_record(res);
+    else if (st==PGRES_COMMAND_OK)
+    { char *n=PQcmdTuples(res);
+      if (n && n[0]) r=n;
+      else r="0";
+      if (op=="insert")
+      { Oid oid=PQoidValue(res);
+        if (oid) r=to_string((unsigned long)oid);
+      }
+    }
+    else
+    { string e=PQerrorMessage(db);
+      PQclear(res);
+      PQfinish(db);
+      raiseerr("Postgres "+e);
+    }
     PQclear(res);
     PQfinish(db);
     return r;
@@ -425,70 +797,24 @@ string qbyid(string context, string query, string orderby, string id)
   return "";
 }
 
-string run_query(string context, string query, string orderby)
-{ DbUri u=parse_context(context);
-  string op=lower_word(query);
-  string sql=(op=="select" || op=="with" || op=="show") ? with_order(query,orderby) : query;
-  (void)sql;
-
+string run_query(string url, string user, string password, string table,
+                 vector<string> fields, string query, string orderby)
+{ DbUri u=parse_context(url);
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u);
-    if (mysql_query(db,sql.c_str()))
-    { string e=mysql_error_string(db);
-      mysql_close(db);
-      raiseerr(e);
-    }
-
-    string r;
-    if (op=="select" || op=="with" || op=="show")
-      r=mysql_first_record(db);
-    else if (op=="insert")
-      r=to_string((unsigned long long)mysql_insert_id(db));
-    else
-      r=to_string((unsigned long long)mysql_affected_rows(db));
-
+    MYSQL *db=mysql_open(u,user,password);
+    mysql_ensure_schema(db,table,fields);
     mysql_close(db);
-    return r;
-#else
-    raiseerr("MySQL support not compiled");
 #endif
   }
-
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u);
-    PGresult *res=PQexec(db,sql.c_str());
-    ExecStatusType st=PQresultStatus(res);
-
-    string r;
-    if (st==PGRES_TUPLES_OK)
-      r=pg_first_record(res);
-    else if (st==PGRES_COMMAND_OK)
-    { char *n=PQcmdTuples(res);
-      r=(n && n[0]) ? n : "0";
-      if (op=="insert")
-      { Oid oid=PQoidValue(res);
-        if (oid) r=to_string((unsigned long)oid);
-      }
-    }
-    else
-    { string e=PQerrorMessage(db);
-      PQclear(res);
-      PQfinish(db);
-      raiseerr("Postgres "+e);
-    }
-
-    PQclear(res);
+    PGconn *db=pg_open(u,user,password);
+    pg_ensure_schema(db,table,fields);
     PQfinish(db);
-    return r;
-#else
-    raiseerr("Postgres support not compiled");
 #endif
   }
-
-  raiseerr("DB engine");
-  return "";
+  return run_query(url,user,password,query,orderby);
 }

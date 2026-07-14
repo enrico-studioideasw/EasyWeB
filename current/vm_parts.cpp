@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <cctype>
 #include <cstdint>
+#include "cron_parser.h"
+#include "db_interface.h"
 
 void raiseerr(string e);
 
@@ -69,7 +71,8 @@ string ewbInt(int v)
 }
 
 string ewbBool(bool v)
-{ return v ? "1" : "0";
+{ if (v) return "1";
+  return "0";
 }
 
 string ewbSum(string x, string y)
@@ -241,6 +244,49 @@ string escapeTag(string s)
     r += s[i++];
   }
   return r;
+}
+
+int validCronString(string s)
+{ ewb_cron cron;
+  char err[128];
+  return cron_parse(s.c_str(), &cron, err, sizeof(err));
+}
+
+void create_base_tables(string url, string user, string password)
+{ string maxs=to_string(MAXCONTEXTSTRINGSIZE);
+  vector<string> fields;
+
+  fields.push_back("task");
+  fields.push_back("program_url");
+  fields.push_back("stack");
+  fields.push_back("parameters");
+  fields.push_back("cronstring");
+  run_query(url,user,password,"_crontab",fields,
+    "create table if not exists _crontab ("
+    "task varchar(" + maxs + ") primary key, "
+    "program_url varchar(" + maxs + "), "
+    "stack text, "
+    "parameters varchar(" + maxs + "), "
+    "cronstring varchar(" + maxs + ")"
+    ")", "");
+
+  fields.clear();
+  fields.push_back("name");
+  fields.push_back("status");
+  fields.push_back("starttime");
+  run_query(url,user,password,"_tasks",fields,
+    "create table if not exists _tasks ("
+    "name varchar(" + maxs + ") primary key, "
+    "status varchar(" + maxs + "), "
+    "starttime bigint"
+    ")", "");
+
+  run_query(url,user,password,"_threads",fields,
+    "create table if not exists _threads ("
+    "name varchar(" + maxs + ") primary key, "
+    "status varchar(" + maxs + "), "
+    "starttime bigint"
+    ")", "");
 }
 
 vector<string> split(string s, char sep)

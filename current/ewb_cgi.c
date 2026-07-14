@@ -132,7 +132,7 @@ int main(int argc, char **argv)
   if (form.stackpos) stackpos=atoi(form.stackpos);
   if (form.stack) stack=form.stack;
 
-  rc=ewb_run_text(program,entrypoint,stackpos,stack);
+  rc=ewb_run_text(program,path,entrypoint,stackpos,stack);
 
   ewb_form_free(&form);
   free(program);

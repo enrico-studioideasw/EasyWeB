@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#define MAXCONTEXTSTRINGSIZE 255
+
 using namespace std;
 
 struct ewb_db;
@@ -39,6 +41,8 @@ string readBinaryString(const unsigned char *program, size_t len, size_t *pos);
 string readBinaryInt(const unsigned char *program, size_t len, size_t *pos);
 string signature(string s);
 string escapeTag(string s);
+int validCronString(string s);
+void create_base_tables(string url, string user, string password);
 vector<string> split(string s, char sep);
 string join(vector<string> v, string sep);
 

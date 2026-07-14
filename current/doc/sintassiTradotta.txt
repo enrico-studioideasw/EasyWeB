@@ -16,9 +16,9 @@ _______________________________________________________
   **NULLA 
 (ok) codice=[ 
 (ok)   commento | 
-       datasetdecl |
-       taskdecl | 
-       targetdecl | 
+(ok)   datasetdecl |
+(ok)   taskdecl | 
+(ok)   targetdecl | 
        inblock | 
 (ok)   ifblock  | 
 (ok)   whileblock  | 
@@ -31,7 +31,7 @@ _______________________________________________________
 (ok)   calcexp]
 (ok)  commento= "'" [*] \n       'gestito da delperc
 
-(ok) datasetdecl= dataset name datasetbody
+(ok) datasetdecl= context name datasetbody
 (ok) datasetbody = "=" campidataset   
   ** addsymtable "name"
 (ok) campidataset= "{" [campodataset [, campodataset] ] "}" 
@@ -63,6 +63,9 @@ _______________________________________________________
 (ok) targetdecl= target name  ["("varname [,varname]")"] "{" [codice] "}"
   ** niente, salva l'entry point del target e il numero di parametri
   ** la chiamate del target implica riempire un form e saltarci. Gli passo lo stack quindi posso passare parametri.
+
+
+
 
 (ok)  vardecl= singlevar ["," singlevar]  'integrata in calcexp
 (ok)  singlevar = name [ "=" inexp ]      'integrata in calcexp
@@ -129,7 +132,7 @@ _______________________________________________________
 (ok) f= b\|f | b\|\|f | b
 (ok)  b= k & b | k && b | k
 (ok) k= tok_var | ! inexp | !! inexp | numvalue | strvalue | (calcexp)  
-(ok) tok_var= variabile[.variabile] [ "[" calcexp "]" ] | funzione   //Il .variabile serve per esplicitare il contesto dove necessario ? 
+(ok) tok_var= variabile[.variabile] [ "[" calcexp "]" ] | funzione | startparallel  //Il .variabile serve per esplicitare il contesto dove necessario ? 
 (ok) variabile=token
 ** - a[3][2]
 ** pushaddr "a"
@@ -148,6 +151,18 @@ _______________________________________________________
 **push A  //N parametri, qui due.
 **push 2  //Numero dei parametri. Ci pensa la CALLN 
 **CALLN "token"
+(ok)  startparallel=
+    cron nometask(parametri) modocrontab   //"30 * * * *" parametri passati per valore
+    **push nometask
+    **per tutti i i parametri
+    **- inexp() 
+    **- push parametro
+    **push arity
+    **inexp()
+    **PUSHA
+    **cron   //Cron ha come parametri nometask, [parametro], arity, crontabdesc
+    refresh nometarget(paametri), interval  //secondi anche con la virgola
+    run nometarget(parametri) 
 
 //qui mi complico la vita, ma almeno posso definire i numeri in qualunque base e dimensione.. 
   numvalue = [+/-] ( bin | hex | oct | dec ) 
@@ -202,13 +217,13 @@ ______________________________________
   lessdate  variable, variable 
 
 per accesso ai database - le variabili sono di ambiente
-  login  variabile[.variabile] 
   add    variabile[.variabile]
   exist  variabile[.variabile]
   remove variabile[.variabile]
   lock   variabile[.variabile] 
   unlock  variabile[.variabile]
-  inblock = in ( variabile[.variabile] [, condizione] ) blocco | inall ( variabile[.variabile] ) blocco | delete ( variabile[.variabile] [, condizione] )
+  inblock = in ( variabile[.variabile] [, condizione] ) blocco 
+          | delete ( variabile[.variabile] [, condizione] )
 
   condizione = sqlcond 
 !!Qui mancano i parsers SQL per condizione e ordinamento.
@@ -272,9 +287,9 @@ Le sock sono numeri.
     write host, port       //scrive
 ________________
 Per i tasks
-    cron nometask modocrontab   //"30 * * * *"
-    refresh nometarget, interval  //secondi anche con la virgola
-
+    cron nometask(parametri) modocrontab   //"30 * * * *"
+    refresh nometarget(paametri), interval  //secondi anche con la virgola
+    run nometarget(parametri) 
     stato del task: inall(_tasks.runtime, name='miotask' && stato=="ready") { ... } 
 
 Per completamento tramite ia (una tantum):
