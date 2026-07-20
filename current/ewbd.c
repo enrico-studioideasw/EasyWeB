@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +52,18 @@ typedef struct control_msg
   char tag;
 } control_msg;
 
+typedef struct request_stat
+{ uint64_t elapsed_ns;
+  int is_evm;
+  int is_error;
+} request_stat;
+
+typedef struct traffic_counters
+{ uint64_t frames;
+  uint64_t errors;
+  uint64_t elapsed_ns;
+} traffic_counters;
+
 typedef struct responder
 {
   pid_t pid;
@@ -61,12 +74,23 @@ typedef struct responder
 
 static volatile sig_atomic_t g_hup=0;
 static volatile sig_atomic_t g_chld=0;
+static volatile sig_atomic_t g_stop=0;
 static responder g_resp[EWBD_MAX_RESPONDERS];
 static int g_num_resp=0;
 static int g_min_resp=2;
 static int g_max_resp=16;
 static int g_generation=1;
 static char g_www_root[4096]=".";
+static char g_stats_file[4096]="ewbd-traffic.log";
+static traffic_counters g_evm_stats;
+static traffic_counters g_other_stats;
+static time_t g_stats_started=0;
+
+static void on_stop(int sig)
+{
+  (void)sig;
+  g_stop=1;
+}
 
 static void die(const char *fmt, ...)
 {
@@ -97,6 +121,68 @@ static void on_chld(int sig)
 {
   (void)sig;
   g_chld=1;
+}
+
+static uint64_t elapsed_ns(struct timespec start, struct timespec end)
+{
+  uint64_t seconds=(uint64_t)(end.tv_sec-start.tv_sec);
+  long nanoseconds=end.tv_nsec-start.tv_nsec;
+  if (nanoseconds<0)
+  {
+    seconds--;
+    nanoseconds+=1000000000L;
+  }
+  return seconds*1000000000ULL+(uint64_t)nanoseconds;
+}
+
+static void add_request_stat(const request_stat *stat)
+{
+  traffic_counters *counter=stat->is_evm ? &g_evm_stats : &g_other_stats;
+  counter->frames++;
+  counter->elapsed_ns+=stat->elapsed_ns;
+  if (stat->is_error) counter->errors++;
+}
+
+static int write_traffic_counters(time_t now)
+{
+  FILE *out;
+  struct tm tmv;
+  char timestamp[32];
+  double evm_average=g_evm_stats.frames ?
+    (double)g_evm_stats.elapsed_ns/(double)g_evm_stats.frames/1000000.0 : 0.0;
+  double other_average=g_other_stats.frames ?
+    (double)g_other_stats.elapsed_ns/(double)g_other_stats.frames/1000000.0 : 0.0;
+
+  if (!localtime_r(&now,&tmv)) return -1;
+  if (!strftime(timestamp,sizeof(timestamp),"%Y-%m-%d %H:%M:%S",&tmv)) return -1;
+
+  out=fopen(g_stats_file,"a");
+  if (!out) return -1;
+  fprintf(out,
+          "%s EVM frames %llu, %llu errors, avg %.1fms, "
+          "OTHERS %llu, %llu errors, avg %.1fms\n",
+          timestamp,
+          (unsigned long long)g_evm_stats.frames,
+          (unsigned long long)g_evm_stats.errors,
+          evm_average,
+          (unsigned long long)g_other_stats.frames,
+          (unsigned long long)g_other_stats.errors,
+          other_average);
+  if (fclose(out)<0) return -1;
+
+  memset(&g_evm_stats,0,sizeof(g_evm_stats));
+  memset(&g_other_stats,0,sizeof(g_other_stats));
+  g_stats_started=now;
+  return 0;
+}
+
+static void traffic_tick(void)
+{
+  time_t now=time(NULL);
+  if (g_stats_started==0) g_stats_started=now;
+  if (now-g_stats_started<300) return;
+  if (write_traffic_counters(now)<0)
+    warnx("cannot write traffic counters to %s: %s",g_stats_file,strerror(errno));
 }
 
 static int set_cloexec(int fd)
@@ -454,20 +540,20 @@ static int serve_static_file(int client_fd, const char *request_path)
 
   if (unsafe_path(clean))
   { http_error(client_fd,403,"Forbidden");
-    return 1;
+    return -1;
   }
 
   snprintf(full,sizeof(full),"%s%s",g_www_root,clean);
 
   if (stat(full,&st)<0 || !S_ISREG(st.st_mode))
   { http_error(client_fd,404,"Not Found");
-    return 1;
+    return -1;
   }
 
   int f=open(full,O_RDONLY);
   if (f<0)
   { http_error(client_fd,403,"Forbidden");
-    return 1;
+    return -1;
   }
 
   snprintf(header,sizeof(header),
@@ -498,7 +584,7 @@ static int serve_static_file(int client_fd, const char *request_path)
       {
         if (errno==EINTR) continue;
         close(f);
-        return 1;
+        return -1;
       }
       done+=w;
     }
@@ -599,7 +685,7 @@ static int run_evm_program_to_fd(int out_fd, const char *clean_path, int entrypo
   free(program);
 
   if (rc<0) warnx("VM returned %d for %s",rc,clean_path);
-  return 1;
+  return rc<0 ? -1 : 1;
 }
 
 static void handle_cron_task(const char *task, int generation, int *loaded_generation)
@@ -641,7 +727,9 @@ static void handle_cron_task(const char *task, int generation, int *loaded_gener
 static int serve_evm_program(int client_fd, const char *request_path, ewb_form *form)
 {
   char clean[1024];
+  char full[8192];
   char header[256];
+  struct stat st;
   const char *stack="";
   int entrypoint=0;
   int stackpos=0;
@@ -652,7 +740,13 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
 
   if (unsafe_path(clean))
   { http_error(client_fd,403,"Forbidden");
-    return 1;
+    return -1;
+  }
+
+  snprintf(full,sizeof(full),"%s%s",g_www_root,clean);
+  if (stat(full,&st)<0 || !S_ISREG(st.st_mode))
+  { http_error(client_fd,404,"Not Found");
+    return -1;
   }
 
   if (form)
@@ -668,11 +762,11 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
            "\r\n");
   write_all(client_fd,header);
   rc=run_evm_program_to_fd(client_fd,clean,entrypoint,stackpos,stack);
-  if (!rc) http_error(client_fd,404,"Not Found");
-  return 1;
+  return rc>0 ? 1 : -1;
 }
 
-static void handle_client(int client_fd, int generation, int *loaded_generation)
+static int handle_client(int client_fd, int generation, int *loaded_generation,
+                         int *is_evm)
 {
   char req[EWBD_REQBUF];
   int req_len=0;
@@ -692,18 +786,22 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
   memset(&er,0,sizeof(er));
 
   req_len=read_http_request(client_fd,req,sizeof(req));
-  if (req_len<0) return;
+  if (req_len<0) return 1;
   parse_request_line(req,method,sizeof(method),path,sizeof(path));
 
   if (method[0]==0) strcpy(method,"?");
   if (path[0]==0) strcpy(path,"/");
   default_index_path(path,resolved_path,sizeof(resolved_path));
+  *is_evm=is_evm_path(resolved_path);
 
   if (!strcmp(method,"GET") || !strcmp(method,"HEAD"))
-  { if (!strcmp(method,"GET") && serve_evm_program(client_fd,resolved_path,NULL)) return;
-    if (serve_static_file(client_fd,resolved_path)) return;
+  { int served;
+    if (!strcmp(method,"GET") && *is_evm)
+      return serve_evm_program(client_fd,resolved_path,NULL)<0;
+    served=serve_static_file(client_fd,resolved_path);
+    if (served) return served<0;
     http_error(client_fd,404,"Not Found");
-    return;
+    return 1;
   }
 
   if (!strcmp(method,"POST"))
@@ -717,23 +815,24 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
     if (strncmp(content_type,"multipart/form-data",19) &&
         strncmp(content_type,"application/x-www-form-urlencoded",33))
     { http_error(client_fd,415,"Unsupported Media Type");
-      return;
+      return 1;
     }
 
     if (read_http_body(client_fd,req,req_len,&post_body,&post_body_len)<0)
     { http_error(client_fd,400,"Bad POST body");
-      return;
+      return 1;
     }
 
     if (ewb_form_parse(&er,content_type,post_body,post_body_len)<0)
     { http_error(client_fd,400,"Bad form body");
       ewb_form_free(&er);
-      return;
+      return 1;
     }
 
-    if (serve_evm_program(client_fd,resolved_path,&er))
-    { ewb_form_free(&er);
-      return;
+    if (*is_evm)
+    { int failed=serve_evm_program(client_fd,resolved_path,&er)<0;
+      ewb_form_free(&er);
+      return failed;
     }
 
     const char *entrypoint="";
@@ -784,7 +883,7 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
     write_all(client_fd,header);
     write_all(client_fd,body);
     ewb_form_free(&er);
-    return;
+    return 0;
   }
 
   snprintf(body,sizeof(body),
@@ -807,6 +906,7 @@ static void handle_client(int client_fd, int generation, int *loaded_generation)
 
   write_all(client_fd,header);
   write_all(client_fd,body);
+  return 0;
 }
 
 static void responder_loop(int control_fd)
@@ -846,9 +946,16 @@ static void responder_loop(int control_fd)
       continue;
     }
 
-    handle_client(client_fd,generation,&loaded_generation);
+    struct timespec started;
+    struct timespec finished;
+    request_stat stat;
+    memset(&stat,0,sizeof(stat));
+    clock_gettime(CLOCK_MONOTONIC,&started);
+    stat.is_error=handle_client(client_fd,generation,&loaded_generation,&stat.is_evm);
+    clock_gettime(CLOCK_MONOTONIC,&finished);
+    stat.elapsed_ns=elapsed_ns(started,finished);
     close(client_fd);
-    send_status(control_fd,'I');
+    send_ctrl_msg(control_fd,'I',-1,0,(const char*)&stat,(int)sizeof(stat));
   }
 }
 
@@ -1006,7 +1113,9 @@ static void cron_tick(void)
 
 static void usage(const char *argv0)
 {
-  fprintf(stderr,"Usage: %s [-p port] [-m min_processes] [-M max_processes] [--www path]\n",argv0);
+  fprintf(stderr,
+          "Usage: %s [-p port] [-m min_processes] [-M max_processes] "
+          "[--www path] [--stats-file path]\n",argv0);
   exit(1);
 }
 
@@ -1023,6 +1132,10 @@ int main(int argc, char **argv)
     { strncpy(g_www_root,argv[++i],sizeof(g_www_root)-1);
       g_www_root[sizeof(g_www_root)-1]=0;
     }
+    else if (!strcmp(argv[i],"--stats-file") && i+1<argc)
+    { strncpy(g_stats_file,argv[++i],sizeof(g_stats_file)-1);
+      g_stats_file[sizeof(g_stats_file)-1]=0;
+    }
     else usage(argv[0]);
   }
 
@@ -1036,6 +1149,8 @@ int main(int argc, char **argv)
 
   signal(SIGHUP,on_hup);
   signal(SIGCHLD,on_chld);
+  signal(SIGTERM,on_stop);
+  signal(SIGINT,on_stop);
   signal(SIGPIPE,SIG_IGN);
 
   int listen_fd=create_listener(port);
@@ -1043,12 +1158,15 @@ int main(int argc, char **argv)
   for (int i=0; i<g_min_resp; i++)
     if (spawn_responder()<0) die("cannot spawn responder");
 
-  fprintf(stderr,"ewbd listening on port %d, responders min=%d max=%d, www=%s\n",
-          port,g_min_resp,g_max_resp,g_www_root);
+  g_stats_started=time(NULL);
+  fprintf(stderr,
+          "ewbd listening on port %d, responders min=%d max=%d, www=%s, stats=%s\n",
+          port,g_min_resp,g_max_resp,g_www_root,g_stats_file);
 
-  for (;;)
+  while (!g_stop)
   {
     cron_tick();
+    traffic_tick();
 
     if (g_hup)
     {
@@ -1116,6 +1234,11 @@ int main(int argc, char **argv)
         if (fd>=0) close(fd);
         if (tag=='I')
         {
+          if (payload_len==(int)sizeof(request_stat))
+          { request_stat stat;
+            memcpy(&stat,payload,sizeof(stat));
+            add_request_stat(&stat);
+          }
           if (g_resp[i].generation!=g_generation)
           { send_ctrl_msg(g_resp[i].fd,'H',-1,g_generation,NULL,0);
             g_resp[i].generation=g_generation;
@@ -1140,6 +1263,10 @@ int main(int argc, char **argv)
       int idx=choose_responder();
       if (idx<0)
       {
+        request_stat stat;
+        memset(&stat,0,sizeof(stat));
+        stat.is_error=1;
+        add_request_stat(&stat);
         write_all(client_fd,
           "HTTP/1.0 503 Service Unavailable\r\n"
           "Connection: close\r\n"
@@ -1154,10 +1281,27 @@ int main(int argc, char **argv)
       g_resp[idx].generation=g_generation;
       if (send_ctrl_msg(g_resp[idx].fd,'R',client_fd,g_generation,NULL,0)<0)
       {
+        request_stat stat;
+        memset(&stat,0,sizeof(stat));
+        stat.is_error=1;
+        add_request_stat(&stat);
         g_resp[idx].busy=0;
         warnx("cannot pass client fd to responder");
       }
       close(client_fd);
     }
   }
+
+  if (g_evm_stats.frames || g_other_stats.frames)
+    if (write_traffic_counters(time(NULL))<0)
+      warnx("cannot write final traffic counters to %s: %s",g_stats_file,strerror(errno));
+
+  close(listen_fd);
+  for (int i=0; i<g_num_resp; i++)
+    send_ctrl_msg(g_resp[i].fd,'Q',-1,g_generation,NULL,0);
+  for (int i=0; i<g_num_resp; i++)
+  { waitpid(g_resp[i].pid,NULL,0);
+    close(g_resp[i].fd);
+  }
+  return 0;
 }

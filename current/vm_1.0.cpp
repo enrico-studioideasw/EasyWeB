@@ -390,7 +390,7 @@ int resume(int xPC,int xSP)
       stack[findvar(varname)] = setpath(A, x, v);  
     } else if (OP==OP_GETPATH) //Nasconde nelle stringhe la complessità degli array
     { /* PUSH "a"; PUSH "3"; PUSH "5"; PUSH 2; GETPATH */
-      pop(x); 
+      POP(x);
       int numlev=ewbIntValue(x);
       vector <string> v; 
       for (int i=0; i<numlev; i++) { POP(A); v.push_back(A); };
