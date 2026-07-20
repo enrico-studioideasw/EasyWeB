@@ -145,7 +145,7 @@ string getpath(string s, vector<string> key)
 
 int resume(int xPC,int xSP)
 { PC=xPC; SP=xSP;//Program counter e stack pointer
-  string A="";   //Accumulatore 
+  string A="";   //Accumulatore  
   string x,y;    //x e y diventano registri, come sul 6502.. 
   EWBOpcode OP;  //Opcode normalizzato
   string varname, vartype, varvalue; //Uso anche questi troppo spesso per non metterli qui. 
@@ -215,6 +215,10 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_DECSP)
     { int n=ewbIntValue(codearg[PC]);
       SP=SP-n;
+      if (SP<0) err("Stack underflow");
+    } else if (OP==OP_INCSP)
+    { int n=ewbIntValue(codearg[PC]);
+      SP=SP+n;
       if (SP<0) err("Stack underflow");
     } else if (OP==OP_STARTFORM)
     { cout << "<form method=post id=__form" << IDF << " enctype=multipart/form-data>";
@@ -325,9 +329,9 @@ int resume(int xPC,int xSP)
       }
       A=qlist(url,user,password,context,fields,filter,orderby);
     } else if (OP==OP_QBYID)  //vedi cicloInEDatabase.txt in doc/
-    { string context, filter, id;
+    { string context, id;
       POP(id);
-      POP(filter);
+      //POP(filter);
       POP(context);
       string url=stack[findvar(context+"._url")];
       string user=stack[findvar(context+"._user")];
@@ -343,8 +347,7 @@ int resume(int xPC,int xSP)
           positions.push_back(symtpos[i]);
         }
       }
-      vector<string> record=qbyid(url,user,password,context,fields,filter,
-                                  orderby,id);
+      vector<string> record=qbyid(url,user,password,context,fields, orderby,id);
       for (size_t i=0; i<positions.size(); i++)
       { stack[positions[i]]="";
         if (i<record.size()) stack[positions[i]]=record[i];
@@ -386,8 +389,9 @@ int resume(int xPC,int xSP)
       A=stack[findvar(varname)];
       stack[findvar(varname)] = setpath(A, x, v);  
     } else if (OP==OP_GETPATH) //Nasconde nelle stringhe la complessità degli array
-    { /* PUSH "a"; PUSH "3"; PUSH "5"; GETPATH 2; */
-      int numlev=ewbIntValue(codearg[PC]);
+    { /* PUSH "a"; PUSH "3"; PUSH "5"; PUSH 2; GETPATH */
+      pop(x); 
+      int numlev=ewbIntValue(x);
       vector <string> v; 
       for (int i=0; i<numlev; i++) { POP(A); v.push_back(A); };
       POP(varname);

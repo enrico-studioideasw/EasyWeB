@@ -1,10 +1,10 @@
 Documentazione VM EWB 2026
 ==========================
 
-La VM esegue una istruzione per riga.
-Le istruzioni lavorano principalmente su stack e accumulatore A.
-**è una macchina a stack di stringhe, Lo stack pointer è indicato dal registro SP parte da 0 
-**GETPATH e SETPATH permettono di inserire nelle stringhe strutture dati complesse
+La VM esegue una istruzione per riga ed e' una macchina a stack di stringhe.
+Le istruzioni lavorano principalmente sullo stack e sull'accumulatore A.
+SP e' lo stack pointer e parte da 0; PC e' il program counter.
+GETPATH e SETPATH permettono di conservare strutture dati dentro le stringhe.
 
 Parole chiave
 -------------
@@ -63,6 +63,9 @@ MUL
 DIV
   POP(y), POP(x), calcola x / y e mette il risultato in A.
 
+MOD
+  POP(y), POP(x), calcola il resto di x / y e mette il risultato in A.
+
 CONCAT
   POP(y), POP(x), concatena x e y come stringhe e mette il risultato in A.
 
@@ -101,9 +104,11 @@ GT, LT, GE, LE, EQ, NEQ
   NEQ  x != y
 
 Se uno dei dati non è numerico viene generata un eccezione. Se non è stato definito un handler questo blocca il codice.
-La VM passa alla funzione ewbCompare() il codice istruzione gia' normalizzato
-in minuscolo: gt, lt, ge, le, eq, neq.
-La libreria accetta questi codici testuali della VM, non i simboli C/C++.
+SGT, SLT, SGE, SLE, SEQ, SNEQ
+  Eseguono gli stessi confronti trattando gli operandi come stringhe.
+
+La VM passa a ewbCompare() il nome dell'istruzione gia' normalizzato in
+minuscolo. La libreria accetta i nomi testuali della VM, non i simboli C/C++.
 
 Salti e chiamate
 ----------------
@@ -116,9 +121,10 @@ JNZ
   POP(x). Se A non vale "0" e non e' stringa vuota, salta all'indirizzo x.
   Internamente la VM imposta PC = x - 1 per compensare il PC++ a fine ciclo.
 
-CALL
-  Inserisce nello stack il PC corrente e salta all'indirizzo contenuto in A.
-  Anche qui il salto usa PC = A - 1.
+CALL indirizzo_ritorno
+  POP(arity), usa l'arita' per raggiungere il segnaposto riservato prima degli
+  argomenti e vi scrive l'argomento immediato dell'istruzione. Salta quindi
+  all'indirizzo contenuto in A. Il salto usa PC = A - 1.
 
 RET
   POP(x) e ritorna all'indirizzo x, usando PC = x - 1.
@@ -128,9 +134,20 @@ Variabili e symbol table
 
 addsymtable
   Registra una variabile nella symbol table.
-  Il nome della variabile e' in A.
+  Il nome della variabile e' l'argomento immediato dell'istruzione.
   La posizione associata e' lo stack pointer corrente.
   Va usata vicino al push del valore della variabile.
+
+delsymtable n
+  Elimina gli ultimi n nomi dalla symbol table.
+
+decsp n
+  Riduce lo stack pointer di n posizioni.
+
+incsp n
+  Aumenta lo stack pointer di n posizioni. Serve soprattutto al compilatore
+  per muoversi temporaneamente dentro un frame gia' predisposto sullo stack;
+  non inserisce valori e non modifica la symbol table.
 
 onerror
   POP(varname). Registra un handler di errore interno con nome __on_error.
@@ -170,13 +187,12 @@ runTarget
   Recupera dallo stack la posizione del target indicata dalla variabile varname,
   scrive i campi interni del form e avvia runtarget() lato client.
 
-crontask
-  POP(interval), POP(varname).
-  Recupera l'entry point del task e lo passa ad addCron().
-  addCron() aggiorna la tabella DEFAULTENGINE/_cron:
-    - se interval non e' vuoto fa update di cron; se l'update non modifica
-      righe, inserisce una nuova riga con nometask e cron.
-    - se interval e' vuoto cancella la riga da _cron.
+crontask n
+  POP(cronstring), poi POP di n parametri e infine POP(taskname).
+  I parametri vengono serializzati insieme allo stack corrente.
+  Usa sempre le credenziali del context ewb.
+  Se cronstring e' vuota cancella il task da _crontab; altrimenti convalida la
+  sintassi cron e registra task, programma, stack, parametri e pianificazione.
 
 task, target
   POP(varname).
@@ -196,87 +212,76 @@ endtask, endtarget
   POP(varname).
   Aggiornano _tasks o _targets mettendo status='stopped'.
 
-Accesso dati
-------------
+Accesso dati e context
+----------------------
 
 L'accesso DB della VM e' stateless: non esistono cursori vivi da conservare tra
 una ask e la ripresa da entry point. La complessita' SQL e i diversi backend
 sono confinati in db_interface.cpp.
 
-context
-_______
-  E' un URI di destinazione DB, per esempio:
+Il nome del context identifica il dataset e quindi la tabella. Non e' l'URI del
+database. I dati di collegamento sono normali variabili dello stesso context:
 
-    mysql://ewb
-    mysql://clienti:3307
-    postgres://analytics:5432
+  context._url       mysql://ewb oppure postgres://ewb
+  context._user      utente DB
+  context._password  password DB
+  context._orderby   ordinamento del dataset
 
-context contiene, oltre ai campi della tabella dichiarati dall'utente: 
-_url
-_user
-_password
-_status
-_orderby
-Quindi posso accedere a _url o a contestoprova._url in ogni punto dopo aver letto la dichiarazione di contesto.
-Non vedo tutti i campi della tabella, solo quelli che ho dichiarato. E'una specie di vista.
-Se ho più contesti che contengono _url enon specifico quale mi interessa vedrò l'ultimo.
-Posso avere dichiarazioni annidate e quindi dichiarare un DB in un unico contesto. 
+Le primitive ricevono soltanto il nome del context e recuperano questi valori
+dalla symbol table. Non usano credenziali DEFAULT. Le primitive interne di VM,
+come task e cron, usano esplicitamente il context chiamato ewb.
 
-Per la cardinalita e le relazioni:
-context clienti = {
-  nome,
-  codice_fiscale,
-  indirizzi = {
-    via,
-    citta 
-  },
-  via
-};
-Per i campi non serve specificare la cardinalità, dentro un a in può controllare il linguaggio.
-Per la "relazione" tra clienti e indirizzi si crea/usa id_indirizzi in clienti 
-Per la visibilità, nel caso sopra:
-I contesti possonno essere globali o locali. Semplicemente se locali spariscono quando a fine blocco/funzione piallo lo stack. 
-memorizzo come variabile in stack al termine della lettura dell'intero costrutto context, quindi richiamandolo ad albero: 
-SP  
-0- indirizzi.id
-1- indirizzi.via
-2- indirizzi.citta
-3- clienti.nome
-4- clienti.codicefiscale
-5- clienti.idz_cliente
-6- clienti.via
-Se nella VM devo risolvere findvar("via") cerco la prima variabile che dopo il punto contenga via, scorrendo lo stack al contrario quindi 6
-Se nella VM devo risolvere findvar("indirizzi.via") cerco la prima variabile che dopo il punto contenga "idirizzi.via" (ci teniamo livelli per il futuro?).. quindi 1.
-In generale, cerco sempre a ritroso nello stack e se la ricerca è approssimativa trovo il primo dato che fa match, Questa è una regola geneale di visibilità.
+Tutte le variabili context.campo dichiarate nello stack definiscono i campi del
+dataset. Sono inclusi anche i nomi che iniziano con underscore; la sola
+eccezione e' _status, riservato alla VM e non persistito.
 
-DEFAULTENGINE vale mysql://ewb.
+Schema dinamico
+---------------
+
+Prima di QLIST, QBYID e QUERY la libreria assicura che esistano database,
+tabella e campi richiesti dal dataset:
+
+  - se il database non esiste tenta di crearlo;
+  - se la tabella non esiste la crea;
+  - ogni tabella ha id intero unsigned auto increment come chiave primaria;
+  - se un campo dichiarato non esiste lo aggiunge come testo.
+
+Il programma EWB puo' quindi usare il proprio spazio ad albero senza conoscere
+in anticipo lo schema fisico del database.
 
 QLIST
-  POP(query), POP(context).
-  order=context._orderby 
-  push(context)
-  Ritorna in A una lista serializzata di id. Rimette in stack il context.
-  Le query sono rese deterministiche dalla libreria DB:
-    - se order e' vuoto viene aggiunto order by id
-    - se order e' presente viene completato con ", id"
+  POP(filter), POP(context), poi PUSH(context).
+  Legge URL, utente, password e ordinamento dal context; ricava i campi dalle
+  variabili context.* e mette in A la lista serializzata degli id che rispettano
+  il filtro. Ripusha il context per il ciclo stateless generato dal compilatore.
 
 QBYID
-  POP(id), POP(order), POP(query), POP(context).
-  Ritorna in A il record corrispondente all'id se appartiene ancora
-  all'insieme logico query/order; altrimenti ritorna stringa vuota.
+  POP(id), POP(context).
+  Recupera direttamente il record della tabella context con quella chiave
+  primaria. Non riceve e non riapplica il filtro: l'insieme e' gia' stato
+  deciso dalla lista di id prodotta da QLIST. Copia i campi del record nelle
+  rispettive variabili context.* dello stack. A vale "1" se il record esiste,
+  altrimenti stringa vuota. Non restituisce il record serializzato in A.
 
 QUERY
-  POP(order), POP(query), POP(context).
-  Chiama run_query(context, query, order) e mette il risultato in A.
-  Serve al livello superiore per select veloci, insert, update e delete
-  atomiche senza passare dal ciclo stateless QLIST/QBYID.
+  POP(query), POP(context).
+  Ricava collegamento, campi e ordinamento dal context, completa lo schema e
+  chiama run_query(). Per select/with/show mette in A il primo record
+  serializzato; per insert l'id inserito dove disponibile; per update/delete il
+  numero di righe modificate.
 
-run_query(context, query, order)
-  Funzione C++ usata dall'opcode QUERY e da primitive interne come task/target
-  e addCron.
-  Per select/with/show ritorna il primo record.
-  Per insert ritorna l'insert id dove il backend lo consente.
-  Per update/delete ritorna il numero di righe modificate.
+Ordinamento
+  QLIST e le select di QUERY sono deterministiche:
+    - se context._orderby e' vuoto viene aggiunto order by id;
+    - altrimenti l'ordinamento viene completato con id.
+
+Backend
+  Sono implementati MySQL/MariaDB e PostgreSQL. _url usa la forma:
+
+    mysql://database
+    mysql://database:porta
+    postgres://database
+    postgres://database:porta
 
 db_quote(value)
   Funzione di supporto della libreria DB: produce un literal SQL sicuro per
@@ -290,10 +295,18 @@ SETPATH n
   POP(value), poi POP dei n livelli di chiave, poi POP(varname).
   Legge la variabile varname dallo stack e aggiorna il valore nel path indicato.
 
-GETPATH n
+GETPATH
   Gestisce valori strutturati dentro una stringa.
-  POP dei n livelli di chiave, poi POP(varname).
+  POP(n), poi POP degli n livelli di chiave e infine POP(varname).
   Legge dal valore varname il path indicato e mette il risultato in A.
+  A differenza di SETPATH, il numero di livelli e' un valore sullo stack e non
+  un argomento immediato. Esempio per leggere a[3][5]:
+
+    PUSH "a"
+    PUSH "3"
+    PUSH "5"
+    PUSH 2
+    GETPATH
 
 Errori
 ------

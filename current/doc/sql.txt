@@ -1,0 +1,37 @@
+espressione EWB
+    ↓
+compilazione in operazioni VM
+    ↓
+a runtime costruzione della stringa SQL
+    ↓
+QLIST / QBYID
+
+nome == uc(ricerca) and id > limite
+PUSH "("
+PUSH "nome"
+PUSH " = "
+PUSH ricerca
+CALL uc
+SQLQUOTE
+CONCAT
+CONCAT
+PUSH " AND "
+PUSH "id"
+PUSH " > "
+PUSH limite
+SQLNUMBER
+CONCAT
+CONCAT
+CONCAT
+CONCAT
+PUSH ")"
+CONCAT
+Quindi il parser SQL è in realtà un compilatore di espressioni che generano SQL.
+
+Questo chiarisce anche la distinzione:
+
+un campo produce testo SQL direttamente;
+una costante produce testo SQL già quotato;
+una variabile esterna produce codice VM che legge il valore e lo quota;
+una funzione EWB indipendente dal record produce codice VM che la esegue e quota il risultato;
+una funzione applicata a un campo deve avere una traduzione SQL oppure è errore.

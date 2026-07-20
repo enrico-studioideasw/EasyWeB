@@ -9,7 +9,7 @@ Valori:
   popa
 
 Aritmetica:
-  sum sub mul div
+  sum sub mul div mod
 
 Stringhe:
   concat
@@ -41,11 +41,28 @@ Symbol table / stack:
   addsymtable "nome"
   delsymtable numero
   decsp numero
+  incsp numero
 
 Database stateless:
   qlist
   qbyid
   query
+
+  qlist: POP(filtro), POP(context); restituisce in A la lista degli id.
+  qbyid: POP(id), POP(context); carica i campi nelle variabili context.* e
+  restituisce in A "1" oppure stringa vuota. Il filtro non viene riapplicato.
+
+  Il nome del context identifica il dataset/tabella. Le primitive leggono
+  context._url, context._user, context._password e context._orderby dalla
+  symbol table. Database, tabella, id intero auto increment e campi dichiarati
+  vengono creati quando mancano. Tutti i campi, compresi quelli con prefisso _,
+  vengono persistiti tranne _status.
+
+Task e pianificazione:
+  runtarget
+  crontask n
+  task target
+  endtask endtarget
 
 Form/web:
   startform

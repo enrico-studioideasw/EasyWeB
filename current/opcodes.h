@@ -55,6 +55,7 @@ typedef enum
   OP_ADDSYMTABLE,
   OP_DELSYMTABLE,
   OP_DECSP,
+  OP_INCSP,
   OP_STARTFORM,
   OP_STARTTARGET,
   OP_ADDTOFORM,
@@ -119,6 +120,7 @@ static const VmInstr vm_instr_table[] =
   {"addsymtable", OP_ADDSYMTABLE, ARG_STRING},
   {"delsymtable", OP_DELSYMTABLE, ARG_INT},
   {"decsp",       OP_DECSP,       ARG_INT},
+  {"incsp",       OP_INCSP,       ARG_INT},
   {"startform",   OP_STARTFORM,   ARG_NONE},
   {"starttarget", OP_STARTTARGET, ARG_NONE},
   {"addtoform",   OP_ADDTOFORM,   ARG_NONE},
@@ -136,7 +138,7 @@ static const VmInstr vm_instr_table[] =
   {"onerror",     OP_ONERROR,     ARG_NONE},
   {"raise",       OP_RAISE,       ARG_NONE},
   {"setpath",     OP_SETPATH,     ARG_INT},
-  {"getpath",     OP_GETPATH,     ARG_INT},
+  {"getpath",     OP_GETPATH,     ARG_NONE},
   {0,             OPCODE_INVALID, ARG_NONE}
 };
 

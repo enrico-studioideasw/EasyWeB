@@ -1,86 +1,74 @@
-Problema:
+IN() stateless su database
+==========================
 
-context aaa(nome,cognome);
-inall (aaa)
-{  
-  ask nome;
-  delete(aaa,persona=nome); 
-};
+Problema
+--------
 
-La ask spezza il flusso della IN e perdo l'accesso al db.
+  context aaa(nome,cognome);
+  inall (aaa)
+  {
+    ask nome;
+    delete(aaa,persona=nome);
+  };
 
-quindi quando ho in in() devo sapere a che record sono arrivato, aprire una connessione, leggere solo il successivo, richiuderla. 
-Se non c'e' salto alla fine della in. 
-Idealmente ho due funzioni: dimmi quanti elementi ha questa query e dammi l'elemento N di questa query. 
-In entrambi i casi devo specificare un ordinamento.. se non c'e' order by devo metterci id. 
-Se c'e' devo aggiungere id in coda perchè potrebbe non essere completo.
+ASK interrompe il flusso e la VM non puo' conservare un cursore o una
+connessione DB aperta. Inoltre piu' IN() possono essere annidate.
 
-SOLUZIONE:
+Soluzione
+---------
 
-QLIST decide l’insieme.
-QBYID recupera il record.
-position scorre solo la lista salvata nello stack.
-Mai usare position come OFFSET SQL.
+QLIST decide una volta l'insieme e restituisce una lista serializzata di id.
+La lista e la posizione corrente restano nel frame dell'IN() sullo stack.
+QBYID rilegge per chiave il record corrente e valorizza direttamente le
+variabili del context.
 
----------------------------------------------------
+Il filtro serve soltanto a QLIST. QBYID non lo riceve e non lo riapplica:
+l'appartenenza all'insieme e' gia' rappresentata dalla lista salvata.
 
-ids = QLIST(query normalizzata ORDER BY ..., id)
+Non usare mai la posizione come OFFSET SQL. L'ordinamento di QLIST e'
+deterministico: se context._orderby e' vuoto viene usato id; altrimenti id
+viene aggiunto in coda all'ordinamento richiesto.
 
-push context query order ids position = 0
-loop:
-  pop position
-  pop ids
-  id = ids[position]
+Interfacce VM
+-------------
 
-  se id non esiste: fine in
+QLIST
+  POP(filter), POP(context), PUSH(context).
+  A riceve la lista serializzata degli id.
 
-  pop context, query, order, id 
-  record = QBYID(context, query, order, id)
-  position++
-  salvo in stack: context query order ids position
-  se record non esiste più:
-      torna a loop
-  esegui corpo
+QBYID
+  POP(id), POP(context).
+  I campi letti vengono copiati nelle variabili context.*.
+  A vale "1" se il record esiste, altrimenti stringa vuota.
 
+GETPATH
+  POP(numero_livelli), POP delle chiavi, POP(nome_variabile).
+  Nel ciclo IN estrae dalla lista l'id alla posizione corrente.
 
-string qlist(string context, string query, string orderby);
-string qbyid(string context, string query, string orderby, string id);
+DECSP n e INCSP n
+  Permettono al codice generato di muoversi dentro il frame dell'IN() senza
+  distruggere i frame degli eventuali cicli esterni.
 
-code:
-    push context
-    push query
-    push order
-    push 0 'position
-    QLIST
-    push ids 'list of id
-loop:
-    POP ids
-    pop position
-    ids[position] 'A=id
-    jz end
-    push context
-    push query
-    push order
-    push id
-    QBYID
-    position++
-    push position
-    push ids
-    record=A
-    jz loop    
-    { corpo IN }
-end: 
-    { resto del programma }
-        
+Schema concettuale
+------------------
 
+  lista = QLIST(context, filtro)
+  posizione = 0
 
+  loop:
+    id = lista[posizione]
+    se id e' vuoto: vai a fine
 
-DELETE o INSERT sono invece atomiche 
-Per la vm: 
-string query(string q);
-string fastquery(string q); 
+    trovato = QBYID(context, id)
+    se trovato:
+      esegui corpo IN
 
-per il linguggio: 
-string qlist(string context, string query, string orderby);
-string qbyid(string context, string query, string orderby, string id);
-run_query(context,query,order); order solo per insert, se insert ritorna 1 o 0, se delete mysql_affected_rows altrimenti è una fastquery.
+    posizione++
+    torna a loop
+
+  fine:
+    rimuovi soltanto il frame appartenente a questa IN
+
+Se un record viene cancellato dopo QLIST, QBYID restituisce stringa vuota e il
+ciclo prosegue con l'id successivo. Ogni IN() annidata mantiene sullo stack la
+propria copia di context, lista e posizione.

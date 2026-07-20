@@ -214,25 +214,16 @@ ______________________________________
   split  variable, variable_tosplit  'analoga alla split del linguaggio perl.
   join   variable, lista             'analoga alla join del perl.
   date
-  lessdate  variable, variable 
 
 per accesso ai database - le variabili sono di ambiente
   add    variabile[.variabile]
-  exist  variabile[.variabile]
-  remove variabile[.variabile]
-  lock   variabile[.variabile] 
+  exists variabile[.variabile]
+  lock   variabile[.variabile]   //Per transazione esplicita. Attento al deadlock: problema dei quattro a tavola. Timeout random e raise. 
   unlock  variabile[.variabile]
-  inblock = in ( variabile[.variabile] [, condizione] ) blocco 
+(OK) inblock = in ( variabile[.variabile] [, condizione] ) blocco 
           | delete ( variabile[.variabile] [, condizione] )
 
-  condizione = sqlcond 
-!!Qui mancano i parsers SQL per condizione e ordinamento.
-!!Voglio evitare di scorrere l'intera tabella per qualunque lettura.
-!!ma devo avere una sintassi limitata con gli operatori logici SQL e le variabili di tabella 
-!!va pensata bene 
-
-  
-
+(OK) condizione = calcexp('SQL') 
 
 per accesso all' interfaccia web
   ask field [,field]
@@ -287,13 +278,13 @@ Le sock sono numeri.
     write host, port       //scrive
 ________________
 Per i tasks
-    cron nometask(parametri) modocrontab   //"30 * * * *"
+(OK) cron nometask(parametri) modocrontab   //"30 * * * *"
     refresh nometarget(paametri), interval  //secondi anche con la virgola
     run nometarget(parametri) 
-    stato del task: inall(_tasks.runtime, name='miotask' && stato=="ready") { ... } 
+//    stato del task: inall(_tasks.runtime, name='miotask' && stato=="ready") { ... } 
 
 Per completamento tramite ia (una tantum):
-    ia "richiesta" 
+(OK)  ia "richiesta" 
 diventa: 
     '(gestita) ia "richiesta"
     /* 

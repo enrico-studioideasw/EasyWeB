@@ -627,6 +627,7 @@ string qlist(string url, string user, string password, string table,
   string sql="select id from "+table;
   filter=trim(filter);
   if (filter!="" && filter!="true") sql+=" where "+filter;
+  if (orderby=="") { orderby="id"; } else orderby+=",id"; 
   sql=with_order(sql,orderby);
   (void)sql;
 
@@ -674,7 +675,7 @@ string qlist(string url, string user, string password, string table,
 }
 
 vector<string> qbyid(string url, string user, string password, string table,
-                     vector<string> fields, string filter, string orderby,
+                     vector<string> fields, string orderby,
                      string id)
 { DbUri u=parse_context(url);
   string query="select ";
@@ -682,10 +683,7 @@ vector<string> qbyid(string url, string user, string password, string table,
   { if (i>0) query+=",";
     query+=fields[i];
   }
-  query+=" from "+table;
-  filter=trim(filter);
-  if (filter!="" && filter!="true") query+=" where "+filter;
-
+  query+=" from "+table + " where id=" + id + " ";
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
