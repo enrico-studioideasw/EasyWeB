@@ -39,12 +39,13 @@
 #include "cgi_parser.h"
 #include "cron_db.h"
 #include "cron_parser.h"
-#include "vm_1.0.h"
+#include "vm.h"
 
 #define EWBD_MAX_RESPONDERS 1024
 #define EWBD_REQBUF 16384
 #define EWBD_MAX_POST (10*1024*1024)
 #define EWBD_CTRL_PAYLOAD_MAX 4096
+#define EWBD_CLIENT_READ_TIMEOUT_SEC 30
 
 typedef struct control_msg
 { int generation;
@@ -948,8 +949,14 @@ static void responder_loop(int control_fd)
 
     struct timespec started;
     struct timespec finished;
+    struct timeval read_timeout;
     request_stat stat;
     memset(&stat,0,sizeof(stat));
+    read_timeout.tv_sec=EWBD_CLIENT_READ_TIMEOUT_SEC;
+    read_timeout.tv_usec=0;
+    if (setsockopt(client_fd,SOL_SOCKET,SO_RCVTIMEO,
+                   &read_timeout,sizeof(read_timeout))<0)
+      warnx("cannot set client read timeout: %s",strerror(errno));
     clock_gettime(CLOCK_MONOTONIC,&started);
     stat.is_error=handle_client(client_fd,generation,&loaded_generation,&stat.is_evm);
     clock_gettime(CLOCK_MONOTONIC,&finished);

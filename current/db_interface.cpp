@@ -1,5 +1,6 @@
 #include "db_interface.h"
 #include "cron_db.h"
+#include "sql_write_parser.h"
 
 //Database mysql
 #define EWB_DB_WITH_MYSQL 1
@@ -54,6 +55,7 @@
 #include <cctype>
 #include <sstream>
 #include <vector>
+#include <ctime>
 
 using namespace std;
 
@@ -232,6 +234,8 @@ static string mysql_error_string(MYSQL *db)
   return string("MySQL ")+e;
 }
 
+static vector<string> mysql_first_row(MYSQL *db);
+
 static MYSQL *mysql_open(DbUri u, string user, string pass)
 { if (user=="") user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
   string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
@@ -273,8 +277,43 @@ static void mysql_ensure_schema(MYSQL *db, string table, vector<string> fields)
   for (size_t i=0; i<fields.size(); i++)
   { string field=checked_name(fields[i]);
     if (field=="id") continue;
-    sql="alter table "+qtable+" add column if not exists `"+field+"` text";
+    sql="alter table "+qtable+" add column if not exists `"+field+"` varchar(40)";
     if (mysql_query(db,sql.c_str())) raiseerr(mysql_error_string(db));
+  }
+}
+
+static void mysql_widen_columns(MYSQL *db, string table, string query)
+{ table=checked_name(table);
+  string qtable="`"+table+"`";
+
+  for (SqlWriteValue item: sql_write_values(query))
+  { string field=checked_name(item.field);
+    if (field=="id") continue;
+
+    string metadata="select data_type, character_maximum_length "
+      "from information_schema.columns where table_schema=database() "
+      "and table_name="+mysql_escape(db,table)+
+      " and column_name="+mysql_escape(db,field);
+    if (mysql_query(db,metadata.c_str())) raiseerr(mysql_error_string(db));
+    vector<string> column=mysql_first_row(db);
+    if (column.empty()) continue;
+
+    string current=column[0];
+    size_t capacity=0;
+    if (column.size()>1 && column[1]!="") capacity=(size_t)strtoull(column[1].c_str(),NULL,10);
+    size_t characters=utf8_characters(item.value);
+
+    string wanted;
+    if ((current=="varchar" || current=="char") && capacity>=characters) continue;
+    if (current=="longtext" || current=="mediumtext") continue;
+    if (characters<=40) wanted="varchar(40)";
+    else if (characters<=250) wanted="varchar(250)";
+    else if (item.value.size()<=65535 && current!="text") wanted="text";
+    else if (item.value.size()>65535) wanted="longtext";
+    if (wanted=="") continue;
+
+    string alter="alter table "+qtable+" modify column `"+field+"` "+wanted;
+    if (mysql_query(db,alter.c_str())) raiseerr(mysql_error_string(db));
   }
 }
 
@@ -579,8 +618,43 @@ static void pg_ensure_schema(PGconn *db, string table, vector<string> fields)
   for (size_t i=0; i<fields.size(); i++)
   { string field=checked_name(fields[i]);
     if (field=="id") continue;
-    sql="alter table "+qtable+" add column if not exists \""+field+"\" text";
+    sql="alter table "+qtable+" add column if not exists \""+field+"\" varchar(40)";
     res=PQexec(db,sql.c_str());
+    if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+    { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
+    PQclear(res);
+  }
+}
+
+static void pg_widen_columns(PGconn *db, string table, string query)
+{ table=checked_name(table);
+  string qtable="\""+table+"\"";
+
+  for (SqlWriteValue item: sql_write_values(query))
+  { string field=checked_name(item.field);
+    if (field=="id") continue;
+
+    string metadata="select data_type, character_maximum_length "
+      "from information_schema.columns where table_schema=current_schema() "
+      "and table_name="+sql_string(table)+" and column_name="+sql_string(field);
+    PGresult *res=PQexec(db,metadata.c_str());
+    if (PQresultStatus(res)!=PGRES_TUPLES_OK)
+    { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
+    if (PQntuples(res)<1) { PQclear(res); continue; }
+
+    string current=PQgetvalue(res,0,0);
+    size_t capacity=0;
+    if (!PQgetisnull(res,0,1)) capacity=(size_t)strtoull(PQgetvalue(res,0,1),NULL,10);
+    PQclear(res);
+
+    size_t characters=utf8_characters(item.value);
+    if ((current=="character varying" || current=="character") && capacity>=characters) continue;
+    if (current=="text") continue;
+
+    string wanted=characters<=40 ? "varchar(40)" :
+                  characters<=250 ? "varchar(250)" : "text";
+    string alter="alter table "+qtable+" alter column \""+field+"\" type "+wanted;
+    res=PQexec(db,alter.c_str());
     if (PQresultStatus(res)!=PGRES_COMMAND_OK)
     { string e=PQerrorMessage(db); PQclear(res); raiseerr("Postgres "+e); }
     PQclear(res);
@@ -621,6 +695,145 @@ static string pg_list_ids(PGresult *res)
 }
 #endif
 
+struct OpenDb
+{ string engine;
+  string database;
+  string user;
+  string password;
+  bool transaction;
+  time_t deadline;
+#if EWB_DB_WITH_MYSQL
+  MYSQL *mysql;
+#endif
+#if EWB_DB_WITH_POSTGRES
+  PGconn *postgres;
+#endif
+};
+
+static vector<OpenDb> open_databases;
+
+static OpenDb *open_database(string url, string user, string password)
+{ DbUri u=parse_context(url);
+  if (u.engine=="postgresql") u.engine="postgres";
+  for (size_t i=0; i<open_databases.size(); i++)
+  { OpenDb *d=&open_databases[i];
+    if (d->engine==u.engine && d->database==u.database)
+    { if (d->user!=user || d->password!=password)
+        raiseerr("DB already open with different credentials");
+      return d;
+    }
+  }
+
+  OpenDb d;
+  d.engine=u.engine;
+  d.database=u.database;
+  d.user=user;
+  d.password=password;
+  d.transaction=false;
+  d.deadline=0;
+#if EWB_DB_WITH_MYSQL
+  d.mysql=NULL;
+#endif
+#if EWB_DB_WITH_POSTGRES
+  d.postgres=NULL;
+#endif
+
+  if (u.engine=="mysql")
+  {
+#if EWB_DB_WITH_MYSQL
+    d.mysql=mysql_open(u,user,password);
+#else
+    raiseerr("MySQL support not compiled");
+#endif
+  } else if (u.engine=="postgres")
+  {
+#if EWB_DB_WITH_POSTGRES
+    d.postgres=pg_open(u,user,password);
+#else
+    raiseerr("Postgres support not compiled");
+#endif
+  } else raiseerr("DB engine");
+
+  open_databases.push_back(d);
+  return &open_databases.back();
+}
+
+void db_begin_transaction(string url, string user, string password, int timeout_seconds)
+{ OpenDb *d=open_database(url,user,password);
+  if (d->transaction) raiseerr("DB resource already locked");
+  if (timeout_seconds<=0) timeout_seconds=30;
+
+  if (d->engine=="mysql")
+  {
+#if EWB_DB_WITH_MYSQL
+    if (mysql_query(d->mysql,"start transaction")) raiseerr(mysql_error_string(d->mysql));
+#endif
+  } else
+  {
+#if EWB_DB_WITH_POSTGRES
+    PGresult *res=PQexec(d->postgres,"begin");
+    if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+    { string e=PQerrorMessage(d->postgres); PQclear(res); raiseerr("Postgres "+e); }
+    PQclear(res);
+#endif
+  }
+  d->transaction=true;
+  d->deadline=time(NULL)+timeout_seconds;
+}
+
+void db_commit_transaction(string url, string user, string password)
+{ DbUri u=parse_context(url);
+  if (u.engine=="postgresql") u.engine="postgres";
+  OpenDb *d=NULL;
+  for (size_t i=0; i<open_databases.size(); i++)
+    if (open_databases[i].engine==u.engine &&
+        open_databases[i].database==u.database)
+    { d=&open_databases[i];
+      break;
+    }
+
+  if (!d || !d->transaction) raiseerr("DB resource is not locked");
+  if (d->user!=user || d->password!=password)
+    raiseerr("DB opened with different credentials");
+
+  if (d->engine=="mysql")
+  {
+#if EWB_DB_WITH_MYSQL
+    if (mysql_query(d->mysql,"commit")) raiseerr(mysql_error_string(d->mysql));
+#endif
+  } else
+  {
+#if EWB_DB_WITH_POSTGRES
+    PGresult *res=PQexec(d->postgres,"commit");
+    if (PQresultStatus(res)!=PGRES_COMMAND_OK)
+    { string e=PQerrorMessage(d->postgres); PQclear(res); raiseerr("Postgres "+e); }
+    PQclear(res);
+#endif
+  }
+  d->transaction=false;
+  d->deadline=0;
+}
+
+void db_check_transactions(void)
+{ time_t now=time(NULL);
+  for (size_t i=0; i<open_databases.size(); i++)
+    if (open_databases[i].transaction && now>=open_databases[i].deadline)
+      raiseerr("DB transaction timeout");
+}
+
+void db_close_all(void)
+{ for (size_t i=0; i<open_databases.size(); i++)
+  {
+#if EWB_DB_WITH_MYSQL
+    if (open_databases[i].mysql) mysql_close(open_databases[i].mysql);
+#endif
+#if EWB_DB_WITH_POSTGRES
+    if (open_databases[i].postgres) PQfinish(open_databases[i].postgres);
+#endif
+  }
+  open_databases.clear();
+}
+
 string qlist(string url, string user, string password, string table,
              vector<string> fields, string filter, string orderby)
 { DbUri u=parse_context(url);
@@ -634,15 +847,13 @@ string qlist(string url, string user, string password, string table,
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u,user,password);
+    MYSQL *db=open_database(url,user,password)->mysql;
     mysql_ensure_schema(db,table,fields);
     if (mysql_query(db,sql.c_str()))
     { string e=mysql_error_string(db);
-      mysql_close(db);
       raiseerr(e);
     }
     string r=mysql_list_ids(db);
-    mysql_close(db);
     return r;
 #else
     raiseerr("MySQL support not compiled");
@@ -652,18 +863,16 @@ string qlist(string url, string user, string password, string table,
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u,user,password);
+    PGconn *db=open_database(url,user,password)->postgres;
     pg_ensure_schema(db,table,fields);
     PGresult *res=PQexec(db,sql.c_str());
     if (PQresultStatus(res)!=PGRES_TUPLES_OK)
     { string e=PQerrorMessage(db);
       PQclear(res);
-      PQfinish(db);
       raiseerr("Postgres "+e);
     }
     string r=pg_list_ids(res);
     PQclear(res);
-    PQfinish(db);
     return r;
 #else
     raiseerr("Postgres support not compiled");
@@ -687,18 +896,16 @@ vector<string> qbyid(string url, string user, string password, string table,
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u,user,password);
+    MYSQL *db=open_database(url,user,password)->mysql;
     mysql_ensure_schema(db,table,fields);
     string sql=by_id_query(query,orderby,id);
     size_t p=sql.find(sql_string(id));
     if (p!=string::npos) sql.replace(p,sql_string(id).size(),mysql_escape(db,id));
     if (mysql_query(db,sql.c_str()))
     { string e=mysql_error_string(db);
-      mysql_close(db);
       raiseerr(e);
     }
     vector<string> r=mysql_first_row(db);
-    mysql_close(db);
     return r;
 #else
     raiseerr("MySQL support not compiled");
@@ -708,7 +915,7 @@ vector<string> qbyid(string url, string user, string password, string table,
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u,user,password);
+    PGconn *db=open_database(url,user,password)->postgres;
     pg_ensure_schema(db,table,fields);
     string sql=by_id_query(query,orderby,id);
     size_t p=sql.find(sql_string(id));
@@ -717,12 +924,10 @@ vector<string> qbyid(string url, string user, string password, string table,
     if (PQresultStatus(res)!=PGRES_TUPLES_OK)
     { string e=PQerrorMessage(db);
       PQclear(res);
-      PQfinish(db);
       raiseerr("Postgres "+e);
     }
     vector<string> r=pg_first_row(res);
     PQclear(res);
-    PQfinish(db);
     return r;
 #else
     raiseerr("Postgres support not compiled");
@@ -743,17 +948,15 @@ string run_query(string url, string user, string password, string query,
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u,user,password);
+    MYSQL *db=open_database(url,user,password)->mysql;
     if (mysql_query(db,sql.c_str()))
     { string e=mysql_error_string(db);
-      mysql_close(db);
       raiseerr(e);
     }
     string r;
     if (op=="select" || op=="with" || op=="show") r=mysql_first_record(db);
     else if (op=="insert") r=to_string((unsigned long long)mysql_insert_id(db));
     else r=to_string((unsigned long long)mysql_affected_rows(db));
-    mysql_close(db);
     return r;
 #else
     raiseerr("MySQL support not compiled");
@@ -763,7 +966,7 @@ string run_query(string url, string user, string password, string query,
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u,user,password);
+    PGconn *db=open_database(url,user,password)->postgres;
     PGresult *res=PQexec(db,sql.c_str());
     ExecStatusType st=PQresultStatus(res);
     string r;
@@ -780,11 +983,9 @@ string run_query(string url, string user, string password, string query,
     else
     { string e=PQerrorMessage(db);
       PQclear(res);
-      PQfinish(db);
       raiseerr("Postgres "+e);
     }
     PQclear(res);
-    PQfinish(db);
     return r;
 #else
     raiseerr("Postgres support not compiled");
@@ -801,17 +1002,17 @@ string run_query(string url, string user, string password, string table,
   if (u.engine=="mysql")
   {
 #if EWB_DB_WITH_MYSQL
-    MYSQL *db=mysql_open(u,user,password);
+    MYSQL *db=open_database(url,user,password)->mysql;
     mysql_ensure_schema(db,table,fields);
-    mysql_close(db);
+    mysql_widen_columns(db,table,query);
 #endif
   }
   if (u.engine=="postgres")
   {
 #if EWB_DB_WITH_POSTGRES
-    PGconn *db=pg_open(u,user,password);
+    PGconn *db=open_database(url,user,password)->postgres;
     pg_ensure_schema(db,table,fields);
-    PQfinish(db);
+    pg_widen_columns(db,table,query);
 #endif
   }
   return run_query(url,user,password,query,orderby);

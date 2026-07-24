@@ -41,7 +41,7 @@ string PROGRAM_URL="";
 
 #include "vm_parts.h"
 #include "db_interface.h"
-#include "vm_1.0.h"
+#include "vm.h"
 
 //Queste rimangono qui: fanno parte della logica di linguaggio.
 string escapeStack()
@@ -143,6 +143,10 @@ string getpath(string s, vector<string> key)
   return getpath(found, keyb);
 }
 
+#define EWB_VM_RUNTIME
+#include "ewb_predef.c"
+#undef EWB_VM_RUNTIME
+
 int resume(int xPC,int xSP)
 { PC=xPC; SP=xSP;//Program counter e stack pointer
   string A="";   //Accumulatore  
@@ -187,6 +191,8 @@ int resume(int xPC,int xSP)
     { POP(x); if (A=="0" || A=="") PC=ewbIntValue(x)-1; 
     } else if (OP==OP_JNZ)
     { POP(x); if (A!="0" && A!="") PC=ewbIntValue(x)-1; 
+    } else if (OP==OP_JMP)
+    { PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_CALL)
     { POP(x); 
       int tmp=SP;
@@ -243,8 +249,41 @@ int resume(int xPC,int xSP)
         "<input name=__entrypoint id=__entrypoint value=\"" + ewbInt(PC+1) + "\">\n" +
         "<input name=__stackpos id=__stackpos value=\"" + ewbInt(SP) + "\">\n" +
         "<input name=__signature id=__signature value=\"" + signature(ewbInt(SP) + " " + ewbInt(PC+1) + " " + stacktext) + "\">\n</form>\n";
+    } else if (OP==OP_DBLOCK)
+    { p_lock(&A);
+    } else if (OP==OP_DBUNLOCK)
+    { p_unlock(&A);
+    } else if (OP==OP_PRINT)
+    { p_print(&A);
+    } else if (OP==OP_EPRINT)
+    { p_eprint(&A);
+    } else if (OP==OP_INPUT)
+    { p_input(&A);
+    } else if (OP==OP_FLOAD)
+    { p_load(&A);
+    } else if (OP==OP_FSAVE)
+    { p_save(&A);
+    } else if (OP==OP_FREADDIR)
+    { p_loaddir(&A);
+    } else if (OP==OP_TOINT)
+    { p_int(&A);
+    } else if (OP==OP_SIND)
+    { p_sin(&A);
+    } else if (OP==OP_TOHEX)
+    { p_hex(&A);
+    } else if (OP==OP_SQRT)
+    { p_sqr(&A);
+    } else if (OP==OP_TIME)
+    { p_time(&A);
+    } else if (OP==OP_DATE)
+    { p_date(&A);
+    } else if (OP==OP_RANDOM)
+    { p_random(&A);
+    } else if (OP==OP_SLEEP)
+    { p_sleep(&A);
     } else if (OP==OP_STOP)
-    { RUNNING=0; //In attesa di rientrare dall'entry point PC 
+    { db_close_all();
+      RUNNING=0; //In attesa di rientrare dall'entry point PC 
     } else if (OP==OP_RUNTARGET) //run TARGET - come STOP - Mi faccio passare l'entry point
     { string interval;
       POP(interval); POP(varname); 

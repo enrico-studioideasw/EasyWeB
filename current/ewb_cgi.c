@@ -1,5 +1,5 @@
 #include "cgi_parser.h"
-#include "vm_1.0.h"
+#include "vm.h"
 
 #include <stdio.h>
 #include <stdlib.h>

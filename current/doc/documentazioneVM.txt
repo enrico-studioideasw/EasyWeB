@@ -160,21 +160,22 @@ Form e interazione HTML
 -----------------------
 
 startform
-  Scrive l'apertura di un form HTML visibile.
+  Imposta A all'apertura di un form HTML visibile.
 
 starttarget
-  Scrive l'apertura di un form HTML nascosto, usato per target asincroni.
+  Imposta A all'apertura di un form HTML nascosto, usato per target asincroni.
 
-addtoform
+addform
   POP(varvalue), POP(vartype), POP(varname).
-  Aggiunge al form un campo HTML.
+  Imposta A al markup del singolo campo HTML.
   Tipi gestiti: input, date, numeric, textarea.
   numeric viene scritto come input type=number.
 
-sendForm
-  Chiude il form e aggiunge i campi interni:
+endform
+  Imposta A ai campi interni seguiti dalla chiusura del form:
   __stack, __entrypoint, __stackpos, __signature.
-  Serve per sospendere l'esecuzione e rientrare dal punto successivo.
+  STARTFORM, i frammenti ADDFORM ed ENDFORM vengono accodati con CONCAT.
+  Nessuna di queste istruzioni scrive direttamente l'output.
 
 stop
   Termina la VM.

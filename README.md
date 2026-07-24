@@ -63,8 +63,12 @@ Stato attuale:
 - supporto CGI apache  -> pronto  
 - web server dedicato per massimizzare le prestazioni -> pronto  
 - VM che esegue codice .evm testuale o pseudo-assembler -> pronta ma richiederà qualche estensione  
-- Compilatore ewb -> quasi pronto  
+- Compilatore ewb -> sviluppo parziale: struttura e primitive principali presenti, non ancora completo né pronto per uso generale  
 - Supporto ewIA per programmazione assistita -> pronto  
 - librerie di funzioni predefinite  -> ancora mancanti  
 - motore di inferenza prolog basato sui dataset -> ancora mancante  
 
+Il repository documenta anche checkpoint intermedi intenzionali: il codice può
+compilare pur contenendo sottosistemi ancora incompleti. Questi checkpoint
+servono a conservare e condividere la crescita del progetto; non equivalgono a
+release stabili o complete.

@@ -67,5 +67,5 @@ Task e pianificazione:
 Form/web:
   startform
   starttarget
-  addtoform
-  sendform
+  addform
+  endform

@@ -1044,6 +1044,106 @@ calcexp()
   } else inexp();
 };
 
+/* ========================================================================
+   FORMS: DA VERIFICARE
+   Ogni primitiva produce un frammento in A. I frammenti vengono accodati
+   esplicitamente con PUSHA e CONCAT.
+   ======================================================================== */
+
+int formvar(char *name) /* FORMS: DA VERIFICARE */
+{ int i;
+  for (i=0; i<nvars; i++)
+  { char *p=variables[i];
+    while (p)
+    { if (!strcmp(p,name)) return i;
+      p=strchr(p,'.');
+      if (p) p++;
+    };
+  };
+  return -1;
+};
+
+formfield() /* FORMS: DA VERIFICARE */
+{ char name[MAXVARLEN];
+  char style[MAXVARLEN];
+  char buf[3*MAXVARLEN];
+  int var;
+
+  if (!token_var()) err("Missing form field");
+  strcpy(name,currtok);
+  var=formvar(name);
+  if (var<0) err("Unknown form field");
+
+  strcpy(style,"text");
+  delperc();
+  if (code[cpos]==':')
+  { cpos++;
+    if (!token()) err("Missing form field type");
+    strcpy(style,currtok);
+  };
+
+  out("PUSHA");
+  sprintf(buf,"PUSH \"%s\"",name); out(buf);
+  sprintf(buf,"PUSH \"%s\"",style); out(buf);
+  sprintf(buf,"PUSH \"%s\"",variables[var]); out(buf);
+  out("PUSH 0");
+  out("GETPATH");
+  out("PUSHA");
+  out("ADDFORM");
+  out("PUSHA");
+  out("CONCAT");
+};
+
+formfields() /* FORMS: DA VERIFICARE */
+{ formfield();
+  delperc();
+  while (code[cpos]==',')
+  { cpos++;
+    formfield();
+    delperc();
+  };
+};
+
+formblock() /* FORMS: DA VERIFICARE */
+{ cpos+=4;
+  delperc();
+  out("MOVA \"\"");
+  formfields();
+};
+
+askblock() /* FORMS: DA VERIFICARE */
+{ cpos+=3;
+  delperc();
+  out("STARTFORM");
+  formfields();
+  out("PUSHA");
+  out("ENDFORM");
+  out("PUSHA");
+  out("CONCAT");
+  out("PUSHA");
+  out("SHOW");
+  out("STOP");
+};
+
+showformblock() /* FORMS: DA VERIFICARE */
+{ cpos+=8;
+  delperc();
+  out("STARTFORM");
+  out("PUSHA");
+  inexp();
+  out("PUSHA");
+  out("CONCAT");
+  out("PUSHA");
+  out("ENDFORM");
+  out("PUSHA");
+  out("CONCAT");
+  out("PUSHA");
+  out("PRINT");
+  out("STOP");
+};
+
+/* ======================== FINE FORMS: DA VERIFICARE ===================== */
+
 codice()
 { delperc(); 
   int p=cpos; 
@@ -1055,6 +1155,10 @@ codice()
   if (istoken("in"))      inblock();
   if (istoken("delete"))  deleteblock();
   if (istoken("add"))     addblock();
+//Web: DA VERIFICARE
+  if (istoken("ask"))      askblock();
+  if (istoken("form"))     formblock();
+  if (istoken("showform")) showformblock();
 //Cicli
   if (istoken("if"))      ifblock();
   if (istoken("while"))   whileblock();
@@ -1115,4 +1219,3 @@ main(int argc, char** argv)
     close(f);   
   } else printf("Errore di lettura file origine\n");  
 };
-
