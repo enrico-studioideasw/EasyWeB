@@ -46,6 +46,8 @@
 #define EWBD_MAX_POST (10*1024*1024)
 #define EWBD_CTRL_PAYLOAD_MAX 4096
 #define EWBD_CLIENT_READ_TIMEOUT_SEC 30
+#define EWBD_CGI_TIMEOUT_SEC 10
+#define EWBD_CGI_MAX_RESPONSE (1024*1024)
 
 typedef struct control_msg
 { int generation;
@@ -460,9 +462,32 @@ static int is_static_path(const char *path)
 
 static int is_evm_path(const char *path)
 {
-  const char *ext=strrchr(path,'.');
+  char clean[1024];
+  const char *ext;
+  size_t i=0;
+  while (path[i] && path[i]!='?' && path[i]!='#' && i+1<sizeof(clean))
+  { clean[i]=path[i];
+    i++;
+  }
+  clean[i]=0;
+  ext=strrchr(clean,'.');
   if (!ext) return 0;
   return !strcmp(ext,".evm");
+}
+
+static int is_cgi_path(const char *path)
+{
+  char clean[1024];
+  const char *ext;
+  size_t i=0;
+  while (path[i] && path[i]!='?' && path[i]!='#' && i+1<sizeof(clean))
+  { clean[i]=path[i];
+    i++;
+  }
+  clean[i]=0;
+  ext=strrchr(clean,'.');
+  if (!ext) return 0;
+  return !strcmp(ext,".cgi");
 }
 
 static int unsafe_path(const char *path)
@@ -487,27 +512,40 @@ static void default_index_path(const char *path, char *out, size_t outsz)
 {
   char clean[1024];
   char full[8192];
+  const char *query;
+  const char *indexes[]={"index.html","index.evm","index.cgi"};
   struct stat st;
 
   strip_query(path,clean,sizeof(clean));
-
-  if (strcmp(clean,"/"))
+  if (unsafe_path(clean))
   { snprintf(out,outsz,"%s",path);
     return;
   }
 
-  snprintf(full,sizeof(full),"%s/index.html",g_www_root);
-  if (!stat(full,&st) && S_ISREG(st.st_mode))
-  { strncpy(out,"/index.html",outsz-1);
-    out[outsz-1]=0;
+  snprintf(full,sizeof(full),"%s%s",g_www_root,clean);
+  if (stat(full,&st)<0 || !S_ISDIR(st.st_mode))
+  { snprintf(out,outsz,"%s",path);
     return;
   }
 
-  snprintf(full,sizeof(full),"%s/index.evm",g_www_root);
-  if (!stat(full,&st) && S_ISREG(st.st_mode))
-  { strncpy(out,"/index.evm",outsz-1);
-    out[outsz-1]=0;
-    return;
+  query=strchr(path,'?');
+  for (size_t i=0; i<sizeof(indexes)/sizeof(indexes[0]); i++)
+  {
+    snprintf(full,sizeof(full),"%s%s%s%s",g_www_root,clean,
+             clean[strlen(clean)-1]=='/' ? "" : "/",indexes[i]);
+    if (!stat(full,&st) && S_ISREG(st.st_mode))
+    {
+      const char *slash=clean[strlen(clean)-1]=='/' ? "" : "/";
+      const char *suffix=query ? query : "";
+      size_t needed=strlen(clean)+strlen(slash)+strlen(indexes[i])+strlen(suffix)+1;
+      if (needed>outsz) continue;
+      out[0]=0;
+      strcat(out,clean);
+      strcat(out,slash);
+      strcat(out,indexes[i]);
+      strcat(out,suffix);
+      return;
+    }
   }
 
   snprintf(out,outsz,"%s",path);
@@ -766,6 +804,203 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
   return rc>0 ? 1 : -1;
 }
 
+static int path_inside_root(const char *path)
+{
+  size_t root_len=strlen(g_www_root);
+  return !strncmp(path,g_www_root,root_len) &&
+         (path[root_len]==0 || path[root_len]=='/');
+}
+
+static int serve_cgi_program(int client_fd, const char *request_path,
+                             const char *method, const char *content_type,
+                             const char *post_body, size_t post_body_len)
+{
+  char clean[1024];
+  char joined[8192];
+  char canonical[8192];
+  char directory[8192];
+  char length[64];
+  const char *query=strchr(request_path,'?');
+  struct stat st;
+  FILE *input=NULL;
+  int output_pipe[2]={-1,-1};
+  pid_t child=-1;
+  char *response=NULL;
+  size_t used=0;
+  int status=0;
+  int timed_out=0;
+  struct timespec started;
+
+  strip_query(request_path,clean,sizeof(clean));
+  if (!is_cgi_path(clean)) return 0;
+  if (unsafe_path(clean))
+  { http_error(client_fd,403,"Forbidden");
+    return -1;
+  }
+
+  snprintf(joined,sizeof(joined),"%s%s",g_www_root,clean);
+  if (!realpath(joined,canonical) || !path_inside_root(canonical) ||
+      stat(canonical,&st)<0 || !S_ISREG(st.st_mode) ||
+      !(st.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)))
+  { http_error(client_fd,403,"Forbidden");
+    return -1;
+  }
+
+  input=tmpfile();
+  if (!input ||
+      (post_body_len && fwrite(post_body,1,post_body_len,input)!=post_body_len) ||
+      fflush(input)<0 || fseek(input,0,SEEK_SET)<0 || pipe(output_pipe)<0)
+  { if (input) fclose(input);
+    if (output_pipe[0]>=0) close(output_pipe[0]);
+    if (output_pipe[1]>=0) close(output_pipe[1]);
+    http_error(client_fd,502,"Bad Gateway");
+    return -1;
+  }
+
+  child=fork();
+  if (child==0)
+  {
+    char *slash;
+    setpgid(0,0);
+    dup2(fileno(input),STDIN_FILENO);
+    dup2(output_pipe[1],STDOUT_FILENO);
+    close(output_pipe[0]);
+    close(output_pipe[1]);
+    snprintf(directory,sizeof(directory),"%s",canonical);
+    slash=strrchr(directory,'/');
+    if (slash)
+    { *slash=0;
+      chdir(directory);
+    }
+    snprintf(length,sizeof(length),"%lu",(unsigned long)post_body_len);
+    setenv("GATEWAY_INTERFACE","CGI/1.1",1);
+    setenv("SERVER_PROTOCOL","HTTP/1.0",1);
+    setenv("REQUEST_METHOD",method,1);
+    setenv("SCRIPT_NAME",clean,1);
+    setenv("QUERY_STRING",query ? query+1 : "",1);
+    setenv("CONTENT_TYPE",content_type ? content_type : "",1);
+    setenv("CONTENT_LENGTH",length,1);
+    execl(canonical,canonical,(char*)NULL);
+    _exit(127);
+  }
+
+  fclose(input);
+  close(output_pipe[1]);
+  if (child<0)
+  { close(output_pipe[0]);
+    http_error(client_fd,502,"Bad Gateway");
+    return -1;
+  }
+  setpgid(child,child);
+
+  response=(char*)malloc(EWBD_CGI_MAX_RESPONSE+1);
+  if (!response)
+  { kill(child,SIGKILL);
+    waitpid(child,NULL,0);
+    close(output_pipe[0]);
+    http_error(client_fd,502,"Bad Gateway");
+    return -1;
+  }
+
+  clock_gettime(CLOCK_MONOTONIC,&started);
+  for (;;)
+  {
+    fd_set rfds;
+    struct timeval tv={0,100000};
+    struct timespec now;
+    ssize_t n;
+    FD_ZERO(&rfds);
+    FD_SET(output_pipe[0],&rfds);
+    if (select(output_pipe[0]+1,&rfds,NULL,NULL,&tv)>0)
+    {
+      n=read(output_pipe[0],response+used,EWBD_CGI_MAX_RESPONSE-used+1);
+      if (n>0)
+      { used+=(size_t)n;
+        if (used>EWBD_CGI_MAX_RESPONSE) break;
+      }
+      else if (n==0) break;
+      else if (errno!=EINTR) break;
+    }
+    clock_gettime(CLOCK_MONOTONIC,&now);
+    if (elapsed_ns(started,now) >= (uint64_t)EWBD_CGI_TIMEOUT_SEC*1000000000ULL)
+    { timed_out=1;
+      break;
+    }
+  }
+  close(output_pipe[0]);
+  while (!timed_out && used<=EWBD_CGI_MAX_RESPONSE)
+  {
+    pid_t waited=waitpid(child,&status,WNOHANG);
+    struct timespec now;
+    struct timespec pause={0,10000000};
+    if (waited==child) break;
+    if (waited<0)
+    { timed_out=1;
+      break;
+    }
+    clock_gettime(CLOCK_MONOTONIC,&now);
+    if (elapsed_ns(started,now) >= (uint64_t)EWBD_CGI_TIMEOUT_SEC*1000000000ULL)
+    { timed_out=1;
+      break;
+    }
+    nanosleep(&pause,NULL);
+  }
+  if (timed_out || used>EWBD_CGI_MAX_RESPONSE)
+  { kill(child,SIGKILL);
+    kill(-child,SIGKILL);
+    waitpid(child,NULL,0);
+    free(response);
+    http_error(client_fd,timed_out ? 504 : 502,
+               timed_out ? "Gateway Timeout" : "Bad Gateway");
+    return -1;
+  }
+  response[used]=0;
+
+  char *separator=strstr(response,"\r\n\r\n");
+  size_t separator_len=4;
+  if (!separator)
+  { separator=strstr(response,"\n\n");
+    separator_len=2;
+  }
+  if (!separator || !WIFEXITED(status) || WEXITSTATUS(status)!=0)
+  { free(response);
+    http_error(client_fd,502,"Bad Gateway");
+    return -1;
+  }
+
+  write_all(client_fd,"HTTP/1.0 200 OK\r\n");
+  if (separator_len==4)
+  { *separator=0;
+    write_all(client_fd,response);
+  }
+  else
+  {
+    for (char *p=response; p<separator; p++)
+      if (*p=='\n') write_all(client_fd,"\r\n");
+      else
+      { char one[2]={*p,0};
+        write_all(client_fd,one);
+      }
+  }
+  write_all(client_fd,"\r\nConnection: close\r\n\r\n");
+  {
+    const char *body=separator+separator_len;
+    size_t body_len=used-(size_t)(body-response);
+    size_t done=0;
+    while (done<body_len)
+    {
+      ssize_t n=write(client_fd,body+done,body_len-done);
+      if (n<0)
+      { if (errno==EINTR) continue;
+        break;
+      }
+      done+=(size_t)n;
+    }
+  }
+  free(response);
+  return 1;
+}
+
 static int handle_client(int client_fd, int generation, int *loaded_generation,
                          int *is_evm)
 {
@@ -799,6 +1034,8 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
   { int served;
     if (!strcmp(method,"GET") && *is_evm)
       return serve_evm_program(client_fd,resolved_path,NULL)<0;
+    if (!strcmp(method,"GET") && is_cgi_path(resolved_path))
+      return serve_cgi_program(client_fd,resolved_path,method,"",NULL,0)<0;
     served=serve_static_file(client_fd,resolved_path);
     if (served) return served<0;
     http_error(client_fd,404,"Not Found");
@@ -812,6 +1049,18 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
     size_t post_body_len=0;
     content_type[0]=0;
     header_value(req,"Content-Type",content_type,sizeof(content_type));
+
+    if (is_cgi_path(resolved_path))
+    {
+      if (read_http_body(client_fd,req,req_len,&post_body,&post_body_len)<0)
+      { http_error(client_fd,400,"Bad POST body");
+        return 1;
+      }
+      int failed=serve_cgi_program(client_fd,resolved_path,method,content_type,
+                                   post_body,post_body_len)<0;
+      free(post_body);
+      return failed;
+    }
 
     if (strncmp(content_type,"multipart/form-data",19) &&
         strncmp(content_type,"application/x-www-form-urlencoded",33))
@@ -1129,6 +1378,8 @@ static void usage(const char *argv0)
 int main(int argc, char **argv)
 {
   int port=8080;
+  char canonical_root[sizeof(g_www_root)];
+  struct stat root_stat;
 
   for (int i=1; i<argc; i++)
   {
@@ -1146,9 +1397,10 @@ int main(int argc, char **argv)
     else usage(argv[0]);
   }
 
-  if (!strcmp(g_www_root,"."))
-  { if (!getcwd(g_www_root,sizeof(g_www_root))) strcpy(g_www_root,".");
-  }
+  if (!realpath(g_www_root,canonical_root) ||
+      stat(canonical_root,&root_stat)<0 || !S_ISDIR(root_stat.st_mode))
+    die("invalid www root: %s",g_www_root);
+  snprintf(g_www_root,sizeof(g_www_root),"%s",canonical_root);
 
   if (g_min_resp<1) g_min_resp=1;
   if (g_max_resp<g_min_resp) g_max_resp=g_min_resp;
