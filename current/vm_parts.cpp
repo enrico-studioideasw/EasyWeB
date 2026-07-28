@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <cctype>
 #include <cstdint>
+#include <cmath>
+#include <limits>
 #include "cron_parser.h"
 #include "db_interface.h"
 
@@ -40,24 +42,85 @@ string hexDecode(string v)
   return r;
 }
 
+static int ewbDigit(char c)
+{ if (c>='0' && c<='9') return c-'0';
+  if (c>='a' && c<='f') return c-'a'+10;
+  if (c>='A' && c<='F') return c-'A'+10;
+  return -1;
+}
+
+static bool ewbParseNumber(const string &text,double *result)
+{ if (text=="") return false;
+  size_t pos=0;
+  int sign=1;
+  if (text[pos]=='+' || text[pos]=='-')
+  { if (text[pos]=='-') sign=-1;
+    pos++;
+  }
+  if (pos>=text.size()) return false;
+
+  int base=10;
+  if (pos+2<=text.size() && text[pos]=='0')
+  { if (text[pos+1]=='b') { base=2; pos+=2; }
+    else if (text[pos+1]=='o') { base=8; pos+=2; }
+    else if (text[pos+1]=='x') { base=16; pos+=2; }
+  }
+  if (pos>=text.size()) return false;
+
+  long double value=0;
+  bool digit=false;
+  while (pos<text.size() && text[pos]!='.')
+  { int d=ewbDigit(text[pos]);
+    if (d<0 || d>=base) return false;
+    value=value*base+d;
+    digit=true;
+    pos++;
+  }
+  if (!digit) return false;
+
+  if (pos<text.size() && text[pos]=='.')
+  { pos++;
+    long double place=1.0L/base;
+    while (pos<text.size())
+    { int d=ewbDigit(text[pos]);
+      if (d<0 || d>=base) return false;
+      value+=d*place;
+      place/=base;
+      pos++;
+    }
+  }
+  if (pos!=text.size()) return false;
+  value*=sign;
+  if (!isfinite(value)) return false;
+  if (value>numeric_limits<double>::max() ||
+      value<-numeric_limits<double>::max()) return false;
+  *result=(double)value;
+  return isfinite(*result);
+}
+
 int ewbIntValue(string v)
-{ try
-  { return stoi(v);
+{ double number=0;
+  if (!ewbParseNumber(v,&number)) { raiseerr("Number"); return 0; }
+  number=trunc(number);
+  if (number>numeric_limits<int>::max() ||
+      number<numeric_limits<int>::min())
+  { raiseerr("Integer range");
+    return 0;
   }
-  catch (...)
-  { raiseerr("Number");
-  }
-  return 0;
+  return (int)number;
 }
 
 double ewbValue(string v)
-{ try
-  { return stod(v);
-  }
-  catch (...)
-  { raiseerr("Number");
-  }
-  return 0;
+{ double result=0;
+  if (!ewbParseNumber(v,&result)) { raiseerr("Number"); return 0; }
+  return result;
+}
+
+bool ewbTrue(string v)
+{ if (v=="") return false;
+  double number=0;
+  if (ewbParseNumber(v,&number)) return number!=0;
+  return true;
 }
 
 string ewbNumber(double v)
@@ -103,15 +166,15 @@ string ewbMod(string x, string y)
 }
 
 string ewbOr(string x, string y)
-{ return ewbBool(ewbIntValue(x) || ewbIntValue(y));
+{ return ewbBool(ewbTrue(x) || ewbTrue(y));
 }
 
 string ewbAnd(string x, string y)
-{ return ewbBool(ewbIntValue(x) && ewbIntValue(y));
+{ return ewbBool(ewbTrue(x) && ewbTrue(y));
 }
 
 string ewbNot(string x)
-{ return ewbBool(!ewbIntValue(x));
+{ return ewbBool(!ewbTrue(x));
 }
 
 string ewbBitwiseOr(string x, string y)

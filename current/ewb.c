@@ -1138,7 +1138,7 @@ showformblock() /* FORMS: DA VERIFICARE */
   out("PUSHA");
   out("CONCAT");
   out("PUSHA");
-  out("PRINT");
+  out("SHOW");
   out("STOP");
 };
 

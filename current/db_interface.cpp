@@ -840,7 +840,6 @@ string qlist(string url, string user, string password, string table,
   string sql="select id from "+table;
   filter=trim(filter);
   if (filter!="" && filter!="true") sql+=" where "+filter;
-  if (orderby=="") { orderby="id"; } else orderby+=",id"; 
   sql=with_order(sql,orderby);
   (void)sql;
 

@@ -1,4 +1,4 @@
-easyweb versione 7.0 - prima definizione della sintassi
+easyweb versione 7.0 - sintassi del linguaggio
  { blocco opzionale
  [ 0 o più volte
  | or, sono piu possibilità per la stessa sintassi
@@ -14,14 +14,19 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
 
   datasetdecl= dataset name "=" campidataset
   campidataset= "{" [campodataset [, campodataset] ] "}" 
-  campodataset = [id|idz|ut|pw|idm|idmz _ ] singlevar ["=" campidataset]
+  campodataset = singlevar ["=" campidataset]
+  'i campi non dichiarano tipi: ogni valore e' testo e la capacita' viene
+  'ampliata automaticamente quando serve.
+  'context non e' un'entita' distinta: e' il dataset selezionato dal ciclo
+  'in durante l'iterazione corrente.
 
 
-  taskdecl= task name([varname [,varname] ])  "{" [codice] "}"
+  taskdecl= task name([varname {,varname} ])  "{" [codice] "}"
 
-  targetdecl= target name { "=" campitarget }
-  campitarget= "{" [campotarget [, campotarget] ] "}" 
-  campotarget = singlevar ["=" campitarget]
+  targetdecl= target name([varname {,varname} ])  "{" [codice] "}"
+  'un target e' un eseguibile dedicato alla presentazione; condivide con il
+  'task parametri, stato e meccanismo di esecuzione, ma non il significato.
+  'i parametri del target sono passati per valore, come nelle funzioni.
 
   vardecl= var singlevar [, singlevar] 
   singlevar = name [ "=" inexp ]
@@ -31,7 +36,14 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
   
   whileblock= while calcexp { [codice] };
   downwhile= do { [codice] } while calcexp;
-  fundecl= sub name([varname [,varname] ]) [ { [codice] } ]
+  foreachblock= foreach (variabile,calcexp) { [codice] }
+              | foreach (chiave,variabile,calcexp) { [codice] }
+  'scorre dal primo all'ultimo senza copiare l'intero array; con una variabile
+  'espone il valore, con due espone chiave e valore.
+  'visita sia chiavi numeriche sia associative, nell'ordine della struttura.
+  'modificare durante il ciclo la stessa struttura attraversata ha
+  'comportamento indefinito.
+  fundecl= sub name([varname {,varname} ]) [ { [codice] } ]
 
 //Sezione di sub-linguaggio assembler per la machina virtuale
         asmline = alabel | ainstr
@@ -46,91 +58,209 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
   calcexp= assign\= inexp | inexp         //    (no ll1 ! attento) 
   assign=variabile  [ "[" pos "]" ]     //Notare che ci sono gli array multidimensionali
   inexp=exp  cfr inexp | exp
-  cfr = \= | == | != | <= | >= | > | < | eq | gt | ge | lt | le
-  'nota: se uno dei due el. e' una stringa e' un confronto di stringhe.
+  cfr = == | != | <= | >= | > | < | eq | neq | gt | ge | lt | le
+  'gli operatori simbolici confrontano numeri e fanno raise se uno degli
+  'operandi non e' interamente numerico; quelli alfabetici confrontano testo
+  'byte per byte.
+  'eq e neq possono confrontare due array marcati in forma canonica; l'ordine
+  'fa parte della struttura. Confronti misti e lt/le/gt/ge sugli array raise.
   exp=e . exp | e
   e = t+e | t-e | t
   t = f*t | f/t | f%t | f
+  'divisione e resto per zero provocano raise.
+  '% applica prima int() ai due operandi; le frazioni sono troncate verso zero.
   f= b\|f | b\|\|f | b
   b= k & b | k && b | k
+  '| e & conservano la semantica bitwise intera della VM; || e && usano la
+  'verita' EWB.
+  '|| e && valutano sempre entrambi gli operandi, da sinistra a destra.
   k= variabile [ "[" calcexp "]" ] | ! inexp | numvalue | strvalue | (calcexp) | identifier 
   identifier = variabile | funzione
-  funzione = predef | fname calcexp [,calcexp]
+  funzione = predef | fname "(" [calcexp {,calcexp}] ")"
+  'le parentesi sono obbligatorie per tutte le chiamate di funzione,
+  'comprese le funzioni predefinite.
 'qui mi complico la vita, ma almeno posso definire i numeri in qualunque base e dimensione.. 
   numvalue = [+/-] ( bin | hex | oct | dec ) 
-  bin = 0b [0..1] [. {0..1} ]                                         // [ E [+/-] { 0..1 } ] 
-  oct = 0o [0..7] [. {0..7} ]                                         // [ E [+/-] { 0..7 } ] 
-  hex = 0x ([0..1]|[A..F]|[a..f])  [. {([0..1]|[A..F]|[a..f])} ]      // [ E [+/-] { ([0..1]|[A..F]|[a..f]) } ] 
-  dec = [0..9] [. {0..9} ]                                            // [ E [+/-] { 0..9 } ] 
+  bin = 0b [0..1] [. {0..1} ]
+  oct = 0o [0..7] [. {0..7} ]
+  hex = 0x ([0..1]|[A..F]|[a..f])  [. {([0..1]|[A..F]|[a..f])} ]
+  dec = [0..9] [. {0..9} ]
+  'la parte frazionaria e' ammessa in tutte le basi, non soltanto in decimale.
+  'la notazione esponenziale non fa ancora parte della sintassi.
   strvalue = \" carattere \"
   variable =a..z|A..Z | _  [a..z | A..Z | 1..9 | _ ] 
   fname =variabile
+  'operatori e funzioni numeriche accettano soltanto stringhe interamente
+  'conformi a numvalue; una conversione parziale provoca raise.
+  'sono falsi la stringa vuota e ogni numvalue uguale a zero; ogni altra
+  'stringa non vuota e' vera.
+  'un array marcato e' falso se non contiene chiavi, vero altrimenti.
+  'operatori logici e confronti restituiscono sempre "0" oppure "1".
 
 _________________________________________________________________________________
 funzioni predefinite
 
   return calcexp  //Return è una predefinita di linguaggio
 
-  print variable    scrive su stdout    //standard di I/O per debugging (allo stderr)
-  eprint variable   scrive su stderr
-  input             legge da stdin      //ancha da web?  forse..  
+  print(valore)   'scrive i byte su stdout senza newline e torna valore.
+  eprint(valore)  'scrive i byte su stderr senza newline e torna valore.
+  'accettano anche array marcati come dati opachi.
+  input()           legge una riga da stdin; nel frontend web torna ""
 
-  load variabile                        //Variabile e' il nome del file
-  save variable,variable
-  loaddir variable                      //carica nella variabile la lista di contenuto della dir.
+  load(filename)  'restituisce tutti i byte del file.
+  save(filename, valore)  'sovrascrive in binario e torna i byte scritti.
+  'load e save trattano scalari e array marcati come dati opachi; gli errori
+  'di apertura, lettura o scrittura provocano raise.
+  loaddir(dirname)  'array marcato 0..n-1 dei soli nomi delle entry, ordinati
+                    'lessicograficamente per byte; include i nomi nascosti,
+                    'ma esclude i nomi "." e "..".
+  exec(comando)                         //esegue tramite shell e torna stdout
+  '_err e' una variabile predefinita che riceve lo stderr dell'ultima exec.
+  'stdout e _err conservano tutti i byte, inclusi i newline finali.
+  'un exit code diverso da zero non provoca raise.
 
                                           //di elaborazione numeri
-  int variable 
-  abs variable 
-  cos variable    nota: seno e coseno sono in gradi. 
-  sin variable    
-  hex variable 
-  sqr variable 
-  random
+  int(variable)   'tronca verso zero, senza limite specifico a 32 bit.
+  abs(variable)
+  cos(variable)   'seno e coseno sono in gradi.
+  sin(variable)
+  hex(variable)   'intero signed 32 bit in hex maiuscolo senza prefisso.
+                  'positivi in forma minima; negativi in complemento a due
+                  'su 8 cifre. Frazione o fuori intervallo provoca raise.
+  sqr(variable)   'radice quadrata reale; argomento negativo provoca raise.
+  random(X)       //intero uniforme: 0 <= risultato < X
+  'X deve essere un intero strettamente positivo, altrimenti raise.
   //un numero e' una stringa che sontiene un numero.
   //miscellanee - dal perl
-  asc variable
-  char variable
+  asc(variable)    //valore 0..255 del primo byte; stringa vuota: errore
+  char(variable)   //singolo byte corrispondente a un intero 0..255
+  'fuori intervallo o non intero provoca raise; non applica modulo 256.
+
+  sleep(millisec)
+  'richiede un intero non negativo; 0 e' valido, negativo o frazionario raise.
 
   //di elaborazione stringhe
-  mid variable, variable, variable
-  mid variable, variable
-  len variable
-  uc variable   'up case  (Per ora fa parte della VM, poi semmai la tolgo)
+  mid(variable,inizio,lunghezza)  'offset da zero e lunghezza in byte
+  mid(variable,inizio)            'suffisso dall'offset in byte
+  'un inizio negativo conta dalla fine: -1 indica l'ultimo byte.
+  'se l'inizio cade oltre i limiti della stringa, restituisce "".
+  'una lunghezza negativa pone la fine contando dal termine: -1 arriva fino
+  'alla fine, -2 esclude gli ultimi due byte. Se la fine precede l'inizio,
+  'restituisce "".
+  'una lunghezza positiva oltre il termine viene troncata alla fine.
+  len(variable)                   'numero di byte
+  uc(variable)  'maiuscolo ASCII: converte soltanto a-z
 ______________________________________
-  index str, substr  ' index di perl. posizione della sottostringa nella stringa.
-  change   seconda, prima, origine   'torna origine scambiando prima con seconda.
-  split  variable, variable_tosplit  'analoga alla split del linguaggio perl.
-  join   variable, lista             'analoga alla join del perl.
-  date
-  lessdate  variable, variable 
+  index(str,substr)  'posizione in byte, oppure -1
+  'una sottostringa vuota ha indice 0, anche in una stringa vuota.
+  'eventuali equivalenti Unicode appartengono a una libreria separata.
+  change(seconda, prima, origine)  'sostituisce tutte le occorrenze di prima
+                                  'con seconda e restituisce il risultato.
+  'se prima e' vuota, provoca raise.
+  split(separatore, testo)  'restituisce un array EWB indicizzato da 0.
+  'con separatore "" divide nei singoli byte; testo "" produce array vuoto.
+  'conserva gli elementi vuoti, compresi quelli finali.
+  join(separatore, lista)   'analoga alla join del linguaggio Perl.
+  'usa i valori nell'ordine dell'array EWB e ignora le chiavi.
+  'una struttura inizia con il byte ASCII 0x1E. Seguono eventualmente elementi
+  'hex(chiave):hex(valore), separati da un solo spazio. Non collassa:
+  '"30:3138" e' uno scalare; 0x1E+"30:3138" e' [0]="18".
+  '0x1E da solo e' l'array vuoto; "" e' lo scalare vuoto.
+  'il runtime produce chiavi uniche; sostituire un valore non sposta la
+  'chiave. In una codifica manuale duplicata prevale l'ultima occorrenza.
+  'senza marcatore il testo e' sempre scalare. Con il marcatore deve essere
+  'interamente canonico; una struttura marcata malformata provoca raise.
+  'la chiave o il valore possono essere vuoti: :HEX, HEX: e : sono validi.
+  'l'hex emesso e' maiuscolo; in lettura accetta entrambi i casi e richiede
+  'un numero pari di cifre su ciascun lato.
+  'le operazioni array su scalare non vuoto provocano raise. Lo scalare vuoto
+  'e' accettato come caso neutro; un'operazione mutante lo promuove ad array
+  'aggiungendo il marcatore.
+  'simmetricamente, le trasformazioni di testo applicate a un array marcato
+  'provocano raise. Le operazioni opache di I/O, come save, restano ammesse.
+  'assegnare "" a una chiave conserva l'elemento con valore vuoto; non lo
+  'elimina. La lettura semplice rende comunque "" anche per una chiave assente.
+  time()  'millisecondi trascorsi dall'epoca Unix.
+  date()  'data locale del server in formato YYYY-MM-DD.
+  'i normali confronti lessicografici ordinano le date.
 
-per accesso ai database - le variabili sono di ambiente
-  login  variabile[.variabile] 
-  add    variabile[.variabile]
-  exist  variabile[.variabile]
-  remove variabile[.variabile]
-  lock   variabile[.variabile] 
-  unlock  variabile[.variabile]
-  inblock = in ( variabile[.variabile] [, condizione] ) blocco | inall ( variabile[.variabile] ) blocco | delete ( variabile[.variabile] [, condizione] )
-  condizione = calcexp 
+per accesso ai database - connessione e credenziali appartengono al dataset;
+  'la connessione viene aperta o riusata quando serve, senza login esplicito.
+  add(variabile[.variabile])
+  exists(variabile[.variabile])
+  'add inserisce i valori correnti dei campi e restituisce l'id creato.
+  'exists verifica se esiste almeno un record compatibile e restituisce
+  '"1" oppure "0".
+  lock(variabile[.variabile])
+  unlock(variabile[.variabile])
+  'lock e unlock restituiscono "1" in caso di successo.
+  'lock apre una transazione sulla risorsa. Un secondo lock sulla stessa
+  'risorsa nello stesso flusso provoca raise. Senza unlock, dopo 30 secondi
+  'la transazione scade e provoca raise. Unlock esegue commit.
+  'ogni raise esegue automaticamente il rollback di tutte le transazioni
+  'ancora aperte prima di entrare nell'handler; un retry riparte da capo.
+  'ask/showform non possono sospendere con transazioni aperte: STOP esegue
+  'prima il rollback e poi raise. Senza transazioni, sospende normalmente.
+  'anche la fine normale con transazioni aperte esegue rollback e raise:
+  'ogni lock deve essere chiuso da un unlock esplicito.
+  'sono ammessi lock contemporanei su database differenti. Dataset che
+  'risolvono allo stesso motore/database identificano la stessa risorsa.
+  'non c'e' ancora commit atomico fra database: ogni unlock conferma subito
+  'la propria risorsa e la sequenza puo' fallire lasciando commit parziali.
+  inblock = in ( variabile[.variabile] [, condizione] ) blocco | delete ( variabile[.variabile] [, condizione] )
+  'in(dataset) senza condizione scorre tutti i record; inall non serve.
+  'in restituisce il numero di record iterati, anche "0"; il risultato del
+  'blocco non diventa il risultato del ciclo.
+  'delete restituisce il numero di record eliminati, anche "0".
+  'delete elimina record, non il dataset. I dataset e i loro campi crescono
+  'dinamicamente; la rimozione strutturale resta un'operazione amministrativa SQL.
+  '_orderby contiene un frammento SQL libero. Se vale "nome, cognome>2",
+  'l'ordinamento effettivo e' "nome, cognome>2, id"; id e' sempre l'ultimo
+  'criterio. Se _orderby e' vuoto, l'ordinamento e' soltanto per id.
+  condizione = calcexp
+  'il parser delle espressioni ha due traduzioni. In modo normale genera
+  'istruzioni VM che calcolano il valore; in sql_mode genera istruzioni VM
+  'che costruiscono il testo SQL equivalente.
+  'ogni predefinita deve dichiarare se supporta sql_mode: se lo supporta
+  'genera la propria espressione SQL, altrimenti provoca errore di compilazione.
 
 per accesso all' interfaccia web
   ask field [,field]
-  askto url,  field [,field] ' il risultato va ad un altra interfaccia.
-                             ' in questo caso riporto solo le var. della ask.
-  field= variable 
-  // no, mettiamo delle classi e id univoci e si può fare css style= text, password, submit, textarea, links, option, checkbox, radio, hidden
+  field= variable [":" style ["(" calcexp ")"]]
+  'l'espressione opzionale e' l'etichetta visibile; senza si usa il nome
+  'della variabile. Per submit e' il testo del pulsante.
+  style= text, password, submit, textarea, links, option, options,
+         checkbox, checks, radio, hidden, info, file
+  'option crea una select singola; options una select multipla.
+  'options e checks usano un array EWB indicizzato, non valori separati da ;.
+  'checkbox e' selezionato se la variabile e' vera; dopo l'invio vale "1"
+  'se selezionato e "" altrimenti. Checks torna l'array dei valori selezionati.
+  'in option, options, radio e checks il prefisso * marca un valore
+  'inizialmente selezionato; non fa parte del valore restituito.
+  'il prefisso \* rappresenta invece un asterisco iniziale letterale.
+  'testo mostrato e valore inviato coincidono.
+  'un campo file carica direttamente nella variabile il contenuto completo;
+  'limite e consumo di memoria sono responsabilita' del runtime.
+  'se il campo si chiama aaa, genera anche la variabile _aaa con:
+  '  _aaa[filename], _aaa[content_type], _aaa[size].
+  'links usa testo->destinazione; senza -> usa la stessa stringa per entrambi.
+  'la sequenza \-> rappresenta un -> letterale.
+  'info mostra soltanto il valore e non genera un campo inviato dal form.
+  'hidden non e' visibile, ma invia normalmente nome e valore.
   ' la richiesta dipende dal valore definito delle variabili prima della ask.
   ' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
   ' crescere. Semplicemente la ask puo' portarsi dietro in post tutte le var. di ambiente.
 
   form  field[, field]
   showform  variable 
-  'crea un form come per la ask ma anziche' mostrarlo con il template lo torna.
+  'completa il frammento, lo inserisce in _template, lo mostra e sospende.
   'serve a creare pagine con piu' forms, ciascuno dei quali porta ad un risultato diverso.
   show variabile
-  ' mostra il testo contornato dal template.
+  'sostituisce ogni <> nel valore corrente di _template con il testo.
+  '_template ha un valore iniziale ma puo' essere ridichiarata o sovrascritta.
+  'se e' vuota non mostra nulla; senza <> mostra soltanto il template.
+  'askto non fa parte di EWB2026: le comunicazioni esterne usano primitive
+  'dedicate, senza imitare un secondo responder EWB.
 
 //per accesso al motore inferenziale SLDNF
   assert dataset, variable
@@ -143,17 +273,45 @@ ________________
 per l' uso di stringhe come liste. Sono gli stessi dati che avrei se nella stringa metto un array. 
 ho il problema di ripetere la cosa a piu' dimensioni.. bah, ho anche le parentesi quadre annidabili.. quindi array stile php. 
 mangia ram ma funge.
+'Una struttura inizia con 0x1E; seguono eventualmente elementi
+'hex(chiave):hex(valore), separati da un solo spazio. Non collassa mai.
+'0x1E da solo e' l'array vuoto; "" e' lo scalare vuoto.
+'Le chiavi canoniche sono uniche; su duplicati manuali prevale l'ultima.
+'Senza marcatore il testo e' sempre scalare; una struttura marcata malformata
+'provoca raise. Chiave e valore vuoti sono ammessi.
+'Le operazioni array su scalare non vuoto provocano raise. Lo scalare vuoto
+'e' neutro e viene promosso con 0x1E dalla prima operazione mutante.
+'Assegnare "" conserva la chiave con valore vuoto; non elimina l'elemento.
 
-	push stack, exp
-'trasformo exp nel suo codice ascii, accodo "exp a var
+	push(stack, exp)
+'codifica chiave e valore in hex e accoda l'elemento alla struttura.
+'su scalare non vuoto provoca raise; su "" crea l'array con exp in posizione 0.
+'la nuova chiave e' max(chiavi numeriche)+1; ignora le chiavi testuali e,
+'se non esistono chiavi numeriche, parte da 0.
+'per chiave numerica si intende un intero decimale non negativo canonico:
+'"0" oppure senza segno e senza zeri iniziali. Le altre chiavi sono associative.
 
-	pop stack
-'recupero da var l' ultimo pezzo con split di " ", trasformo da codice ascii a valore.
+	pop(stack)
+'estrae l'ultimo elemento dalla variabile semplice, accorcia l'array e torna
+'il valore; su array vuoto torna "". Per andare oltre si usa getelem.
+'su scalare non vuoto provoca raise; su "" torna "".
+'su un array estrae la massima chiave numerica e ignora quelle testuali.
+'se non vi sono chiavi numeriche torna "" senza modificare l'array.
 
 	//getelem stack,n
 	//setelem stack,n ,exp //Non servono ho variabile[n] = X, anche miltidimensionale.
-	numel var
-'torno il numero di elementi in una lista
+	numel(var)
+'conta le chiavi numeriche canoniche del primo livello.
+	numkey(var)
+'conta tutte le chiavi del primo livello, numeriche e associative.
+	haskey(var, chiave)
+'restituisce "1" se la chiave esiste al primo livello, "0" altrimenti.
+'su scalare non vuoto provoca raise; su "" restituisce "0".
+	delkey(nomevariabile, chiave)
+'elimina la chiave al primo livello da una variabile semplice e restituisce
+'il valore rimosso; se la chiave e' assente restituisce "".
+'su scalare non vuoto provoca raise; su "" restituisce "".
+'su "" numel e numkey valgono 0; su ogni altro scalare provocano raise.
 
 ________________
 Per l' uso di sock stream
@@ -168,19 +326,29 @@ Le sock sono numeri.
 	sread socket [size]    //legge una riga dalla porta [fino a size]
 	swrite socket,data     //scrive una riga sulla porta
     read port              //legge (se c'e') un pacchetto da una porta
-    write host, port       //scrive
+    write host,port,data   //scrive un pacchetto
 ________________
 Per i tasks
-    schedule varname varname varname  //task interval (hourly,daily,monthly,weekly)  when ("12", "12:00", "monday", "monday 12:00")
-    stato del task: inall(_tasks.runtime, name='miotask' && stato=="ready") { ... } 
+    cron nometask(parametri) modocrontab  //es. "30 * * * *"
+    'la pianificazione e' persistente lato server. La sua pulizia non e'
+    'ancora definita: un uso incontrollato puo' accumulare troppi cron.
+    'il nome del target identifica il cron: una nuova dichiarazione dello
+    'stesso target sostituisce pianificazione e parametri precedenti.
+    refresh nometarget(parametri), interval  //millisecondi; parametri per valore
+    'se alla scadenza il task e' running, la nuova esecuzione non parte.
+    run nometarget(parametri)  //lancia una AJAX asincrona e prosegue
+    stato del task: in(_tasks.runtime, name='miotask' && stato=="ready") { ... }
+    'gli stati pubblici sono ready, running ed error. Error indica un errore
+    'terminato senza essere intercettato da un handler.
+    'dopo una conclusione normale il task torna da running a ready.
 
 Per completamento tramite ia (una tantum):
-    ia "richiesta" 
-diventa: 
-    '(gestita) ia "richiesta"
-    /* 
-      blocco di codice 
-    */
+    AI("richiesta")
+    'e' gestita da un preprocessore dedicato. Se la sezione arriva a ewcc,
+    'il compilatore segnala: "Sezione IA non implementata".
+    'ewIA commenta la richiesta e aggiunge come commenti le proposte
+    'LOCAL_CODE e GLOBAL_CODE con i relativi metadati IA. Il codice non
+    'diventa attivo finche' un umano non decide di adottarlo.
 
 _______________________________________________________________________________
 
@@ -399,5 +567,3 @@ Non sono quattro idee separate.
 Sono quattro modi di dire:
 
 "Questa cosa non appartiene a un singolo pezzo di codice."
-
-

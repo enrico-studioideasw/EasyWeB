@@ -155,8 +155,8 @@ int resume(int xPC,int xSP)
   string varname, vartype, varvalue; //Uso anche questi troppo spesso per non metterli qui. 
   RUNNING=1; 
   for (;;)
-  { if (PC<0 || PC>=codeLines) raiseerr("PC out of code");
-    if (RUNNING!=1) return RUNNING; 
+  { if (RUNNING!=1) return RUNNING;
+    if (PC<0 || PC>=codeLines) raiseerr("PC out of code");
     OP=codeop[PC];
     if (OP==OPCODE_INVALID)
     { raiseerr("Unknown opcode");
@@ -188,9 +188,9 @@ int resume(int xPC,int xSP)
                OP==OP_SGT || OP==OP_SLT || OP==OP_SEQ || OP==OP_SNEQ || OP==OP_SGE || OP==OP_SLE)
     { POP(y); POP(x); A=ewbCompare(x, y, vm_instr_table[vm_instr(OP)].name); 
     } else if (OP==OP_JZ)
-    { POP(x); if (A=="0" || A=="") PC=ewbIntValue(x)-1; 
+    { POP(x); if (!ewbTrue(A)) PC=ewbIntValue(x)-1;
     } else if (OP==OP_JNZ)
-    { POP(x); if (A!="0" && A!="") PC=ewbIntValue(x)-1; 
+    { POP(x); if (ewbTrue(A)) PC=ewbIntValue(x)-1;
     } else if (OP==OP_JMP)
     { PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_CALL)
@@ -233,16 +233,7 @@ int resume(int xPC,int xSP)
     { A="<form style=visibility:hidden id=__form" + to_string(IDF) + " method=post enctype=multipart/form-data>";
       IDF++; 
     } else if (OP==OP_ADDFORM)
-    { POP(varvalue); POP(vartype); POP(varname);
-      if (vartype=="text" || vartype=="input" || vartype=="date" || vartype=="numeric")
-      { if (vartype=="input") vartype="text";
-        if (vartype=="numeric") vartype="number";
-        A="<input type=" + vartype + " name=" + varname + " id=" + varname + " value=" + mettiVirgolette(varvalue) + " />\n";
-      } else if (vartype=="textarea")
-      { A="<textarea name=" + varname + " id=" + varname + ">" + escapeTag(varvalue) + "</textarea>";
-      } else  //Gli altri tipi.. ancora da fare.
-      { A="";
-      };
+    { p_addform(&A);
     } else if (OP==OP_ENDFORM)
     { string stacktext=escapeStack();
       A="<textarea name=__stack id=__stack>" + stacktext + "</textarea>\n" +
@@ -259,6 +250,8 @@ int resume(int xPC,int xSP)
     { p_eprint(&A);
     } else if (OP==OP_INPUT)
     { p_input(&A);
+    } else if (OP==OP_SHOW)
+    { p_show(&A);
     } else if (OP==OP_FLOAD)
     { p_load(&A);
     } else if (OP==OP_FSAVE)
@@ -273,6 +266,22 @@ int resume(int xPC,int xSP)
     { p_hex(&A);
     } else if (OP==OP_SQRT)
     { p_sqr(&A);
+    } else if (OP==OP_ASC)
+    { p_asc(&A);
+    } else if (OP==OP_CHAR)
+    { p_char(&A);
+    } else if (OP==OP_MID)
+    { p_mid(&A);
+    } else if (OP==OP_LEN)
+    { p_len(&A);
+    } else if (OP==OP_UC)
+    { p_uc(&A);
+    } else if (OP==OP_INDEX)
+    { p_index(&A);
+    } else if (OP==OP_ARRAYPOP)
+    { p_arraypop(&A);
+    } else if (OP==OP_NUMEL)
+    { p_numel(&A);
     } else if (OP==OP_TIME)
     { p_time(&A);
     } else if (OP==OP_DATE)
@@ -513,7 +522,13 @@ static void loadStack(const char *encoded_stack, int stackpos)
 { SP=0; string A; 
   vector<string> v=split(encoded_stack, ' ');
   for (int i=0; i<(int)v.size(); i++) if (v[i]!="") { A=hexDecode(v[i]); PUSH(A); };
-  SP=stackpos; 
+  if (stackpos==0)
+  { stack[0]="<html><body bgcolor=lightyellow><div align=center><></body></html>";
+    SP=1;
+  } else SP=stackpos;
+  symtname[0]="_template";
+  symtpos[0]=0;
+  ST=1;
 }
 
 extern "C" int ewb_run_text(const char *program, const char *program_url, int entrypoint, int stackpos, const char *encoded_stack)

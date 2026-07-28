@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <dirent.h>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <thread>
@@ -62,6 +64,138 @@ static void p_input(string *accumulator)
 { if (!getline(cin,*accumulator)) *accumulator="";
 }
 
+static string p_html(string value)
+{ string result="";
+  for (size_t i=0; i<value.size(); i++)
+  { if (value[i]=='&') result += "&amp;";
+    else if (value[i]=='<') result += "&lt;";
+    else if (value[i]=='>') result += "&gt;";
+    else if (value[i]=='"') result += "&quot;";
+    else result += value[i];
+  }
+  return result;
+}
+
+static vector<string> p_array_values(string value)
+{ vector<string> result;
+  vector<string> elements=split(value,' ');
+  for (size_t i=0; i<elements.size(); i++)
+  { size_t separator=elements[i].find(':');
+    if (separator==string::npos) continue;
+    result.push_back(hexDecode(elements[i].substr(separator+1)));
+  }
+  return result;
+}
+
+static void p_addform(string *accumulator)
+{ string name,type,value,label;
+  POP(value);
+  POP(type);
+  POP(name);
+  label=name;
+  if (type=="submit") label="";
+
+  string field="";
+  if (type=="text" || type=="password" || type=="hidden" || type=="file")
+  { field="<input name=\"" + p_html(name) + "\" type=\"" + type + "\"";
+    if (type!="file") field += " value=\"" + p_html(value) + "\"";
+    field += ">";
+  }
+  else if (type=="textarea")
+  { field="<textarea name=\"" + p_html(name) + "\">" +
+          p_html(value) + "</textarea>";
+  }
+  else if (type=="checkbox")
+  { field="<input name=\"" + p_html(name) +
+          "\" type=\"checkbox\" value=\"1\"";
+    if (value!="0" && value!="") field += " checked";
+    field += ">";
+  }
+  else if (type=="info")
+  { field="<b>" + p_html(value) + "</b>";
+  }
+  else if (type=="option" || type=="options" || type=="radio" ||
+           type=="checks" || type=="links" || type=="submit")
+  { vector<string> values=p_array_values(value);
+    if (type=="option" || type=="options")
+    { field="<select name=\"" + p_html(name) + "\"";
+      if (type=="options") field += " multiple";
+      field += ">";
+    }
+    for (size_t i=0; i<values.size(); i++)
+    { string item=values[i];
+      bool selected=false;
+      if (item.size()>0 && item[0]=='*')
+      { selected=true;
+        item=item.substr(1);
+      }
+      if (type=="option" || type=="options")
+      { field += "<option value=\"" + p_html(item) + "\"";
+        if (selected) field += " selected";
+        field += ">" + p_html(item) + "</option>";
+      }
+      else if (type=="radio" || type=="checks")
+      { string input_type="radio";
+        if (type=="checks") input_type="checkbox";
+        field += "<input name=\"" + p_html(name) + "\" type=\"" +
+                 input_type + "\" value=\"" + p_html(item) + "\"";
+        if (selected) field += " checked";
+        field += ">" + p_html(item);
+      }
+      else if (type=="links")
+      { size_t arrow=item.find("->");
+        string text=item;
+        string destination=item;
+        if (arrow!=string::npos)
+        { text=item.substr(0,arrow);
+          destination=item.substr(arrow+2);
+        }
+        field += "<a href=\"" + p_html(destination) + "\">" +
+                 p_html(text) + "</a>";
+      }
+      else if (type=="submit")
+      { field += "<input name=\"" + p_html(name) +
+                 "\" type=\"submit\" value=\"" + p_html(item) + "\">";
+      }
+    }
+    if (type=="option" || type=="options") field += "</select>";
+  }
+  else
+  { raiseerr("Unknown form field type: "+type);
+    return;
+  }
+
+  if (type!="hidden" && label!="")
+  { field="<label for=\"" + p_html(name) + "\">" + p_html(label) +
+          "</label>" + field;
+  }
+  *accumulator=field+"\n";
+}
+
+static void p_show(string *accumulator)
+{ string value;
+  POP(value);
+  int template_position=findvar("_template");
+  if (template_position<0)
+  { raiseerr("Missing _template");
+    return;
+  }
+
+  string page=stack[template_position];
+  string result="";
+  size_t start=0;
+  size_t marker=page.find("<>");
+  while (marker!=string::npos)
+  { result += page.substr(start,marker-start);
+    result += value;
+    start=marker+2;
+    marker=page.find("<>",start);
+  }
+  result += page.substr(start);
+  cout << result;
+  *accumulator=value;
+}
+
 static void p_load(string *accumulator)
 { string filename;
   POP(filename);
@@ -109,9 +243,11 @@ static void p_int(string *accumulator)
 { string value;
   POP(value);
   double number=ewbValue(value);
-  if (!isfinite(number) || number>2147483647.0 || number<-2147483648.0)
-  { raiseerr("Integer range"); return; }
-  *accumulator=ewbInt((int)number); /* conversione C++: troncamento verso zero */
+  number=trunc(number);
+  if (number==0) number=0;
+  ostringstream result;
+  result << fixed << setprecision(0) << number;
+  *accumulator=result.str();
 }
 
 static void p_sin(string *accumulator)
@@ -124,11 +260,18 @@ static void p_sin(string *accumulator)
 static void p_hex(string *accumulator)
 { string value;
   POP(value);
-  int number=ewbIntValue(value);
+  double parsed=ewbValue(value);
+  if (parsed!=trunc(parsed) ||
+      parsed<numeric_limits<int32_t>::min() ||
+      parsed>numeric_limits<int32_t>::max())
+  { raiseerr("Hex range");
+    return;
+  }
+  int32_t number=(int32_t)parsed;
   ostringstream result;
   if (number<0)
-  { result << "-0x" << uppercase << hex << -(long long)number;
-  } else result << "0x" << uppercase << hex << number;
+  { result << uppercase << hex << setw(8) << setfill('0') << (uint32_t)number;
+  } else result << uppercase << hex << number;
   *accumulator=result.str();
 }
 
@@ -140,8 +283,120 @@ static void p_sqr(string *accumulator)
   *accumulator=ewbNumber(sqrt(number));
 }
 
+static void p_asc(string *accumulator)
+{ string value;
+  POP(value);
+  if (value=="")
+  { raiseerr("ASC of empty string");
+    return;
+  }
+  *accumulator=to_string((unsigned int)(unsigned char)value[0]);
+}
+
+static void p_char(string *accumulator)
+{ string value;
+  POP(value);
+  double parsed=ewbValue(value);
+  if (parsed!=trunc(parsed) || parsed<0 || parsed>255)
+  { raiseerr("Invalid byte");
+    return;
+  }
+  *accumulator=string(1,(char)(unsigned char)parsed);
+}
+
+static void p_mid(string *accumulator)
+{ string text,start_text,length_text;
+  POP(length_text);
+  POP(start_text);
+  POP(text);
+  int start=ewbIntValue(start_text);
+  int length=ewbIntValue(length_text);
+  long long first=start;
+  if (first<0) first=(long long)text.size()+first;
+  if (first<0 || first>=(long long)text.size())
+  { *accumulator="";
+    return;
+  }
+  if (length==-1)
+  { *accumulator=text.substr((size_t)first);
+    return;
+  }
+  long long last=first;
+  if (length>=0) last+=length;
+  else last=(long long)text.size()+length;
+  if (last<=first)
+  { *accumulator="";
+    return;
+  }
+  if (last>(long long)text.size()) last=(long long)text.size();
+  *accumulator=text.substr((size_t)first,(size_t)(last-first));
+}
+
+static void p_len(string *accumulator)
+{ string value;
+  POP(value);
+  *accumulator=to_string((unsigned long long)value.size());
+}
+
+static void p_uc(string *accumulator)
+{ string value;
+  POP(value);
+  for (size_t i=0; i<value.size(); i++)
+  { unsigned char character=(unsigned char)value[i];
+    if (character>='a' && character<='z') value[i]=(char)(character-'a'+'A');
+  }
+  *accumulator=value;
+}
+
+static void p_index(string *accumulator)
+{ string text,substring;
+  POP(substring);
+  POP(text);
+  size_t found=text.find(substring);
+  if (found==string::npos)
+  { *accumulator="-1";
+    return;
+  }
+  *accumulator=to_string((unsigned long long)found);
+}
+
+static void p_numel(string *accumulator)
+{ string value;
+  POP(value);
+  *accumulator=ewbInt((int)p_array_values(value).size());
+}
+
+static void p_arraypop(string *accumulator)
+{ string name;
+  POP(name);
+  int position=findvar(name);
+  if (position<0)
+  { raiseerr("Unknown array: "+name);
+    return;
+  }
+
+  vector<string> elements=split(stack[position],' ');
+  while (elements.size()>0 && elements.back()=="") elements.pop_back();
+  if (elements.size()==0)
+  { *accumulator="";
+    return;
+  }
+
+  string element=elements.back();
+  size_t separator=element.find(':');
+  if (separator==string::npos)
+  { raiseerr("Invalid EWB array");
+    return;
+  }
+  *accumulator=hexDecode(element.substr(separator+1));
+  elements.pop_back();
+  stack[position]=join(elements," ");
+}
+
 static void p_time(string *accumulator)
-{ *accumulator=to_string((long long)time(NULL));
+{ long long milliseconds=chrono::duration_cast<chrono::milliseconds>(
+      chrono::system_clock::now().time_since_epoch()).count();
+  *accumulator=to_string(milliseconds);
 }
 
 static void p_date(string *accumulator)
@@ -155,17 +410,30 @@ static void p_date(string *accumulator)
 }
 
 static void p_random(string *accumulator)
-{ static mt19937 generator((random_device())());
-  static uniform_int_distribution<int> values(0,2147483647);
-  *accumulator=ewbInt(values(generator));
+{ string limit_text;
+  POP(limit_text);
+  double parsed=ewbValue(limit_text);
+  if (parsed!=trunc(parsed) || parsed<1 ||
+      parsed>(double)numeric_limits<long long>::max())
+  { raiseerr("Random range");
+    return;
+  }
+  unsigned long long limit=(unsigned long long)parsed;
+  static mt19937_64 generator((random_device())());
+  uniform_int_distribution<unsigned long long> values(0,limit-1);
+  *accumulator=to_string(values(generator));
 }
 
 static void p_sleep(string *accumulator)
 { string milliseconds;
   POP(milliseconds);
-  int delay=ewbIntValue(milliseconds);
-  if (delay<0) { raiseerr("Negative sleep"); return; }
-  this_thread::sleep_for(chrono::milliseconds(delay));
+  double parsed=ewbValue(milliseconds);
+  if (parsed!=trunc(parsed) || parsed<0 ||
+      parsed>(double)numeric_limits<long long>::max())
+  { raiseerr("Sleep range");
+    return;
+  }
+  this_thread::sleep_for(chrono::milliseconds((long long)parsed));
   *accumulator="";
 }
 
@@ -366,7 +634,7 @@ static void p_loaddir(void)
 static void p_int(void)
 { /* Opcode necessario: TOINT.
        [x] -> A = parte intera di x, troncata verso zero
-     Le primitive aritmetiche attuali non espongono il troncamento.
+     Non applica un limite artificiale signed 32 bit.
   */
 }
 
@@ -403,9 +671,9 @@ static void p_sin(void)
 
 static void p_hex(void)
 { /* Opcode necessario: TOHEX.
-       [intero] -> A = rappresentazione esadecimale canonica
-     Usa il prefisso 0x e cifre A-F maiuscole; per i negativi il segno precede
-     il prefisso, per esempio -0x2A.
+       [intero signed 32 bit] -> A = rappresentazione esadecimale canonica
+     Nessun prefisso; positivi minimi, negativi in complemento a due su
+     otto cifre. Frazioni e valori fuori intervallo eseguono raise.
   */
 }
 
@@ -418,43 +686,45 @@ static void p_sqr(void)
 
 static void p_asc(void)
 { /* Opcode necessario: ASC.
-       [testo] -> A = codice Unicode del primo carattere
-     Stringa vuota o UTF-8 non valido eseguono raise.
+       [testo] -> A = valore 0..255 del primo byte
+     La stringa vuota esegue raise.
   */
 }
 
 static void p_char(void)
 { /* Opcode necessario: CHAR.
-       [codice] -> A = carattere codificato UTF-8
-     Un code point Unicode non valido esegue raise.
+       [codice] -> A = singolo byte
+     Codice non intero o fuori 0..255 esegue raise.
   */
 }
 
 static void p_mid(void)
 { /* Opcode necessario: MID.
-       [testo,inizio]           -> A = suffisso
+       [testo,inizio,-1]        -> A = suffisso
        [testo,inizio,lunghezza] -> A = sottostringa
-     Indici e lunghezza contano caratteri UTF-8, non byte.
+     Il compilatore aggiunge -1 come terzo parametro per la forma MID a due
+     argomenti: la VM riceve quindi sempre lo stesso numero di valori.
+     Offset e lunghezza sono in byte; un offset negativo conta dalla fine.
   */
 }
 
 static void p_len(void)
 { /* Opcode necessario: LEN.
-       [testo] -> A = numero di caratteri UTF-8
+       [testo] -> A = numero di byte
   */
 }
 
 static void p_uc(void)
 { /* Opcode necessario: UC.
-       [testo] -> A = testo convertito in maiuscolo
-     La semantica Unicode/locale deve vivere nel runtime, non nel compilatore.
+       [testo] -> A = testo convertito in maiuscolo ASCII
+     Converte soltanto a-z; gli altri byte restano invariati.
   */
 }
 
 static void p_index(void)
 { /* Opcode necessario: INDEX.
        [testo,sottostringa] -> A = posizione oppure -1
-     La posizione conta caratteri UTF-8.
+     La posizione e' un offset in byte.
   */
 }
 
@@ -504,10 +774,9 @@ static void p_push(void)
 
 static void p_pop(void)
 { /* Opcode necessario: ARRAYPOP.
-       [lista] -> A = elemento estratto; la variabile riceve la lista accorciata.
-     Una ricostruzione con SPLIT, eliminazione e JOIN e' possibile, ma richiede
-     comunque microcodice dedicato alla rimozione. ARRAYPOP resta per mantenere
-     atomica e leggibile l'operazione sulla rappresentazione EWB.
+       [nome_lista] -> A = elemento estratto
+     La variabile semplice indicata da nome_lista riceve la lista accorciata.
+     Su lista vuota A riceve "". Per percorsi annidati si usa GETELEM.
   */
 }
 
@@ -520,7 +789,7 @@ static void p_numel(void)
 
 static void p_time(void)
 { /* Opcode necessario: TIME.
-       [] -> A = Unix time corrente in secondi
+       [] -> A = Unix time corrente in millisecondi
   */
 }
 
@@ -534,7 +803,8 @@ static void p_date(void)
 
 static void p_random(void)
 { /* Opcode necessario: RANDOM.
-       [] -> A = intero pseudocasuale fra 0 e 2147483647 inclusi
+       [X] -> A = intero pseudocasuale uniforme, 0 <= A < X
+     X deve essere un intero strettamente positivo.
      Seed e generatore sono stato della VM.
   */
 }
@@ -542,6 +812,7 @@ static void p_random(void)
 static void p_sleep(void)
 { /* Opcode necessario: SLEEP.
        [millisecondi] -> A = ""
+     Il valore deve essere un intero non negativo.
      Il runtime può bloccare il processo oggi e in futuro schedulare la
      continuazione, senza cambiare il linguaggio.
   */

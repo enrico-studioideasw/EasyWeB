@@ -17,6 +17,7 @@ void raiseerr(string e);
 
 int    ewbIntValue(string v); //Qui conversione interna a intero
 double ewbValue(string v);    //Questa alza eccezione se non numero
+bool   ewbTrue(string v);
 string ewbNumber(double v);
 string ewbInt(int v);
 string ewbBool(bool v);
