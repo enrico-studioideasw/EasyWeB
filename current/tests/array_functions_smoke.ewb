@@ -1,0 +1,17 @@
+var a="";
+var b="";
+push(a,"A");
+push(a,"B");
+b=join("-",a);
+print(b);
+b=change("x","-","A-B");
+print(b);
+a="";
+a["name"]="Mario";
+b=split(",",a);
+a=join(",",b);
+print(getelem(a,"name"));
+a="";
+a[5]="F";
+push(a,"G");
+print(getelem(a,6));

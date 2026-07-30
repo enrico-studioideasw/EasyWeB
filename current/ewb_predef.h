@@ -1,2 +1,2 @@
 int is_predef(char* f);
-predef(char *name);
+int predef(char *name);

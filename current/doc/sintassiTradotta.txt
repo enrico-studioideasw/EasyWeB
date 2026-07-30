@@ -1,4 +1,16 @@
 easyweb versione 7.0 - stato corrente della sintassi tradotta
+
+// Questo file non e' documentazione intorno al compilatore: e' il compilatore
+// nella sua forma dichiarativa. La sintassi stabilisce cosa riconoscere, le
+// righe ** definiscono la traduzione nella VM, le simulazioni dello stack ne
+// verificano l'esecuzione e (NO) delimita cio' che resta da completare.
+// Il sorgente C e' la trascrizione necessaria per far comprendere ed eseguire
+// questa specifica alla macchina.
+//
+// Per comprendere EWB si puo' quindi partire da qui, come si parte dalla
+// sintassi per imparare un linguaggio: prima la forma e le trasformazioni,
+// poi le spiegazioni discorsive e infine i dettagli dell'implementazione.
+
  { blocco opzionale
  [ 0 o più volte
  | or, sono piu possibilità per la stessa sintassi
@@ -15,16 +27,20 @@ _______________________________________________________
 // I bachi o le eccezioni nell'implementazione di ewcc non cambiano il
 // significato qui definito.
 
-programma= [blocco { blocco  }]
+programma= { codice ";" }
   **NULLA
-blocco= codice ";" | "{" codice "}" ";"
+blocco= codice | "{" { codice ";" } "}"
   **NULLA 
+// ";" non appartiene mai all'istruzione: termina una frase e separa i codici
+// contenuti in un blocco. Anche un costrutto terminato da "}" viene seguito
+// da ";" quando costituisce una frase del programma o del blocco esterno.
 codice=[
   commento |
   datasetdecl |
   taskdecl |
   targetdecl |
-       inblock | 
+  inblock |
+  deleteblock |
   ifblock  |
   whileblock  |
   downwhile  |
@@ -40,45 +56,75 @@ datasetdecl= dataset name datasetbody
 // "context" non introduce una dichiarazione diversa: indica il dataset
 // selezionato dal ciclo IN durante l'iterazione corrente.
 datasetbody = "=" campidataset
-  ** addsymtable "name"
-  ** push "name"
-  ** push "_dataset"
-  ** setpath 0
 campidataset= "{" [campodataset [, campodataset] ] "}"
-  ** a fine lettura dataset, pe ciascun campo:
-  ** addsymtable "name._url"
-  ** push "name._url"
-  ** push "mysql://ewb"
-  ** setpath 0
-  ** addsymtable "name._user"
-  ** push "name._user"
-  ** push "ewb"
-  ** setpath 0
-  ** addsymtable "name._password"
-  ** push "name._password"
-  ** push "ewb"
-  ** setpath 0
-  ** addsymtable "name._status"
-  ** push "name._status"
-  ** push "stopped"
-  ** setpath 0
-  ** addsymtable "name._orderby"
-  ** push "name._orderby"
-  ** push "id"
-  ** setpath 0
-  ** addsymtable "singlevar", SP 
-  ** push SP 
 campodataset = singlevar ["=" campidataset]
 // Nessun prefisso di tipo: ogni campo contiene testo e la capacita' viene
 // ampliata automaticamente dal backend quando serve.
+// Durante il parsing non viene emessa alcuna variabile. Il compilatore legge
+// integralmente il dataset in memoria, compresi i descrittori dei dataset
+// annidati. Soltanto alla graffa finale emette tutte le celle del dataset
+// corrente, contigue e in questo ordine:
+  ** ADDSYMTABLE "name"
+  ** PUSH "name"
+  ** ADDSYMTABLE "name._url"
+  ** PUSH "mysql://ewb"
+  ** ADDSYMTABLE "name._user"
+  ** PUSH "ewb"
+  ** ADDSYMTABLE "name._password"
+  ** PUSH "ewb"
+  ** ADDSYMTABLE "name._status"
+  ** PUSH "stopped"
+  ** ADDSYMTABLE "name._orderby"
+  ** PUSH ""
+  ** per ogni campo semplice, nell'ordine di dichiarazione:
+  **   ADDSYMTABLE "name.campo"
+  **   PUSH ""
+// Un campo che contiene un dataset annidato non genera name.campo. Nel dataset
+// esterno genera invece il riferimento name.id_campo, inizialmente vuoto:
+  ** ADDSYMTABLE "name.id_campo"
+  ** PUSH ""
+// Terminata l'emissione del dataset corrente, il compilatore affronta in
+// ricorsione ciascun descrittore annidato, nello stesso ordine. Ogni figlio
+// viene quindi emesso come dataset distinto e forma a sua volta un blocco
+// contiguo nello stack.
+//
+// Esempio:
+//   dataset aaa = { bbb, ccc = { prova } }
+// produce, prima di affrontare ccc:
+  ** ADDSYMTABLE "aaa";           PUSH "aaa"
+  ** ADDSYMTABLE "aaa._url";      PUSH "mysql://ewb"
+  ** ADDSYMTABLE "aaa._user";     PUSH "ewb"
+  ** ADDSYMTABLE "aaa._password"; PUSH "ewb"
+  ** ADDSYMTABLE "aaa._status";   PUSH "stopped"
+  ** ADDSYMTABLE "aaa._orderby";  PUSH ""
+  ** ADDSYMTABLE "aaa.bbb";       PUSH ""
+  ** ADDSYMTABLE "aaa.id_ccc";    PUSH ""
+// e soltanto dopo:
+  ** ADDSYMTABLE "ccc";           PUSH "ccc"
+  ** ADDSYMTABLE "ccc._url";      PUSH "mysql://ewb"
+  ** ADDSYMTABLE "ccc._user";     PUSH "ewb"
+  ** ADDSYMTABLE "ccc._password"; PUSH "ewb"
+  ** ADDSYMTABLE "ccc._status";   PUSH "stopped"
+  ** ADDSYMTABLE "ccc._orderby";  PUSH ""
+  ** ADDSYMTABLE "ccc.prova";     PUSH ""
+// Le cinque predefinite sono, nell'ordine: _url, _user, _password, _status,
+// _orderby. _status non e' un campo SQL: la VM lo esclude sempre dallo schema.
+// Il vecchio parser inizializzava ncampi a 5 ma collocava _orderby in campi[5]
+// ed emetteva soltanto gli indici minori di ncampi: questo errore non deve
+// eliminare nuovamente la quinta predefinita.
 
 taskdecl= task name "(" [varname {,varname}] ")"  "{" [codice] "}"
-  ** salva l'entry point del task e il numero di parametri
-  ** un task è una funzione. Cambia solo il modo in cui è chiamata. 
+  ** stesso entrypoint e stesso frame dei parametri di fundecl
+  ** all'entry point: TASK
+  ** alla fine: ENDTASK; RET
+  // Un task e' una funzione. Cambia il modo in cui viene avviata e il suo
+  // stato pubblico ready/running/error.
 
 targetdecl= target name "(" [varname {,varname}] ")" "{" [codice] "}"
-  ** niente, salva l'entry point del target e il numero di parametri
-  ** la chiamata del target implica riempire un form e saltarci
+  ** stesso entrypoint e stesso frame dei parametri di fundecl
+  ** all'entry point: TARGET
+  ** alla fine: ENDTARGET; RET
+  // La chiamata del target implica riempire un form e saltarci.
   ** i parametri sono valutati e passati per valore, come per una funzione
 
 
@@ -86,108 +132,292 @@ targetdecl= target name "(" [varname {,varname}] ")" "{" [codice] "}"
 
 vardecl= var singlevar ["," singlevar]
 singlevar = name [ "=" inexp ]
-  ** calcolo la inexp -> risultato in A  
-  ** addsymtable "singlevar", SP
-  ** push SP 
+  ** se manca inexp: MOVA ""
+  ** altrimenti valuta inexp                  ; A=valore iniziale
+  ** ADDSYMTABLE "name"                       ; associa name alla SP corrente
+  ** PUSHA
 ifblock= if calcexp blocco [elseif calcexp blocco] { else blocco }
-  ** valuto calcexp 
-  ** JZ *fineif01* -> numeri progressivi.. 
-  ** valuto blocco
-  ** A=0 
-  ** sostituisco *fineif01* 
-  ** finche elseif 
-  ** valuto calcexp 
-  ** JZ *fineif02* -> numeri progressivi.. 
-  ** valuto blocco 
-  ** A=0 
-  ** sostituisco *fineif02* 
-  ** se else 
-  ** JZ *fineif03*
-  ** valuto blocco
-  ** sostutuisco *fineif03*
+  ** valuta calcexp
+  ** JZ NEXT
+  ** valuta blocco
+  ** JMP ENDIF
+  ** NEXT:
+  ** per ciascun elseif ripeti la stessa sequenza con una nuova NEXT
+  ** se presente, valuta il blocco else
+  ** ENDIF:
 
-forblock= for (calcexp; calcexp; calcexp) { [codice] }
-whileblock= while calcexp { [codice] };
-downwhile= do { [codice] } while calcexp;
+forblock= for (calcexp; calcexp; calcexp) blocco
+  ** valuta inizializzazione
+  ** COND:
+  ** valuta condizione
+  ** JZ ENDFOR
+  ** JMP BODY
+  ** STEP:
+  ** valuta incremento
+  ** JMP COND
+  ** BODY:
+  ** valuta blocco
+  ** JMP STEP
+  ** ENDFOR:
+
+whileblock= while calcexp blocco
+  ** STARTWHILE:
+  ** valuta calcexp
+  ** JZ ENDWHILE
+  ** valuta blocco
+  ** JMP STARTWHILE
+  ** ENDWHILE:
+
+downwhile= do blocco while calcexp
+  ** STARTDO:
+  ** valuta blocco
+  ** valuta calcexp
+  ** JNZ STARTDO
+
 foreachblock= foreach (variabile,calcexp) { [codice] }
             | foreach (chiave,variabile,calcexp) { [codice] }
-  ** conserva array/riferimento e indice corrente sullo stack
+  ** valuta calcexp
+  ** PUSHA                                      ; [source,...]
+  ** PUSHA                                      ; [source,source,...]
+  ** NUMKEY
+  ** PUSHA                                      ; [count,source,...]
+  ** PUSH 0                                     ; [pos,count,source,...]
+  ** PUSH "dummy"                               ; [key,pos,count,source,...]
+  // I quattro valori sono il frame anonimo del FOREACH. Non vengono aggiunti
+  // alla symbol table. DECSP e INCSP permettono di raggiungerli senza
+  // distruggerli e di sostituire il dummy con la chiave corrente.
+  // [...] e' la parte attiva dello stack; i valori a sinistra della [
+  // sono celle temporaneamente oltre SP. ... e' lo stack precedente.
+  ** FOREACHCOND:
+  ** DECSP 1                                   ; key,[pos,count,source,...]
+  ** POPA                                      ; key,pos,[count,source,...] A=pos
+  ** INCSP 2                                   ; [key,pos,count,source,...]
+  ** PUSHA                                     ; [pos,key,pos,count,source,...]
+  ** DECSP 3                                   ; pos,key,pos,[count,source,...]
+  ** POPA                                      ; pos,key,pos,count,[source,...] A=count
+  ** INCSP 4                                   ; [pos,key,pos,count,source,...]
+  ** PUSHA                                     ; [count,pos,key,pos,count,source,...]
+  ** LT
+  ** JZ ENDFOREACH
+  // Copia source e pos sopra il frame senza consumarli.
+  ** DECSP 3                                   ; key,pos,count,[source,...]
+  ** POPA                                      ; key,pos,count,source,[...] A=source
+  ** INCSP 4                                   ; [key,pos,count,source,...]
+  ** PUSHA                                     ; [source,key,pos,count,source,...]
+  ** DECSP 2                                   ; source,key,[pos,count,source,...]
+  ** POPA                                      ; source,key,pos,[count,source,...] A=pos
+  ** INCSP 3                                   ; [source,key,pos,count,source,...]
+  ** PUSHA                                     ; [pos,source,key,pos,count,source,...]
+  ** KEYAT
+  ** DECSP 1
+  ** PUSHA                                     ; [key,pos,count,source,...]
+                                                // sostituisce key/dummy
+  ** se presente la variabile chiave:
+  **   PUSH "chiave"
+  **   PUSHA
+  **   SETPATH 0
+  // Copia source e key sopra il frame.
+  ** DECSP 3                                   ; key,pos,count,[source,...]
+  ** POPA                                      ; key,pos,count,source,[...] A=source
+  ** INCSP 4                                   ; [key,pos,count,source,...]
+  ** PUSHA                                     ; [source,key,pos,count,source,...]
+  ** DECSP 1                                   ; source,[key,pos,count,source,...]
+  ** POPA                                      ; source,key,[pos,count,source,...] A=key
+  ** INCSP 2                                   ; [source,key,pos,count,source,...]
+  ** PUSHA                                     ; [key,source,key,pos,count,source,...]
+  ** GETELEM                                   ; A=valore
+  ** PUSH "variabile"
+  ** PUSHA
+  ** SETPATH 0
+  ** valuta blocco
+  // Incrementa pos e sostituisce la sua cella senza toccare il resto.
+  ** DECSP 1                                   ; key,[pos,count,source,...]
+  ** POPA                                      ; key,pos,[count,source,...] A=pos
+  ** INCSP 2                                   ; [key,pos,count,source,...]
+  ** PUSHA
+  ** PUSH 1
+  ** SUM
+  ** DECSP 2                                   ; key,pos,[count,source,...]
+  ** PUSHA                                     ; key,[pos+1,count,source,...]
+  ** INCSP 1                                   ; [key,pos+1,count,source,...]
+  ** JMP FOREACHCOND
+  ** ENDFOREACH:
+  ** DECSP 4                                   ; key,pos,count,source,[...]
+  // Se il FOREACH e' partito con stack vuoto, [...] e' precisamente [].
+  // SP e' quindi tornato al valore che aveva prima del ciclo.
+  // Source, posizione, conteggio e chiave restano nello stack tra i giri:
+  // ASK li serializza e un ciclo annidato aggiunge un frame indipendente.
+  // NUMKEY rende valida anche la chiave vuota: KEYAT non viene usata come
+  // condizione di fine.
+  // KEYAT(struttura,posizione) restituisce la chiave alla posizione indicata.
+  // GETELEM(struttura,chiave) restituisce il valore senza richiedere il nome
+  // di una variabile.
   ** assegna valore, oppure chiave e valore, dal primo all'ultimo
   ** visita chiavi numeriche e associative nell'ordine della struttura
-  ** non copia l'intero array
+  ** valuta la struttura una sola volta
   // Modificare nel corpo la stessa struttura attraversata ha comportamento
   // indefinito.
-  fundecl= sub token([varname {,varname} ]) blocco
-  ** addsymtable "name"   //Ho aggiunto la funzione alla symbol table globale. 
-  ** PUSH "name"
-  ** PUSH PC+2
-  ** SETPATH 0
-  ** JMP ENDFUNCTION  
-  //Punto di entrata.  Arrivo qui con una CALL. 
-  //In SP-3 ho indirizzo di ritorno. 
-  //In SP-2, SP-1 i due parametri. Riesco a prenderli?
-  ** SUBSP s  // SP = SP - ARITY  
-  ** addsymtable "var2"
-  ** addsymtable "var1"
-  ** { corpo funzione block() }
-  ** delsymtable 2  // ST = ST - ARITY
-  ** RET               //Toglie dallo stack indirizzo di ritorno e torna
-  ** ENDFUNCTION: 
-
-  
-
+fundecl= sub token "(" [varname {"," varname}] ")" blocco
+  ** JMP ENDFUNCTION
+  ** entrypoint:
+  // Durante la dichiarazione il compilatore registra nella propria tabella
+  // name, arity ed entrypoint. Non crea una variabile nella VM: CALL contiene
+  // direttamente l'entrypoint gia' noto.
+  // CALL ha gia' creato [argN,...,arg1,return,...]. Ogni chiamata, anche
+  // ricorsiva, ha celle distinte.
+  ** DECSP arity                              ; argN,...,arg1,[return,...]
+  ** per ciascun parametro, da arg1 ad argN:
+  **   ADDSYMTABLE "varname"                  ; associa la cella oltre SP
+  **   INCSP 1
+  // Al termine dei parametri lo stack attivo e' nuovamente:
+  // [argN,...,arg1,return,...]
+  ** valuta blocco
+  ** DELSYMTABLE arity
+  ** DECSP arity                              ; argN,...,arg1,[return,...]
+  ** RET
+  ** ENDFUNCTION:
+// Nome riservato per l'handler:
+//   sub _onerror(error) blocco
+// E' una normale funzione e puo' essere ridefinita in qualunque punto; quando
+// la dichiarazione viene eseguita, il suo entrypoint sostituisce quello
+// precedente tramite ONERROR. RAISE passa il testo dell'errore come unico
+// parametro. Se nessun _onerror e' stato definito, la VM termina il codice.
+// Una ridefinizione con corpo vuoto:
+//   sub _onerror(error) { }
+// non installa un handler che ignora l'errore: ripristina l'handler predefinito.
+// Il compilatore emette PUSH ""; ONERROR; ONERROR con valore vuoto elimina
+// l'entrypoint personalizzato. Il RAISE successivo termina quindi il codice.
+// Quando un opcode esegue RAISE, consuma gli operandi come avrebbe fatto in
+// caso di successo e lascia lo stack nella posizione prevista dall'opcode.
+// Il risultato non prodotto non viene usato: la VM esegue una normale CALL
+// _onerror(error), e il valore restituito dall'handler sostituisce A.
+// RET dall'handler riprende dall'opcode immediatamente successivo a quello che
+// ha eseguito RAISE. Non esiste un retry automatico del codice.
+// Prima di chiamare _onerror, RAISE esegue DBROLLBACK su tutte le transazioni
+// aperte, in ordine inverso. "Riprova da capo" riguarda un eventuale nuovo
+// tentativo della transazione: il database e' tornato allo stato precedente
+// al LOCK; non significa che la VM riavvii funzione, target o programma.
+// L'handler deve quindi restituire un valore adatto al codice che prosegue.
+// Se _onerror esegue a sua volta RAISE, non viene richiamato ricorsivamente:
+// si applica l'handler predefinito e il codice termina.
 //Sezione di sub-linguaggio assembler per la machina virtuale
 asmline= "." ISTRUZIONE [numero | "stringa"] [' commento] "\n"
 
 calcexp= assign "=" inexp | inexp         //    (no ll1 ! attento)
-assign=variabile  [ "[" pos "]" ]     //Notare che ci sono gli array multidimensionali
+assign=variabile  { "[" calcexp "]" ]     //Array multidimensionali
   ** - a[3][2] = exp
-  **pushaddr "a"      ; riferimento alla variabile base
-  **eval 3            ; A = 3
-  **push A
-  **eval 2            ; A = 2
-  **push A
-  **eval inexp        ; A = 4
-  **setpath 2         ; 2 livelli di indice, valore in A, si rimangia lo stack.
+  ** PUSH "a"                                  ; ["a",...]
+  ** valuta 3; PUSHA                           ; [3,"a",...]
+  ** valuta 2; PUSHA                           ; [2,3,"a",...]
+  ** valuta inexp; PUSHA                       ; [valore,2,3,"a",...]
+  ** SETPATH 2                                 ; [...] A resta il valore
+// Se il target termina in ._orderby, inexp viene compilata con sql_mode=1.
+// Le espressioni separate da virgola sono concatenate con ", ". Il backend
+// aggiunge sempre id in coda una sola volta; se il frammento e' vuoto usa id.
+// Eccezione: se l'intero lato destro e' il literal "", viene emesso MOVA ""
+// senza attivare sql_mode. Serve a cancellare un ordinamento gia' impostato;
+// non deve diventare il literal SQL ''.
 inexp=exp  cfr inexp | exp
 cfr = == | != | <= | >= | > | < | eq | neq | gt | ge | lt | le
   ** simbolici: GT, LT, EQ, NEQ, GE, LE; operando non numerico -> RAISE
   ** alfabetici: SGT, SLT, SEQ, SNEQ, SGE, SLE; confronto byte per byte
+  // Traduzione normale:
+  ** valuta EXP1
+  ** PUSHA
+  ** valuta EXP2
+  ** PUSHA
+  ** OP
+  // Traduzione con sql_mode=1. DUMMY riserva una cella che viene sovrascritta
+  // da EXP2; EXP1 resta temporaneamente oltre SP durante la sua valutazione.
+  ** PUSH "("                                  ; (
+  ** PUSH "DUMMY"                              ; DUMMY,(
+  ** PUSHA                                     ; EXP1,DUMMY,(
+  ** DECSP 2                                   ; (
+  ** valuta EXP2
+  ** PUSHA                                     ; EXP2,(
+  ** INCSP 1                                   ; EXP1,EXP2,(
+  ** PUSH " OP "                               ; OP,EXP1,EXP2,(
+  ** CONCAT                                    ; A=EXP1 OP
+  ** PUSHA
+  ** CONCAT                                    ; A=EXP1 OP EXP2
+  ** PUSHA
+  ** CONCAT                                    ; A=(EXP1 OP EXP2
+  ** PUSHA
+  ** PUSH ")"
+  ** CONCAT                                    ; A=(EXP1 OP EXP2)
+  // OP SQL e' =, !=, <=, >=, > oppure <. Gli operatori alfabetici perdono
+  // soltanto il prefisso S: il confronto viene comunque espresso in SQL.
+  // Nei confronti simbolici, i valori esterni destinati a un operando numerico
+  // vengono validati come numeri; una stringa parziale come "123A" provoca
+  // RAISE. Identificatori e campi del dataset restano espressioni SQL.
   // SEQ/SNEQ accettano anche due array marcati e ne confrontano la struttura
   // canonica, ordine compreso. Misti e ordinamenti sugli array: RAISE.
 exp=e . exp | e
+  ** normale: valuta sinistra; PUSHA; valuta destra; PUSHA; CONCAT
+  ** sql_mode: costruisce CONCAT(sinistra,destra)
 e = t+e | t-e | t
+  ** normale: SUM | SUB
+  ** sql_mode: costruisce (sinistra + destra) | (sinistra - destra)
 t = f*t | f/t | f%t | f
+  ** normale: MUL | DIV | MOD
+  ** sql_mode: costruisce (sinistra * destra), (sinistra / destra)
+  **           oppure MOD(sinistra,destra)
   // DIV e MOD con divisore numericamente zero provocano RAISE.
   // MOD applica prima INT ai due operandi, troncandoli verso zero.
   // La conversione deve validare l'intero operando prima di troncare.
 f= b\|f | b\|\|f | b
+  ** normale: ORB | OR
+  ** sql_mode: costruisce (sinistra | destra) | (sinistra OR destra)
 b= k & b | k && b | k
+  ** normale: ANDB | AND
+  ** sql_mode: costruisce (sinistra & destra) | (sinistra AND destra)
   // | e &: bitwise interi della VM. || e &&: verita' EWB.
   // || e && valutano sempre entrambi gli operandi, da sinistra a destra.
 // OR/AND logici devono usare la verita' EWB.
 k= tok_var | ! inexp | !! inexp | numvalue | strvalue | (calcexp)
+  ** !: NOT; sql_mode: NOT(espressione)
+  ** !!: NOTB; sql_mode: ~(espressione)
 tok_var= variabile[.variabile] [ "[" calcexp "]" ] | funzione | startparallel
 variabile=token
 ** - a[3][2]
-** pushaddr "a"
-** eval 3
-** push A
-** eval 2
-** push A
-** getpath 2         ; A = valore
-** store "x"
+** PUSH "a"
+** valuta 3; PUSHA
+** valuta 2; PUSHA
+** PUSH 2
+** GETPATH                                    ; A=valore
+// In sql_mode il nome viene prima sottoposto a JNCONTEXT:
+** PUSH "nome"
+** JNCONTEXT EXTERNAL
+** MOVA "campo SQL senza prefisso"
+** JMP ENDVARIABLE
+** EXTERNAL:
+** valuta normalmente la variabile
+** PUSHA
+** SQLQUOTE
+** ENDVARIABLE:
 funzione=token "(" [calcexp {,calcexp}] ")"
 funzione = predef | token  "(" [inexp [,inexp]] ")"
 // Le parentesi sono obbligatorie anche per le funzioni predefinite.
-**push "" //Dummy
-**{inexp}
-**push A
-**{inexp}
-**push A  //N parametri, qui due.
-**push 2  //Numero dei parametri. Ci pensa la CALLN 
-**CALL "token"
+** PUSH "dummy"                              ; [dummy,...]
+** valuta arg1; PUSHA                       ; [arg1,dummy,...]
+** ...
+** valuta argN; PUSHA                       ; [argN,...,arg1,dummy,...]
+** PUSH arity
+** CALL entrypoint
+// CALL consuma arity, sostituisce dummy con PC+1 e salta:
+// [argN,...,arg1,return,...]
+// RET elimina return dopo che il callee ha portato SP sotto gli argomenti.
+// A attraversa CALL/RET ed e' il valore restituito.
+// Una predefinita priva di traduzione SQL provoca errore di compilazione
+// quando viene incontrata con sql_mode=1.
 startparallel=
+    // Task e target ricevono i parametri esattamente come una funzione:
+    // controllo statico dell'arita', valutazione da sinistra a destra e frame
+    // [argN,...,arg1,return,...]. Cambia soltanto chi avvia la nuova VM e come
+    // le passa il frame serializzato; non cambia l'ingresso del corpo.
+    // Non esiste un secondo formato di stato: ASK, task e target usano lo
+    // stesso serializzatore gia' esistente, che trasforma stack e posizione
+    // nello stesso stringone ripristinabile dalla nuova VM.
     cron nometask(parametri) modocrontab   //"30 * * * *" parametri passati per valore
     // La pianificazione e' persistente lato server.
     // La politica di pulizia dei cron non e' ancora definita.
@@ -201,12 +431,39 @@ startparallel=
     **inexp()
     **PUSHA
     **CRONTASK arity
-    (NO) refresh nometarget(parametri), interval
-    // interval e' in millisecondi; a ogni scadenza richiama il target
-    // con una nuova copia dei parametri per valore. Parser presente ma vuoto.
+    refresh nometarget(parametri), interval
+    // interval e' obbligatorio e strettamente positivo, in millisecondi;
+    // a ogni scadenza richiama il target
+    // con una nuova copia dei parametri per valore.
     // Se alla scadenza il task e' running, la nuova esecuzione non parte.
+    ** PUSH "nometarget"
+    ** valuta parametro1; PUSHA
+    ** ...
+    ** valuta parametroN; PUSHA
+    ** PUSH arity
+    ** valuta interval; PUSHA
+    ** REFRESHTARGET entrypoint
+    // L'argomento intero dell'opcode e' l'entrypoint risolto staticamente.
+    // REFRESHTARGET consuma intervallo, arita', parametri e nome; conserva lo
+    // stesso stringone dello stack usato da ASK insieme ai parametri necessari
+    // a costruire il frame della nuova VM. Un nuovo refresh dello stesso nome
+    // target sostituisce il precedente.
+    (NO) run nometask(parametri)
+    // Estensione facoltativa: accoda una singola esecuzione nel gestore
+    // esterno. Non usa CALL e non esegue il task nel flusso corrente.
+    // EWB sopravvive anche senza questa forma: oggi i task partono da CRON.
     run nometarget(parametri)
-    // Lancia una AJAX asincrona e prosegue senza attendere il risultato.
+    // Il compilatore riconosce staticamente che il simbolo e' un target.
+    // Genera un form invisibile contenente parametri, stack, entrypoint,
+    // stackpos e firma; emette poi JavaScript che lo invia una sola volta via
+    // AJAX. Il flusso corrente prosegue senza attendere il risultato.
+    // Anche il target viene quindi eseguito da una nuova VM, non tramite CALL.
+    ** PUSH "nometarget"
+    ** valuta parametro1; PUSHA
+    ** ...
+    ** valuta parametroN; PUSHA
+    ** PUSH arity
+    ** RUNTARGET entrypoint
 
 //qui mi complico la vita, ma almeno posso definire i numeri in qualunque base e dimensione.. 
   numvalue = [+/-] ( bin | hex | oct | dec ) 
@@ -216,7 +473,11 @@ startparallel=
   dec = [0..9] [. {0..9} ]
   // La parte frazionaria e' ammessa in tutte le basi.
   // La notazione esponenziale non fa ancora parte della sintassi.
+  ** MOVA "testo numerico"
+  ** con sql_mode: PUSHA; SQLNUMBER
   strvalue = \" carattere \"
+  ** MOVA "testo"
+  ** con sql_mode: PUSHA; SQLQUOTE
 token= a..z|A..Z | _  [a..z | A..Z | 0..9 | _ ]
 // Operatori e primitive numeriche validano l'intera stringa secondo numvalue;
 // una conversione parziale provoca RAISE.
@@ -228,23 +489,33 @@ token= a..z|A..Z | _  [a..z | A..Z | 0..9 | _ ]
 _________________________________________________________________________________
 funzioni predefinite
 
+// Convenzione comune: gli argomenti sono valutati da sinistra a destra e
+// depositati con PUSHA. L'opcode o il microcodice li consuma e lascia il
+// risultato in A. Le forme composte sotto sono parte del compilatore.
+
   return calcexp  //Return è una predefinita di linguaggio 
-  **valuto calcexp
-  **return (PC=[SP-1], SP--)
+  ** valuta calcexp
+  ** RET
 
   print(valore)   //scrive i byte su stdout senza newline e torna valore
+  ** valuta valore; PUSHA; PRINT
   eprint(valore)  //scrive i byte su stderr senza newline e torna valore
+  ** valuta valore; PUSHA; EPRINT
   // Accettano anche array marcati come dati opachi.
   input()           legge una riga da stdin; nel frontend web torna ""
+  ** INPUT
 
   load(filename)  //restituisce tutti i byte del file
+  ** valuta filename; PUSHA; FLOAD
   save(filename, valore)  //sovrascrive in binario e torna i byte scritti
+  ** valuta filename; PUSHA; valuta valore; PUSHA; FSAVE
   // LOAD e SAVE trattano scalari e array marcati come dati opachi; errori
   // di apertura, lettura o scrittura provocano RAISE.
   loaddir(dirname)  //array marcato 0..n-1 dei soli nomi delle entry
+  ** valuta dirname; PUSHA; FREADDIR
                     //ordinati lessicograficamente per byte; include i
                     //nomi nascosti, ma esclude "." e ".."
-  (NO) exec(comando)
+  exec(comando)
   ** valuta comando; EXEC
   ** A riceve stdout; la predefinita _err riceve stderr
   ** stdout e _err conservano tutti i byte, inclusi i newline finali
@@ -252,23 +523,47 @@ funzioni predefinite
 
                                         //di elaborazione numeri
   int(variable)  //tronca verso zero, senza limite specifico a 32 bit
+  ** valuta variable; PUSHA; TOINT
   abs(variable)
+  ** valuta variable                            ; A=a
+  ** PUSHA                                     ; [a,...]
+  ** PUSHA                                     ; [a,a,...]
+  ** PUSH 0                                    ; [0,a,a,...]
+  ** GT                                        ; [a,...] A=(a>0)
+  ** JZ NEGATIVE
+  ** POPA                                      ; [...] A=a
+  ** JMP ENDABS
+  ** NEGATIVE:
+  ** POPA                                      ; [...] A=a
+  ** PUSH 0                                    ; [0,...]
+  ** PUSHA                                     ; [a,0,...]
+  ** SUB                                       ; [...] A=0-a
+  ** ENDABS:
+  // GT valida l'intero operando come numero. Se a non e' numerico provoca
+  // RAISE; per a=0 il ramo 0-a restituisce comunque 0.
   cos(variable)   //seno e coseno sono in gradi
+  ** valuta variable; PUSHA; PUSH 90; SUM; PUSHA; SIND
   sin(variable)
+  ** valuta variable; PUSHA; SIND
   hex(variable)  //signed 32 bit, hex maiuscolo senza prefisso
+  ** valuta variable; PUSHA; TOHEX
                  //positivi minimi; negativi complemento a due, 8 cifre
                  //frazione o fuori intervallo: RAISE
   sqr(variable)   //radice quadrata reale; argomento negativo: RAISE
+  ** valuta variable; PUSHA; SQRT
   random(X)       //intero uniforme: 0 <= risultato < X
                   //X intero strettamente positivo, altrimenti RAISE
   ** valuta X; PUSHA; RANDOM
   //un numero e' una stringa che sontiene un numero.
   //miscellanee - dal perl
   asc(variable)   //valore 0..255 del primo byte; vuota: RAISE
+  ** valuta variable; PUSHA; ASC
   char(variable)  //singolo byte da un intero 0..255
+  ** valuta variable; PUSHA; CHAR
                   //fuori intervallo o non intero: RAISE, nessun modulo
 
   sleep(millisec)
+  ** valuta millisec; PUSHA; SLEEP
   // Richiede un intero non negativo; 0 e' valido, negativo o frazionario RAISE.
 
   //di elaborazione stringhe
@@ -282,19 +577,34 @@ funzioni predefinite
   // fino alla fine, -2 esclude gli ultimi due byte. Fine prima dell'inizio: "".
   // Una lunghezza positiva oltre il termine viene troncata alla fine.
   len(variable)                   //numero di byte
+  ** valuta variable; PUSHA; LEN
   uc(variable)  //maiuscolo ASCII: converte soltanto a-z
+  ** valuta variable; PUSHA; UC
 ______________________________________
   index(str,substr)  //posizione in byte, oppure -1
+  ** valuta str; PUSHA; valuta substr; PUSHA; INDEX
   // Una sottostringa vuota ha indice 0, anche in una stringa vuota.
   // Le equivalenti Unicode appartengono a una libreria separata.
   change(seconda, prima, origine)  //sostituisce tutte le occorrenze di prima
                                   //con seconda e restituisce il risultato
+  ** SPLIT(prima,origine); JOIN(seconda,risultato)
   // Se prima e' vuota, provoca RAISE.
   split(separatore, testo)  //restituisce un array EWB indicizzato da 0
-  // Separatore "" divide nei singoli byte; testo "" produce array vuoto.
-  // Conserva gli elementi vuoti, compresi quelli finali.
+  ** valuta separatore; PUSHA; valuta testo; PUSHA; SPLIT
+  // Se testo e' scalare, lo divide sul separatore. Separatore "" divide nei
+  // singoli byte; testo "" produce array vuoto. Conserva gli elementi vuoti,
+  // compresi quelli finali.
+  // Se il valore comincia con 0x1E, non e' testo ma una struttura EWB:
+  // SPLIT legge gli elementi della struttura. Un valore semplice resta un
+  // elemento semplice; una coppia chiave/valore diventa un elemento che e'
+  // a sua volta una struttura marcata di due valori: [chiave,valore].
   join(separatore, lista)   //analoga alla join del linguaggio Perl
-  // Usa i valori nell'ordine dell'array EWB e ignora le chiavi.
+  ** valuta separatore; PUSHA; valuta lista; PUSHA; JOIN
+  // JOIN e' duale: un elemento scalare viene trattato come valore; un elemento
+  // che e' una struttura marcata [chiave,valore] viene trattato come coppia.
+  // Il riconoscimento dipende esclusivamente dal byte iniziale 0x1E.
+  // Non si interpreta mai una stringa come coppia perche' contiene ":":
+  // "a:b" resta sempre uno scalare.
   // Una struttura inizia con il byte ASCII 0x1E. Seguono eventualmente elementi
   // hex(chiave):hex(valore), separati da un solo spazio. Non collassa:
   // "30:3138" e' scalare; 0x1E+"30:3138" rappresenta [0]="18".
@@ -314,7 +624,9 @@ ______________________________________
   // Assegnare "" conserva la chiave con valore vuoto; non elimina l'elemento.
   // La lettura semplice restituisce "" anche quando la chiave e' assente.
   time()       //millisecondi trascorsi dall'epoca Unix
+  ** TIME
   date()       //data locale del server in formato YYYY-MM-DD
+  ** DATE
   // DATE e' lessicograficamente ordinabile: non serve LESSDATE.
 
 per accesso ai database - connessione e credenziali appartengono al dataset;
@@ -329,21 +641,94 @@ per accesso ai database - connessione e credenziali appartengono al dataset;
   // LOCK apre una transazione sulla risorsa. Un secondo LOCK sulla stessa
   // risorsa nello stesso flusso provoca RAISE. Senza UNLOCK, dopo 30 secondi
   // la transazione scade e provoca RAISE. UNLOCK esegue COMMIT.
-  (NO) // Ogni RAISE deve eseguire DBROLLBACK su tutte le transazioni ancora
-       // aperte, in ordine inverso, prima di entrare nell'handler.
-  (NO) // STOP con transazioni aperte esegue DBROLLBACK e poi RAISE.
+  // Ogni RAISE esegue DBROLLBACK su tutte le transazioni ancora aperte,
+  // in ordine inverso, prima di entrare nell'handler.
+  // STOP con transazioni aperte esegue DBROLLBACK e poi RAISE.
        // Senza transazioni aperte, STOP sospende normalmente.
-  (NO) // Anche la fine normale con transazioni aperte esegue DBROLLBACK e
-       // RAISE: ogni LOCK richiede un UNLOCK esplicito.
+  // Anche la fine normale con transazioni aperte esegue DBROLLBACK e RAISE:
+  // ogni LOCK richiede un UNLOCK esplicito.
   // Sono ammessi LOCK contemporanei su database differenti. Dataset che
   // risolvono alla stessa coppia motore/database sono la stessa risorsa.
   !! UNLOCK non e' atomica fra database: ogni chiamata conferma subito la
      propria risorsa; un errore successivo puo' lasciare commit parziali.
 inblock = in ( variabile[.variabile] [, condizione] ) blocco
-          | delete ( variabile[.variabile] [, condizione] )
 // IN(dataset) senza condizione sostituisce la vecchia INALL.
-(NO) // IN deve restituire il numero di record iterati, anche "0"; la
-     // traduzione corrente non mantiene ancora il conteggio separato.
+  ** valuta variabile[.variabile]               ; A=context
+  ** PUSHA                                      ; [context,...]
+  ** se manca condizione: PUSH "true"
+  ** altrimenti:
+  **   sql_mode=1
+  **   valuta condizione                        ; A=filtro SQL
+  **   sql_mode=0
+  **   PUSHA
+  ** QLIST
+  // QLIST consuma filtro e context, ripusha context e lascia in A la lista
+  // serializzata degli id. Applica una volta l'ordinamento del dataset.
+  ** PUSHA                                      ; [ids,context,...]
+  ** PUSH 0                                     ; [pos,ids,context,...]
+  ** PUSH "dummy"                               ; [id,pos,ids,context,...]
+  // Frame anonimo, uguale al FOREACH salvo l'oggetto attraversato.
+  ** LOOP:
+  **   DECSP 2                                  ; id,pos,[ids,context,...]
+  **   POPA                                     ; id,pos,ids,[context,...] A=ids
+  **   INCSP 3                                  ; [id,pos,ids,context,...]
+  **   PUSHA                                    ; [ids,id,pos,ids,context,...]
+  **   DECSP 2                                  ; ids,id,[pos,ids,context,...]
+  **   POPA                                     ; ids,id,pos,[ids,context,...] A=pos
+  **   INCSP 3                                  ; [ids,id,pos,ids,context,...]
+  **   PUSHA                                    ; [pos,ids,id,pos,ids,context,...]
+  **   GETELEM                                  ; A=id corrente
+  **   JZ ENDIN                                 ; gli id del DB non sono vuoti
+  **   DECSP 1
+  **   PUSHA                                    ; [id,pos,ids,context,...]
+  // Copia context e id sopra il frame per QBYID.
+  **   DECSP 3                                  ; id,pos,ids,[context,...]
+  **   POPA                                     ; id,pos,ids,context,[...] A=context
+  **   INCSP 4                                  ; [id,pos,ids,context,...]
+  **   PUSHA                                    ; [context,id,pos,ids,context,...]
+  **   DECSP 1                                  ; context,[id,pos,ids,context,...]
+  **   POPA                                     ; context,id,[pos,ids,context,...] A=id
+  **   INCSP 2                                  ; [context,id,pos,ids,context,...]
+  **   PUSHA                                    ; [id,context,id,pos,ids,context,...]
+  **   QBYID
+  **   JZ NEXT
+  // QBYID valorizza context.* e vale "1" se il record esiste. Se il record
+  // e' stato cancellato dopo QLIST, il corpo viene saltato.
+  **   valuta blocco
+  ** NEXT:
+  **   DECSP 1                                  ; id,[pos,ids,context,...]
+  **   POPA                                     ; id,pos,[ids,context,...] A=pos
+  **   INCSP 2                                  ; [id,pos,ids,context,...]
+  **   PUSHA
+  **   PUSH 1
+  **   SUM
+  **   DECSP 2                                  ; id,pos,[ids,context,...]
+  **   PUSHA                                    ; id,[pos+1,ids,context,...]
+  **   INCSP 1                                  ; [id,pos+1,ids,context,...]
+  **   JMP LOOP
+  ** ENDIN:
+  ** DECSP 4                                    ; id,pos,ids,context,[...]
+// Il frame resta nello stack durante ASK e ogni IN annidata ne aggiunge uno
+// distinto. IN non garantisce un valore di ritorno.
+
+deleteblock = delete "(" variabile[.variabile] "," condizione ")"
+// Il filtro e' obbligatorio: non esiste la forma DELETE(context) implicita.
+  ** valuta variabile[.variabile]               ; A=context
+  ** PUSHA                                      ; [context,...]
+  ** PUSH "delete from "
+  ** PUSHA                                      ; [context,"delete from ",context,...]
+  ** CONCAT                                     ; A="delete from context"
+  ** PUSHA
+  ** PUSH " where "
+  ** CONCAT                                     ; A="delete from context where "
+  ** PUSHA                                      ; [prefisso,context,...]
+  ** sql_mode=1
+  ** valuta condizione                          ; A=filtro SQL
+  ** sql_mode=0
+  ** PUSHA                                      ; [filtro,prefisso,context,...]
+  ** CONCAT                                     ; A=query completa
+  ** PUSHA                                      ; [query,context,...]
+  ** QUERY                                      ; [...] A=record eliminati
 // DELETE restituisce il numero di record eliminati, anche "0".
 // DELETE elimina record. Non esiste REMOVE del dataset: struttura e campi
 // crescono dinamicamente; la rimozione strutturale e' amministrazione SQL.
@@ -359,9 +744,26 @@ condizione = calcexp('SQL')
 
 per accesso all' interfaccia web
   ask field [,field]
-  (NO) field= variable [":" style ["(" calcexp ")"]]
+  field= variable [":" style ["(" calcexp ")"]]
   ** passa ad ADDFORM nome, style, valore ed etichetta
+  ** ENDFORM CONTINUAZIONE
+  // CONTINUAZIONE e' la prima istruzione dopo STOP: al POST non vengono
+  // rieseguite la composizione e la visualizzazione del form.
+  // Lo stringone firmato conserva sia valori dello stack sia nomi/posizioni
+  // della symbol table. Il vecchio formato con i soli valori resta leggibile.
+  // Prima di riprendere, il frontend applica i campi ricevuti alle rispettive
+  // celle; omonimi multipli diventano un array EWB. Per un file assegna il
+  // contenuto alla variabile e filename, content_type e size a _nomecampo.
   // Senza espressione l'etichetta e' il nome; per submit e' il testo.
+  // La label e' testo a sinistra del campo. Per un campo "nome":
+  //   label: id="labelnome", class="label"
+  //   campo: id="nome",      class="field"
+  // Non si incorpora l'id del form negli id dei figli: il form e' gia'
+  // identificato. Sono quindi validi e sufficienti:
+  //   #form1 > #labelnome
+  //   #form1 > #nome
+  //   #form1 > .label
+  //   #form1 > .field
   // Compilatore e ADDFORM correnti passano ancora soltanto tre valori.
   style= text, password, submit, textarea, links, option, options,
          checkbox, checks, radio, hidden, info, file
@@ -388,16 +790,47 @@ per accesso all' interfaccia web
   'serve a creare pagine con piu' forms, ciascuno dei quali porta ad un risultato diverso.
   show variabile
   'sostituisce ogni <> nel valore corrente di _template con il testo.
-  '_template e' inizializzata dal runtime, ma e' ridichiarabile.
+  '_template e' inizializzata dal runtime con:
+  '<!doctype html><html><body><div id=_main><></div></body></html>
+  'ma resta ridichiarabile e sovrascrivibile.
   'vuota non mostra nulla; senza <> mostra soltanto il template.
+  'Ogni target genera nella pagina principale:
+  '<div id=_nomeTarget></div>
+  'per esempio il target prova usa <div id=_prova></div>.
+  'Il prefisso _ riserva gli id strutturali generati da EWB e non consuma
+  'gli id naturali che l'utente puo' assegnare ai campi o ad altri elementi.
+  'La chiamata AJAX del target popola il relativo div; _main resta il
+  'contenitore del flusso principale.
   // ASKTO non fa parte di EWB2026.
 
 //per accesso al motore inferenziale SLDNF
-  (NO) assert dataset, variable
-  (NO) retract dataset, variable
-primo parametro: gruppo di clausole, secondo: clausola
-  (NO) goal dataset, variabile blocco
-parametro: il goal. Svolge un ciclo con le var. del goal definite.
+  assert(gruppo, clausola)
+  ** valuta gruppo; PUSHA; valuta clausola; PUSHA; ASSERT
+  retract(gruppo, testa)
+  ** valuta gruppo; PUSHA; valuta testa; PUSHA; RETRACT
+// Il primo parametro identifica il gruppo di clausole; non sceglie la
+// connessione. Le regole sono conservate nel dataset predefinito "ewb",
+// tabella interna "_rules".
+// _rules contiene almeno id, gruppo e clausola; id permette di eliminare
+// esattamente le righe selezionate dal motore.
+// ASSERT carica il gruppo, applica l'assert del motore storico e, se valido,
+// inserisce la clausola. A riceve l'esito. ASSERT e' una primitiva atomica.
+// RETRACT elimina tutte le clausole del gruppo la cui testa fa match con
+// "testa". Se testa e' "", elimina l'intero gruppo. A riceve il numero di
+// clausole eliminate. RETRACT e' una primitiva atomica.
+
+  goal(gruppo, obiettivo) blocco
+  ** valuta gruppo; PUSHA; valuta obiettivo; PUSHA; GOAL
+  ** attraversa la struttura restituita con il frame anonimo di FOREACH
+// Carica da ewb._rules tutte le clausole del gruppo ed esegue il solver
+// storico SLDNF. Il solver conserva concatenazione con virgola, negazione ~
+// e cut !. GOAL e' una primitiva atomica: puo' essere lenta, ma non espone
+// cursori o stati intermedi e restituisce in A la struttura EWB completa di
+// tutte le soluzioni.
+// Il costrutto GOAL attraversa poi questa struttura con la stessa traduzione
+// di FOREACH. Soluzioni e posizione appartengono al frame anonimo del ciclo,
+// quindi ASK, annidamento e ricorsione non condividono stato. Per ogni
+// soluzione valorizza le variabili EWB presenti nei binding ed esegue blocco.
 
 ________________
 per l' uso di stringhe come liste. Sono gli stessi dati che avrei se nella stringa metto un array. 
@@ -409,15 +842,12 @@ mangia ram ma funge.
 // Le chiavi canoniche sono uniche; su duplicati manuali prevale l'ultima.
 // Senza marcatore il testo e' sempre scalare; una struttura marcata malformata
 // provoca RAISE. Chiave e valore vuoti sono ammessi.
-(NO) // Il runtime corrente non usa ancora il marcatore 0x1E.
 // Le operazioni array su scalare non vuoto provocano RAISE. Lo scalare vuoto
 // e' neutro e viene promosso con 0x1E dalla prima operazione mutante.
 // Assegnare "" conserva la chiave con valore vuoto; non elimina l'elemento.
-(NO) // NUMEL, ARRAYPOP, GETPATH e SETPATH correnti non applicano ancora
-     // queste regole in modo uniforme; GETPATH/SETPATH privilegiano inoltre
-     // la prima occorrenza invece dell'ultima nei duplicati manuali.
 
 	push(stack, exp)
+	** PUSH "stack"; valuta exp; PUSHA; ARRAYPUSH
 'Codifica chiave e valore in hex e accoda l'elemento alla struttura.
 'Su scalare non vuoto provoca RAISE; su "" crea exp in posizione 0.
 'La nuova chiave e' max(chiavi numeriche)+1; ignora le chiavi testuali e,
@@ -436,15 +866,27 @@ mangia ram ma funge.
 	//setelem stack,n ,exp //Non servono ho variabile[n] = X, anche miltidimensionale.
 	numel(var)
 'Conta le chiavi numeriche canoniche del primo livello.
-	(NO) numkey(var)
+	numkey(var)
 'Conta tutte le chiavi del primo livello, numeriche e associative.
-	(NO) haskey(var, chiave)
+	** valuta var; PUSHA; NUMKEY
+	keyat(var, posizione)
+'Restituisce la chiave alla posizione indicata nell'ordine della struttura.
+'Posizione negativa o oltre la fine restituisce "".
+	** valuta var; PUSHA; valuta posizione; PUSHA; KEYAT
+	getelem(var, chiave)
+'Restituisce il valore della chiave senza richiedere il nome di una variabile.
+'Una chiave assente restituisce ""; HASKEY permette di distinguerla da un
+'valore vuoto.
+	** valuta var; PUSHA; valuta chiave; PUSHA; GETELEM
+	haskey(var, chiave)
 'Restituisce "1" se la chiave esiste al primo livello, "0" altrimenti.
 'Su scalare non vuoto provoca RAISE; su "" restituisce "0".
-	(NO) delkey(nomevariabile, chiave)
+	** valuta var; PUSHA; valuta chiave; PUSHA; HASKEY
+	delkey(nomevariabile, chiave)
 'Elimina la chiave al primo livello da una variabile semplice e restituisce
 'il valore rimosso; se la chiave e' assente restituisce "".
 'Su scalare non vuoto provoca RAISE; su "" restituisce "".
+	** PUSH "nomevariabile"; valuta chiave; PUSHA; DELKEY
 'Su "" NUMEL e NUMKEY valgono 0; su ogni altro scalare provocano RAISE.
 
 ________________
@@ -452,20 +894,55 @@ Per l' uso di sock stream
 
 Ho la necessita' di comunicare con altri programmi con sock stream o a pacchetto...
 Cerco di fare la cosa nel modo piu' spiccio possibile.
-Le sock sono numeri.
+Le sock sono handle opachi della VM.
 
-	int socket host, port  //crea una client socket ipv4
-	int server port        //trasforma il programma in un server sulla porta.
-	int accept port        //accept.
-	sread socket [size]    //legge una riga dalla porta [fino a size]
-	swrite socket,data     //scrive una riga sulla porta
-    read port              //legge (se c'e') un pacchetto da una porta
-    write host,port,data   //scrive un pacchetto
+	socket(host, port)
+	** valuta host; PUSHA; valuta port; PUSHA; SOCKET
+	// Apre una socket client TCP IPv4 e attiva autoflush.
+	// Se risoluzione o connessione falliscono restituisce falso/vuoto.
+
+	server(port)
+	** valuta port; PUSHA; SERVER
+	// Apre una socket TCP IPv4 in ascolto, backlog 5 e riuso indirizzo.
+	// Se l'apertura fallisce restituisce falso/vuoto.
+
+	accept(server_socket)
+	** valuta server_socket; PUSHA; ACCEPT
+	// Attende una connessione e restituisce la socket client con autoflush.
+	// La chiamata e' bloccante; se fallisce restituisce falso/vuoto.
+
+	sread(socket)
+	** valuta socket; PUSHA; SREAD
+	// Legge una riga. Come nel runtime storico, conserva il newline ricevuto.
+	// EOF o errore restituiscono falso/vuoto.
+
+	swrite(socket, dati)
+	** valuta socket; PUSHA; valuta dati; PUSHA; SWRITE
+	// Scrive i dati esattamente come sono, senza aggiungere newline.
+	// Restituisce l'esito storico della scrittura: vero se riuscita, falso
+	// altrimenti; non il numero dei byte.
+
+	close(socket)
+	** valuta socket; PUSHA; SCLOSE
+	// Chiude la socket e restituisce vero o falso.
+
+// Le socket sono risorse vive del processo e non sono serializzabili. La regola
+// e' generale: qualsiasi risorsa viva della VM che non possa essere ricostruita
+// dal valore serializzato provoca RAISE se compare nello stato da trasferire,
+// in A, nello stack o in una variabile. Vale per ASK e per l'avvio esterno di
+// task e target, che usano lo stesso stringone dello stack. La VM non converte
+// un handle in testo e non tenta di ricostruirlo alla ripresa.
+
+	(NO) read(port)
+	(NO) write(host, port, dati)
+	// Primitive datagram presenti nella sintassi, ma non ritrovate nel runtime
+	// storico disponibile (circa 5.30). Blocco, timeout, risultato ed errori
+	// restano da definire; non si deducono dalle socket TCP.
 ________________
 Per i tasks
     cron nometask(parametri) modocrontab   //"30 * * * *"
     // Persistente; lo stesso target sostituisce pianificazione e parametri.
-    refresh nometarget(parametri), interval  //millisecondi; vedi (NO) sopra
+    refresh nometarget(parametri), interval  //millisecondi
     // Se il task e' running, la scadenza viene saltata.
     run nometarget(parametri)  //AJAX asincrona
     stato del task: in(_tasks.runtime, name='miotask' && stato=="ready") { ... }

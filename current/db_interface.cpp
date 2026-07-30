@@ -393,7 +393,123 @@ static string mysql_list_ids(MYSQL *db)
   mysql_free_result(res);
   return out;
 }
+
+static void mysql_ensure_rules(MYSQL *db)
+{ const char *sql=
+    "create table if not exists `_rules` ("
+    "`id` int unsigned not null auto_increment primary key,"
+    "`gruppo` varchar(250) not null,"
+    "`clausola` longtext not null,"
+    "index (`gruppo`))";
+  if (mysql_query(db,sql)) raiseerr(mysql_error_string(db));
+}
 #endif
+
+vector<EwbRuleRow> db_rule_list(string url, string user, string password,
+                                string group)
+{ DbUri u=parse_context(url);
+  if (u.engine!="mysql") raiseerr("Rules require MySQL");
+#if EWB_DB_WITH_MYSQL
+  MYSQL *db=mysql_open(u,user,password);
+  mysql_ensure_rules(db);
+  string sql="select id, clausola from `_rules` where `gruppo`="+
+             mysql_escape(db,group)+" order by id";
+  if (mysql_query(db,sql.c_str()))
+  { string error=mysql_error_string(db);
+    mysql_close(db);
+    raiseerr(error);
+  }
+  MYSQL_RES *result=mysql_store_result(db);
+  vector<EwbRuleRow> rows;
+  if (result)
+  { MYSQL_ROW row;
+    while ((row=mysql_fetch_row(result)))
+    { unsigned long *lengths=mysql_fetch_lengths(result);
+      EwbRuleRow item;
+      if (row[0]) item.id=string(row[0],lengths[0]);
+      if (row[1]) item.clause=string(row[1],lengths[1]);
+      rows.push_back(item);
+    }
+    mysql_free_result(result);
+  }
+  mysql_close(db);
+  return rows;
+#else
+  raiseerr("MySQL support not compiled");
+  return vector<EwbRuleRow>();
+#endif
+}
+
+string db_rule_insert(string url, string user, string password,
+                      string group, string clause)
+{ DbUri u=parse_context(url);
+  if (u.engine!="mysql") raiseerr("Rules require MySQL");
+#if EWB_DB_WITH_MYSQL
+  MYSQL *db=mysql_open(u,user,password);
+  mysql_ensure_rules(db);
+  string sql="insert into `_rules` (`gruppo`,`clausola`) values ("+
+             mysql_escape(db,group)+","+mysql_escape(db,clause)+")";
+  if (mysql_query(db,sql.c_str()))
+  { string error=mysql_error_string(db);
+    mysql_close(db);
+    raiseerr(error);
+  }
+  string id=to_string((unsigned long long)mysql_insert_id(db));
+  mysql_close(db);
+  return id;
+#else
+  raiseerr("MySQL support not compiled");
+  return "";
+#endif
+}
+
+int db_rule_delete(string url, string user, string password, vector<string> ids)
+{ if (ids.empty()) return 0;
+  DbUri u=parse_context(url);
+  if (u.engine!="mysql") raiseerr("Rules require MySQL");
+#if EWB_DB_WITH_MYSQL
+  MYSQL *db=mysql_open(u,user,password);
+  mysql_ensure_rules(db);
+  string sql="delete from `_rules` where id in (";
+  for (size_t i=0; i<ids.size(); i++)
+  { if (i) sql+=",";
+    sql+=mysql_escape(db,ids[i]);
+  }
+  sql+=")";
+  if (mysql_query(db,sql.c_str()))
+  { string error=mysql_error_string(db);
+    mysql_close(db);
+    raiseerr(error);
+  }
+  int count=(int)mysql_affected_rows(db);
+  mysql_close(db);
+  return count;
+#else
+  raiseerr("MySQL support not compiled");
+  return 0;
+#endif
+}
+
+int db_rule_delete_group(string url, string user, string password, string group)
+{ DbUri u=parse_context(url);
+  if (u.engine!="mysql") raiseerr("Rules require MySQL");
+#if EWB_DB_WITH_MYSQL
+  MYSQL *db=mysql_open(u,user,password);
+  mysql_ensure_rules(db);
+  string sql="delete from `_rules` where `gruppo`="+mysql_escape(db,group);
+  if (mysql_query(db,sql.c_str()))
+  { string error=mysql_error_string(db);
+    mysql_close(db);
+    raiseerr(error);
+  }
+  int count=(int)mysql_affected_rows(db);
+  mysql_close(db);
+  return count;
+#else
+  raiseerr("MySQL support not compiled");
+  return 0;
+#endif
+}
 
 void create_base_database(void)
 { DbUri u=parse_context(DEFAULTENGINE);
@@ -821,8 +937,37 @@ void db_check_transactions(void)
       raiseerr("DB transaction timeout");
 }
 
-void db_close_all(void)
+bool db_has_transactions(void)
 { for (size_t i=0; i<open_databases.size(); i++)
+    if (open_databases[i].transaction) return true;
+  return false;
+}
+
+void db_rollback_all(void)
+{ size_t i=open_databases.size();
+  while (i>0)
+  { OpenDb *d=&open_databases[--i];
+    if (!d->transaction) continue;
+    if (d->engine=="mysql")
+    {
+#if EWB_DB_WITH_MYSQL
+      mysql_query(d->mysql,"rollback");
+#endif
+    } else
+    {
+#if EWB_DB_WITH_POSTGRES
+      PGresult *res=PQexec(d->postgres,"rollback");
+      if (res) PQclear(res);
+#endif
+    }
+    d->transaction=false;
+    d->deadline=0;
+  }
+}
+
+void db_close_all(void)
+{ db_rollback_all();
+  for (size_t i=0; i<open_databases.size(); i++)
   {
 #if EWB_DB_WITH_MYSQL
     if (open_databases[i].mysql) mysql_close(open_databases[i].mysql);

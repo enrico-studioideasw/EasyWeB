@@ -1,0 +1,3 @@
+var nome="Mario";
+ask nome:text("Nome");
+print(nome);

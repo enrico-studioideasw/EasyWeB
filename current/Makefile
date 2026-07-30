@@ -7,16 +7,19 @@ INSTALL_BIN=/usr/local/bin
 SERVICE_DIR=/etc/systemd/system
 RESOURCE_INSTALL_DIR=/usr/local/share/ewb/IA-Resources
 
-all: $(BUILD)/ewbd $(BUILD)/ewb_cgi $(BUILD)/ewIA $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm_parts.o $(BUILD)/vm.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
+all: $(BUILD)/ewb $(BUILD)/ewbd $(BUILD)/ewb_cgi $(BUILD)/ewIA $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/vm.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
+$(BUILD)/ewb: ewb.c opcodes.h ewb_predef.h | $(BUILD)
+	$(CC) -std=gnu11 -Wall -Wextra -Wno-error=implicit-int -Wno-return-mismatch ewb.c -o $(BUILD)/ewb
+
 $(BUILD)/ewbd.o: ewbd.c cgi_parser.h cron_db.h cron_parser.h vm.h | $(BUILD)
 	$(CC) $(CFLAGS) -c ewbd.c -o $(BUILD)/ewbd.o
 
-$(BUILD)/ewbd: $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
-	$(CXX) $(CXXFLAGS) $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o -o $(BUILD)/ewbd -lmysqlclient -lpq
+$(BUILD)/ewbd: $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
+	$(CXX) $(CXXFLAGS) $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o -o $(BUILD)/ewbd -lmysqlclient -lpq
 
 $(BUILD)/cgi_parser.o: cgi_parser.c cgi_parser.h | $(BUILD)
 	$(CC) $(CFLAGS) -c cgi_parser.c -o $(BUILD)/cgi_parser.o
@@ -36,6 +39,9 @@ $(BUILD)/ewb_cgi.o: ewb_cgi.c cgi_parser.h vm.h | $(BUILD)
 $(BUILD)/vm_parts.o: vm_parts.cpp vm_parts.h cron_parser.h | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c vm_parts.cpp -o $(BUILD)/vm_parts.o
 
+$(BUILD)/prolog_engine.o: prolog_engine.cpp prolog_engine.h | $(BUILD)
+	$(CXX) $(CXXFLAGS) -c prolog_engine.cpp -o $(BUILD)/prolog_engine.o
+
 $(BUILD)/vm.o: vm.cpp vm.h vm_parts.h db_interface.h ewb_predef.c | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c vm.cpp -o $(BUILD)/vm.o
 
@@ -45,8 +51,8 @@ $(BUILD)/db_interface.o: db_interface.cpp db_interface.h sql_write_parser.h | $(
 $(BUILD)/sql_write_parser.o: sql_write_parser.cpp sql_write_parser.h | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c sql_write_parser.cpp -o $(BUILD)/sql_write_parser.o
 
-$(BUILD)/ewb_cgi: $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
-	$(CXX) $(CXXFLAGS) $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o -o $(BUILD)/ewb_cgi -lmysqlclient -lpq
+$(BUILD)/ewb_cgi: $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o
+	$(CXX) $(CXXFLAGS) $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o -o $(BUILD)/ewb_cgi -lmysqlclient -lpq
 
 install: all
 	install -m 0755 $(BUILD)/ewbd $(INSTALL_BIN)/ewbd

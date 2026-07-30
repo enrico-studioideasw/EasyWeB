@@ -2,6 +2,7 @@
 #include "vm.h"
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -75,6 +76,22 @@ static const char *program_path(int argc, char **argv)
   return p;
 };
 
+static void state_signature(const char *stackpos, const char *entrypoint,
+                            const char *stack, char out[9])
+{ uint32_t hash=2166136261u;
+  const char *parts[5]={stackpos," ",entrypoint," ",stack};
+  for (int i=0; i<5; i++)
+  { const char *part=parts[i];
+    if (!part) part="";
+    const unsigned char *p=(const unsigned char*)part;
+    while (*p)
+    { hash^=*p++;
+      hash*=16777619u;
+    };
+  };
+  snprintf(out,9,"%08X",hash);
+};
+
 int main(int argc, char **argv)
 { ewb_form form;
   char *program=NULL;
@@ -131,6 +148,28 @@ int main(int argc, char **argv)
   if (form.entrypoint) entrypoint=atoi(form.entrypoint);
   if (form.stackpos) stackpos=atoi(form.stackpos);
   if (form.stack) stack=form.stack;
+  if (form.stack || form.entrypoint || form.stackpos)
+  { char expected[9];
+    state_signature(form.stackpos,form.entrypoint,stack,expected);
+    if (!form.signature || strcmp(form.signature,expected))
+    { ewb_form_free(&form);
+      free(program);
+      printf("Bad CGI signature\n");
+      return 1;
+    };
+  };
+
+  ewb_form_clear();
+  for (int i=0; i<form.nfields; i++)
+  { if (!strncmp(form.fields[i].name,"__",2)) continue;
+    ewb_form_add_field(form.fields[i].name,form.fields[i].value,
+                       form.fields[i].size);
+  };
+  for (int i=0; i<form.nfiles; i++)
+  { ewb_form_add_file(form.files[i].name,form.files[i].filename,
+                      form.files[i].content_type,form.files[i].tmp_path,
+                      form.files[i].size);
+  };
 
   rc=ewb_run_text(program,path,entrypoint,stackpos,stack);
 

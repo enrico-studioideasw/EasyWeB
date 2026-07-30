@@ -1,0 +1,5 @@
+dataset ewb={};
+var X="";
+goal("family","ancestor(mario,X)") {
+  print(X);
+};

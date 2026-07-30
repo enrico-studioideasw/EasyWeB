@@ -246,6 +246,9 @@ per accesso all' interfaccia web
   'links usa testo->destinazione; senza -> usa la stessa stringa per entrambi.
   'la sequenza \-> rappresenta un -> letterale.
   'info mostra soltanto il valore e non genera un campo inviato dal form.
+  'lo stato sospeso conserva stack e symbol table nello stesso stringone
+  'firmato usato anche da task e target. Al rientro i campi aggiornano le
+  'celle per nome; valori omonimi multipli diventano un array EWB.
   'hidden non e' visibile, ma invia normalmente nome e valore.
   ' la richiesta dipende dal valore definito delle variabili prima della ask.
   ' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
@@ -334,9 +337,9 @@ Per i tasks
     'ancora definita: un uso incontrollato puo' accumulare troppi cron.
     'il nome del target identifica il cron: una nuova dichiarazione dello
     'stesso target sostituisce pianificazione e parametri precedenti.
-    refresh nometarget(parametri), interval  //millisecondi; parametri per valore
+    refresh nometarget(parametri), interval  //millisecondi positivi; parametri per valore
     'se alla scadenza il task e' running, la nuova esecuzione non parte.
-    run nometarget(parametri)  //lancia una AJAX asincrona e prosegue
+    run nometarget(parametri)  //un solo invio AJAX asincrono e prosegue
     stato del task: in(_tasks.runtime, name='miotask' && stato=="ready") { ... }
     'gli stati pubblici sono ready, running ed error. Error indica un errore
     'terminato senza essere intercettato da un handler.

@@ -16,14 +16,17 @@
 #include <cstdlib>
 #include <time.h>
 #include <cctype>
+#include <algorithm>
 #include "opcodes.h"
 using namespace std;
 
+void raiseerr(string e);
+
 #define MAXSTACK 10000
-#define MAXLINES 100000  //Qui vedremo di faree qualcosa di dinamico. Intanto deve funzionare. 
+#define MAXLINES 100000  //Qui vedremo di faree qualcosa di dinamico. Intanto deve funzionare.
 #define MAXVAR 2000
-#define POP(v)  { if (SP <= 0) err("Stack underflow"); (v) = stack[--SP]; }
-#define PUSH(v) { if (SP >= MAXSTACK) err("Stack overflow"); stack[SP]=v; SP++; }
+#define POP(v)  { if (SP <= 0) raiseerr("Stack underflow"); (v) = stack[--SP]; }
+#define PUSH(v) { if (SP >= MAXSTACK) raiseerr("Stack overflow"); stack[SP]=v; SP++; }
 
 string stack[MAXSTACK];
 int PC;                       //Program counter
@@ -38,17 +41,43 @@ EWBOpcode codeop[MAXLINES];
 int codeLines=0;
 int RUNNING=1; 
 string PROGRAM_URL="";
+static bool error_handler_running=false;
+static int error_handler_return=-1;
+
+struct PendingFormValue
+{ string name;
+  string value;
+};
+struct PendingFormFile
+{ string name;
+  string filename;
+  string content_type;
+  string path;
+  size_t size;
+};
+static vector<PendingFormValue> pending_form_values;
+static vector<PendingFormFile> pending_form_files;
 
 #include "vm_parts.h"
 #include "db_interface.h"
+#include "prolog_engine.h"
 #include "vm.h"
+
+static bool p_live_resource(string value);
+static void p_close_resources(void);
 
 //Queste rimangono qui: fanno parte della logica di linguaggio.
 string escapeStack()
 { int i;
-  string r;  
+  string r="@";
+  for (i=0; i<ST; i++)
+  { if (i) r+=",";
+    r+=hexEncode(symtname[i])+":"+ewbInt(symtpos[i]);
+  }
+  r+="|";
   for (i=0; i<SP; i++)
-  { r=r + hexEncode(stack[i]);
+  { if (p_live_resource(stack[i])) raiseerr("Live resource cannot be serialized");
+    r=r + hexEncode(stack[i]);
     if (i<SP-1) r = r + ' ';
   };
   return r; 
@@ -77,45 +106,18 @@ int findvar(string varname)
   }; 
   return -1; //Non trovata 
 };
-//Questa fa comodo che diventi una funzione.. dovessimo segnalare qualcosa da sistema.. 
-void raise()
-{ int x=findvar("_on_error");
-  if (x>-1) 
-  { PC=x; //Vado all'indirizzo che c'e' dentro X. Quello dell'error handler. 
-  } else //Gestione interna: segnalo l'errore e mi fermo.  
-  { string e; POP(e); err(e);  
-  };
-};
 
+static int errorHandler(void)
+{ for (int i=ST-1; i>=0; i--)
+    if (symtname[i]=="__on_error") return symtpos[i];
+  return -1;
+}
 void raiseerr(string e)
-{ PUSH(e); raise();
+{ throw e;
 };
 
 string setpath(string s, string value, vector<string> key)
-{ if (key.size() == 0) return value;
-  vector<string> v = split(s, ' ');
-  string k = key[0];
-  string hk = hexEncode(k);
-  string old = "";
-  int found = -1;
-  for (int i=0; i<(int)v.size(); i++)
-  { vector<string> p = split(v[i], ':');
-    if (p.size() >= 2 && p[0] == hk)
-    { found = i;
-      old = hexDecode(p[1]);
-      break;
-    };
-  };
-  if (key.size() == 1)  
-  { old = value;
-  } else 
-  { vector<string> keyb(key.begin() + 1, key.end());
-    old = setpath(old, value, keyb);
-  };
-  if (found >= 0)
-  { v[found] = hk + ":" + hexEncode(old);
-  } else v.push_back(hk + ":" + hexEncode(old));
-  return join(v, " ");
+{ return ewbSetPath(s,value,key);
 }
 EWBOpcode opcode(string IR)
 { string op="";
@@ -126,21 +128,7 @@ EWBOpcode opcode(string IR)
 }
 
 string getpath(string s, vector<string> key)
-{ if (key.size() == 0) return s;
-  vector<string> v = split(s, ' ');
-  string k = key[0];
-  string found = "";
-  // cerca hex(k):qualcosa
-  for (int i=0; i<(int)v.size(); i++)
-  { vector<string> p = split(v[i], ':');
-    if (p.size() >= 2 && hexDecode(p[0]) == k)
-    { found = hexDecode(p[1]);
-      break;
-    }
-  }
-  if (found == "") return "";   // chiave non trovata
-  vector<string> keyb(key.begin() + 1, key.end());
-  return getpath(found, keyb);
+{ return ewbGetPath(s,key);
 }
 
 #define EWB_VM_RUNTIME
@@ -156,11 +144,23 @@ int resume(int xPC,int xSP)
   RUNNING=1; 
   for (;;)
   { if (RUNNING!=1) return RUNNING;
-    if (PC<0 || PC>=codeLines) raiseerr("PC out of code");
-    OP=codeop[PC];
-    if (OP==OPCODE_INVALID)
-    { raiseerr("Unknown opcode");
-    } else if (OP==OP_SUM)
+    try
+    { if (PC==codeLines)
+      { if (db_has_transactions())
+        { db_rollback_all();
+          raiseerr("Program ended with open transaction");
+        }
+        p_close_resources();
+        db_close_all();
+        RUNNING=0;
+        continue;
+      }
+      if (PC<0 || PC>codeLines) raiseerr("PC out of code");
+      db_check_transactions();
+      OP=codeop[PC];
+      if (OP==OPCODE_INVALID)
+      { raiseerr("Unknown opcode");
+      } else if (OP==OP_SUM)
     { POP(y); POP (x); A=ewbSum(x,y);
     } else if (OP==OP_CONCAT)
     { POP(y); POP(x); A = x + y; 
@@ -188,20 +188,49 @@ int resume(int xPC,int xSP)
                OP==OP_SGT || OP==OP_SLT || OP==OP_SEQ || OP==OP_SNEQ || OP==OP_SGE || OP==OP_SLE)
     { POP(y); POP(x); A=ewbCompare(x, y, vm_instr_table[vm_instr(OP)].name); 
     } else if (OP==OP_JZ)
-    { POP(x); if (!ewbTrue(A)) PC=ewbIntValue(x)-1;
+    { if (!ewbTrue(A)) PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_JNZ)
-    { POP(x); if (ewbTrue(A)) PC=ewbIntValue(x)-1;
+    { if (ewbTrue(A)) PC=ewbIntValue(codearg[PC])-1;
+    } else if (OP==OP_JNCONTEXT)
+    { POP(varname);
+      string context="";
+      for (int pos=SP-1; pos>=0 && context==""; pos--)
+      { string candidate=stack[pos];
+        string dataset=candidate+"._dataset";
+        string url=candidate+"._url";
+        for (int i=0; i<ST; i++)
+        { if (symtname[i]==dataset || symtname[i]==url) context=candidate;
+        }
+      }
+      if (context=="") raiseerr("JNCONTEXT without context");
+      string field=varname;
+      string prefix=context+".";
+      if (field.compare(0,prefix.size(),prefix)==0)
+        field=field.substr(prefix.size());
+      string fullname=prefix+field;
+      bool found=false;
+      for (int i=0; i<ST; i++)
+      { if (symtname[i]==fullname) found=true;
+      }
+      if (found) A=field;
+      else PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_JMP)
     { PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_CALL)
-    { POP(x); 
-      int tmp=SP;
-      SP = SP - ewbIntValue(x) + 1;
-      PUSH(codearg[PC]);    //Metto PC in posizione SP-(arity+1). Ho gia preparato il "buco".
-      SP=tmp; 
-      PC=ewbIntValue(A)-1;  //E sono saltato..  
+    { POP(x);
+      int arity=ewbIntValue(x);
+      int return_position=SP-arity-1;
+      if (arity<0 || return_position<0) raiseerr("Bad CALL frame");
+      stack[return_position]=ewbInt(PC+1);
+      PC=ewbIntValue(codearg[PC])-1;
     } else if (OP==OP_RET)
-    { POP(x); PC=ewbIntValue(x)-1;             //E  sono tornato..
+    { POP(x);
+      int destination=ewbIntValue(x);
+      if (error_handler_running && destination==error_handler_return)
+      { error_handler_running=false;
+        error_handler_return=-1;
+      }
+      PC=destination-1;
     } else if (OP==OP_MOVA)                   //Unica istruzione con parametri.. Mi adeguo.. prendo il dato dallo stack.  
     { A=codearg[PC];                  //Metto il valore in accumulatore.
     } else if (OP==OP_PUSHA)
@@ -211,9 +240,10 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_POPA)
     { POP(A);  
     } else if (OP==OP_ADDSYMTABLE) //Aggiunge la variabile alla symbol table. Va seguita da un push del valore. 
-    { symtname[ST]=codearg[PC]; 
+    { if (ST>=MAXVAR) raiseerr("Vars overflow");
+      symtname[ST]=codearg[PC];
       symtpos[ST]=SP; 
-      ST++; if (ST>=MAXVAR) err("Vars overflow");
+      ST++;
     } else if (OP==OP_DELSYMTABLE)
     { int n=ewbIntValue(codearg[PC]);
       ST=ST-n;
@@ -225,25 +255,34 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_INCSP)
     { int n=ewbIntValue(codearg[PC]);
       SP=SP+n;
-      if (SP<0) err("Stack underflow");
+      if (SP<0) raiseerr("Stack underflow");
+      if (SP>MAXSTACK) raiseerr("Stack overflow");
     } else if (OP==OP_STARTFORM)
-    { A="<form method=post id=__form" + to_string(IDF) + " enctype=multipart/form-data>";
-      IDF++;  
+    { IDF++;
+      A="<form method=post id=form" + to_string(IDF) + " enctype=multipart/form-data>";
     } else if (OP==OP_STARTTARGET)
-    { A="<form style=visibility:hidden id=__form" + to_string(IDF) + " method=post enctype=multipart/form-data>";
-      IDF++; 
+    { IDF++;
+      A="<form style=visibility:hidden id=form" + to_string(IDF) + " method=post enctype=multipart/form-data>";
     } else if (OP==OP_ADDFORM)
     { p_addform(&A);
     } else if (OP==OP_ENDFORM)
-    { string stacktext=escapeStack();
+    { string form;
+      int continuation=ewbIntValue(codearg[PC]);
+      POP(form);
+      string stacktext=escapeStack();
+      int saved_stack_position=SP;
+      PUSH(form);
       A="<textarea name=__stack id=__stack>" + stacktext + "</textarea>\n" +
-        "<input name=__entrypoint id=__entrypoint value=\"" + ewbInt(PC+1) + "\">\n" +
-        "<input name=__stackpos id=__stackpos value=\"" + ewbInt(SP) + "\">\n" +
-        "<input name=__signature id=__signature value=\"" + signature(ewbInt(SP) + " " + ewbInt(PC+1) + " " + stacktext) + "\">\n</form>\n";
+        "<input name=__entrypoint id=__entrypoint value=\"" + ewbInt(continuation) + "\">\n" +
+        "<input name=__stackpos id=__stackpos value=\"" + ewbInt(saved_stack_position) + "\">\n" +
+        "<input name=__signature id=__signature value=\"" + signature(ewbInt(saved_stack_position) + " " + ewbInt(continuation) + " " + stacktext) + "\">\n</form>\n";
     } else if (OP==OP_DBLOCK)
     { p_lock(&A);
     } else if (OP==OP_DBUNLOCK)
     { p_unlock(&A);
+    } else if (OP==OP_DBROLLBACK)
+    { db_rollback_all();
+      A="1";
     } else if (OP==OP_PRINT)
     { p_print(&A);
     } else if (OP==OP_EPRINT)
@@ -282,6 +321,41 @@ int resume(int xPC,int xSP)
     { p_arraypop(&A);
     } else if (OP==OP_NUMEL)
     { p_numel(&A);
+    } else if (OP==OP_NUMKEY)
+    { POP(x);
+      A=ewbInt(ewbNumKey(x));
+    } else if (OP==OP_KEYAT)
+    { POP(y);
+      POP(x);
+      A=ewbKeyAt(x,ewbIntValue(y));
+    } else if (OP==OP_GETELEM)
+    { POP(y);
+      POP(x);
+      A=ewbGetElement(x,y);
+    } else if (OP==OP_HASKEY)
+    { POP(y);
+      POP(x);
+      A=ewbHasKey(x,y);
+    } else if (OP==OP_DELKEY)
+    { POP(y);
+      POP(varname);
+      int position=findvar(varname);
+      if (position<0) raiseerr("Unknown array: "+varname);
+      A=ewbDeleteKey(&stack[position],y);
+    } else if (OP==OP_SPLIT)
+    { POP(y);
+      POP(x);
+      A=ewbSplit(x,y);
+    } else if (OP==OP_JOIN)
+    { POP(y);
+      POP(x);
+      A=ewbJoin(x,y);
+    } else if (OP==OP_ARRAYPUSH)
+    { POP(x);
+      POP(varname);
+      int position=findvar(varname);
+      if (position<0) raiseerr("Unknown array: "+varname);
+      A=ewbArrayPush(&stack[position],x);
     } else if (OP==OP_TIME)
     { p_time(&A);
     } else if (OP==OP_DATE)
@@ -290,19 +364,181 @@ int resume(int xPC,int xSP)
     { p_random(&A);
     } else if (OP==OP_SLEEP)
     { p_sleep(&A);
+    } else if (OP==OP_EXEC)
+    { p_exec(&A);
+    } else if (OP==OP_SOCKET)
+    { p_socket_open(&A);
+    } else if (OP==OP_SERVER)
+    { p_server_open(&A);
+    } else if (OP==OP_ACCEPT)
+    { p_socket_accept(&A);
+    } else if (OP==OP_SREAD)
+    { p_socket_read(&A);
+    } else if (OP==OP_SWRITE)
+    { p_socket_write(&A);
+    } else if (OP==OP_SCLOSE)
+    { p_socket_close(&A);
+    } else if (OP==OP_ASSERT)
+    { string clause, group;
+      POP(clause);
+      POP(group);
+      if (!prologValidRule(clause)) raiseerr("Invalid rule");
+      int url_position=findvar("ewb._url");
+      int user_position=findvar("ewb._user");
+      int password_position=findvar("ewb._password");
+      if (url_position<0 || user_position<0 || password_position<0)
+        raiseerr("Missing ewb dataset");
+      db_rule_insert(stack[url_position],stack[user_position],
+                     stack[password_position],group,clause);
+      A="1";
+    } else if (OP==OP_RETRACT)
+    { string head, group;
+      POP(head);
+      POP(group);
+      int url_position=findvar("ewb._url");
+      int user_position=findvar("ewb._user");
+      int password_position=findvar("ewb._password");
+      if (url_position<0 || user_position<0 || password_position<0)
+        raiseerr("Missing ewb dataset");
+      string url=stack[url_position];
+      string user=stack[user_position];
+      string password=stack[password_position];
+      if (head=="")
+      { A=ewbInt(db_rule_delete_group(url,user,password,group));
+      }
+      else
+      { vector<EwbRuleRow> rules=db_rule_list(url,user,password,group);
+        vector<string> ids;
+        for (size_t i=0; i<rules.size(); i++)
+        { if (prologHeadMatches(head,rules[i].clause)) ids.push_back(rules[i].id);
+        }
+        A=ewbInt(db_rule_delete(url,user,password,ids));
+      }
+    } else if (OP==OP_GOAL)
+    { string objective, group;
+      POP(objective);
+      POP(group);
+      int url_position=findvar("ewb._url");
+      int user_position=findvar("ewb._user");
+      int password_position=findvar("ewb._password");
+      if (url_position<0 || user_position<0 || password_position<0)
+        raiseerr("Missing ewb dataset");
+      vector<EwbRuleRow> stored=db_rule_list(
+        stack[url_position],stack[user_position],stack[password_position],group);
+      vector<string> clauses;
+      for (size_t i=0; i<stored.size(); i++) clauses.push_back(stored[i].clause);
+      vector<map<string,string> > solutions;
+      try
+      { solutions=prologSolve(objective,clauses);
+      }
+      catch (const exception &)
+      { raiseerr("Invalid goal or rule set");
+      }
+      A="";
+      for (size_t i=0; i<solutions.size(); i++)
+      { string bindings="";
+        for (map<string,string>::const_iterator item=solutions[i].begin();
+             item!=solutions[i].end(); ++item)
+        { vector<string> path(1,item->first);
+          bindings=ewbSetPath(bindings,item->second,path);
+        }
+        vector<string> path(1,to_string(i));
+        A=ewbSetPath(A,bindings,path);
+      }
     } else if (OP==OP_STOP)
-    { db_close_all();
-      RUNNING=0; //In attesa di rientrare dall'entry point PC 
-    } else if (OP==OP_RUNTARGET) //run TARGET - come STOP - Mi faccio passare l'entry point
-    { string interval;
-      POP(interval); POP(varname); 
-      string EP=stack[findvar(varname)]; //posizione del target. 
-      cout << "<textarea name=__stack   id=__stack     >" << escapeStack() << "</textarea>\n"; 
-      cout << "<input name=__entrypoint id=__entrypoint value=\"" << EP << "\">\n"; 
-      cout << "<input name=__stackpos   id=__stackpos   value=\"" << SP << "\">\n"; 
-      cout << "<input name=__signature  id=__signature  value=\"" << signature(ewbInt(SP) + " " + EP + " " + escapeStack()) << "\">\n"; 
-      cout << "</form>\n";
-      cout << "<script>runtarget(" << (IDF-1) << "," << interval << ");</script>\n";  
+    { if (db_has_transactions())
+      { db_rollback_all();
+        raiseerr("STOP with open transaction");
+      }
+      p_close_resources();
+      db_close_all();
+      RUNNING=0;
+    } else if (OP==OP_RUNTARGET)
+    { string arity_text, target_name;
+      POP(arity_text);
+      int arity=ewbIntValue(arity_text);
+      if (arity<0 || arity>SP-1) raiseerr("Bad target arity");
+      vector<string> parameters((size_t)arity);
+      for (int i=arity-1; i>=0; i--) POP(parameters[(size_t)i]);
+      POP(target_name);
+      for (size_t i=0; i<parameters.size(); i++)
+      { if (p_live_resource(parameters[i]))
+          raiseerr("Live resource cannot be serialized");
+      }
+      string stacktext=escapeStack();
+      if (stacktext!="") stacktext+=" ";
+      stacktext+=hexEncode(ewbInt(codeLines));
+      for (size_t i=0; i<parameters.size(); i++)
+        stacktext+=" "+hexEncode(parameters[i]);
+      int target_stack_position=SP+1+arity;
+      int entrypoint=ewbIntValue(codearg[PC]);
+      string signed_state=ewbInt(target_stack_position)+" "+
+                          ewbInt(entrypoint)+" "+stacktext;
+
+      IDF++;
+      string form_id="form"+to_string(IDF);
+      cout << "<form style=\"display:none\" id=\"" << form_id
+           << "\" method=\"post\" enctype=\"multipart/form-data\">"
+           << "<textarea name=__stack id=__stack>" << stacktext << "</textarea>\n"
+           << "<input name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
+           << "<input name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
+           << "<input name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
+           << "</form>\n";
+      cout << "<script>(async function(){const f=document.getElementById('"
+           << form_id << "');const r=await fetch(f.action||location.href,"
+           << "{method:'POST',body:new FormData(f)});const t=await r.text();"
+           << "const d=new DOMParser().parseFromString(t,'text/html');"
+           << "const n=d.getElementById('_" << p_html(target_name)
+           << "'),c=document.getElementById('_" << p_html(target_name)
+           << "');if(r.ok&&n&&c)c.replaceChildren(...n.childNodes);})();</script>\n";
+      A="";
+    } else if (OP==OP_REFRESHTARGET)
+    { string interval, arity_text, target_name;
+      POP(interval);
+      int milliseconds=ewbIntValue(interval);
+      if (milliseconds<=0) raiseerr("Refresh interval must be positive");
+      POP(arity_text);
+      int arity=ewbIntValue(arity_text);
+      if (arity<0 || arity>SP-1) raiseerr("Bad target arity");
+      vector<string> parameters((size_t)arity);
+      for (int i=arity-1; i>=0; i--) POP(parameters[(size_t)i]);
+      POP(target_name);
+      for (size_t i=0; i<parameters.size(); i++)
+      { if (p_live_resource(parameters[i]))
+          raiseerr("Live resource cannot be serialized");
+      }
+      string stacktext=escapeStack();
+      if (stacktext!="") stacktext+=" ";
+      stacktext+=hexEncode(ewbInt(codeLines));
+      for (size_t i=0; i<parameters.size(); i++)
+        stacktext+=" "+hexEncode(parameters[i]);
+      int target_stack_position=SP+1+arity;
+      int entrypoint=ewbIntValue(codearg[PC]);
+      string signed_state=ewbInt(target_stack_position)+" "+
+                          ewbInt(entrypoint)+" "+stacktext;
+
+      IDF++;
+      string form_id="form"+to_string(IDF);
+      cout << "<form style=\"display:none\" id=\"" << form_id
+           << "\" method=\"post\" enctype=\"multipart/form-data\">"
+           << "<textarea name=__stack id=__stack>" << stacktext << "</textarea>\n"
+           << "<input name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
+           << "<input name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
+           << "<input name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
+           << "</form>\n";
+      cout << "<script>(function(){let f=document.getElementById('"
+           << form_id << "');let busy=false;async function tick(){if(busy)return;"
+           << "busy=true;try{const r=await fetch(f.action||location.href,"
+           << "{method:'POST',body:new FormData(f)});const t=await r.text();"
+           << "const d=new DOMParser().parseFromString(t,'text/html');"
+           << "const n=d.getElementById('_" << p_html(target_name)
+           << "'),c=document.getElementById('_" << p_html(target_name)
+           << "'),nf=d.getElementById('" << form_id << "');"
+           << "if(r.ok&&n&&c){c.replaceChildren(...n.childNodes);"
+           << "if(nf){f.replaceWith(nf);f=nf;}}}finally{busy=false;}}tick();"
+           << "const ms=" << milliseconds
+           << ";setInterval(tick,ms);})();</script>\n";
+      A="";
     } else if (OP==OP_CRONTASK) //cron task 
     { int arity=ewbIntValue(codearg[PC]);
       string cronstring, taskname;
@@ -419,33 +655,76 @@ int resume(int xPC,int xSP)
       }
       A=run_query(url,user,password,context,fields,query,orderby);
     } 
-    else if (OP==OP_ONERROR) //Visibilità, sempre l'ultima in ricorsione.  
-    { POP(varname); 
-      symtname[ST]="__on_error"; 
-      symtpos[ST]=ewbIntValue(varname); 
-      ST++; if (ST>=MAXVAR) err("Vars overflow");
+    else if (OP==OP_ONERROR)
+    { POP(varname);
+      int write=0;
+      for (int read=0; read<ST; read++)
+      { if (symtname[read]!="__on_error")
+        { if (write!=read)
+          { symtname[write]=symtname[read];
+            symtpos[write]=symtpos[read];
+          }
+          write++;
+        }
+      }
+      ST=write;
+      if (varname!="")
+      { if (ST>=MAXVAR) raiseerr("Vars overflow");
+        symtname[ST]="__on_error";
+        symtpos[ST]=ewbIntValue(varname);
+        ST++;
+      }
     } else if (OP==OP_RAISE) //c'e' l'errore. 
-    { raise();    
+    { POP(x);
+      raiseerr(x);
     } else if (OP==OP_SETPATH) //Nasconde nelle stringhe la complessità degli array
     { /* PUSH "a"; PUSH "3"; PUSH "5"; PUSH "pippo"; SETPATH 2; */
       int numlev=ewbIntValue(codearg[PC]);
       POP(x); //Value
       //pop array di livelli
-      vector <string> v; 
+      vector <string> v;
       for (int i=0; i<numlev; i++) { POP(A); v.push_back(A); };
+      reverse(v.begin(),v.end());
       POP(varname);
-      A=stack[findvar(varname)];
-      stack[findvar(varname)] = setpath(A, x, v);  
+      int position=findvar(varname);
+      if (position<0) raiseerr("Unknown variable: "+varname);
+      A=stack[position];
+      stack[position]=setpath(A,x,v);
+      A=x;
     } else if (OP==OP_GETPATH) //Nasconde nelle stringhe la complessità degli array
     { /* PUSH "a"; PUSH "3"; PUSH "5"; PUSH 2; GETPATH */
       POP(x);
       int numlev=ewbIntValue(x);
-      vector <string> v; 
+      vector <string> v;
       for (int i=0; i<numlev; i++) { POP(A); v.push_back(A); };
+      reverse(v.begin(),v.end());
       POP(varname);
-      A=getpath(stack[findvar(varname)], v);     
-    };
-    PC++; 
+      int position=findvar(varname);
+      if (position<0) raiseerr("Unknown variable: "+varname);
+      A=getpath(stack[position],v);
+    } else if (OP==OP_SQLQUOTE)
+    { POP(x);
+      A=db_quote(x);
+    } else if (OP==OP_SQLNUMBER)
+    { POP(x);
+      A=ewbNumber(ewbValue(x));
+    } else raiseerr("Opcode not implemented");
+    }
+    catch (const string &e)
+    { db_rollback_all();
+      int handler=errorHandler();
+      if (error_handler_running || handler<0)
+      { err(e);
+        continue;
+      }
+      error_handler_running=true;
+      error_handler_return=PC+1;
+      PUSH(ewbInt(error_handler_return));
+      PUSH(e);
+      PC=handler;
+      continue;
+    }
+    PC++;
   };
 };
 
@@ -512,23 +791,114 @@ static void loadProgramBinary(const unsigned char *program, size_t len)
 
 // Se il primo byte e' 0x00 usa il formato binario, altrimenti il testo.
 static void loadProgram(const char *program, size_t len)
-{ if (!program) err("No program");
+{ RUNNING=1;
+  error_handler_running=false;
+  error_handler_return=-1;
+  if (!program) err("No program");
   if (len>0 && ((const unsigned char*)program)[0]==0)
   { loadProgramBinary((const unsigned char*)program, len);
   } else loadProgramText(program);
 }
 
 static void loadStack(const char *encoded_stack, int stackpos)
-{ SP=0; string A; 
-  vector<string> v=split(encoded_stack, ' ');
+{ p_close_resources();
+  SP=0;
+  ST=0;
+  string A;
+  string encoded=encoded_stack ? encoded_stack : "";
+  if (encoded.size()>0 && encoded[0]=='@')
+  { size_t separator=encoded.find('|');
+    if (separator==string::npos) raiseerr("Serialized symbol table");
+    string symbols=encoded.substr(1,separator-1);
+    vector<string> entries=split(symbols,',');
+    for (size_t i=0; i<entries.size(); i++)
+    { if (entries[i]=="") continue;
+      size_t colon=entries[i].find(':');
+      if (colon==string::npos || ST>=MAXVAR) raiseerr("Serialized symbol");
+      symtname[ST]=hexDecode(entries[i].substr(0,colon));
+      symtpos[ST]=ewbIntValue(entries[i].substr(colon+1));
+      ST++;
+    }
+    encoded=encoded.substr(separator+1);
+  }
+  vector<string> v=split(encoded, ' ');
   for (int i=0; i<(int)v.size(); i++) if (v[i]!="") { A=hexDecode(v[i]); PUSH(A); };
   if (stackpos==0)
-  { stack[0]="<html><body bgcolor=lightyellow><div align=center><></body></html>";
+  { stack[0]="<!doctype html><html><body><div id=_main><></div></body></html>";
     SP=1;
-  } else SP=stackpos;
-  symtname[0]="_template";
-  symtpos[0]=0;
-  ST=1;
+    symtname[0]="_template";
+    symtpos[0]=0;
+    ST=1;
+  }
+  else
+  { SP=stackpos;
+    if (ST==0)
+    { symtname[0]="_template";
+      symtpos[0]=0;
+      ST=1;
+    }
+  }
+
+  for (size_t i=0; i<pending_form_values.size(); i++)
+  { bool handled=false;
+    int count=0;
+    for (size_t j=0; j<i; j++)
+      if (pending_form_values[j].name==pending_form_values[i].name) handled=true;
+    if (handled) continue;
+    for (size_t j=i; j<pending_form_values.size(); j++)
+      if (pending_form_values[j].name==pending_form_values[i].name) count++;
+    int position=findvar(pending_form_values[i].name);
+    if (position<0) continue;
+    if (count==1) stack[position]=pending_form_values[i].value;
+    else
+    { stack[position]="";
+      for (size_t j=i; j<pending_form_values.size(); j++)
+      { if (pending_form_values[j].name==pending_form_values[i].name)
+          ewbArrayPush(&stack[position],pending_form_values[j].value);
+      }
+    }
+  }
+  for (size_t i=0; i<pending_form_files.size(); i++)
+  { ifstream input(pending_form_files[i].path.c_str(),ios::binary);
+    string content((istreambuf_iterator<char>(input)),istreambuf_iterator<char>());
+    int position=findvar(pending_form_files[i].name);
+    if (position>=0) stack[position]=content;
+    position=findvar("_"+pending_form_files[i].name);
+    if (position>=0)
+    { vector<string> path(1,"filename");
+      stack[position]=ewbSetPath(stack[position],pending_form_files[i].filename,path);
+      path[0]="content_type";
+      stack[position]=ewbSetPath(stack[position],pending_form_files[i].content_type,path);
+      path[0]="size";
+      stack[position]=ewbSetPath(stack[position],to_string(pending_form_files[i].size),path);
+    }
+  }
+  pending_form_values.clear();
+  pending_form_files.clear();
+}
+
+extern "C" void ewb_form_clear(void)
+{ pending_form_values.clear();
+  pending_form_files.clear();
+}
+
+extern "C" void ewb_form_add_field(const char *name, const char *value, size_t size)
+{ PendingFormValue item;
+  if (name) item.name=name;
+  if (value) item.value.assign(value,size);
+  pending_form_values.push_back(item);
+}
+
+extern "C" void ewb_form_add_file(const char *name, const char *filename,
+                                  const char *content_type, const char *path,
+                                  size_t size)
+{ PendingFormFile item;
+  if (name) item.name=name;
+  if (filename) item.filename=filename;
+  if (content_type) item.content_type=content_type;
+  if (path) item.path=path;
+  item.size=size;
+  pending_form_files.push_back(item);
 }
 
 extern "C" int ewb_run_text(const char *program, const char *program_url, int entrypoint, int stackpos, const char *encoded_stack)

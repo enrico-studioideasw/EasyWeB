@@ -233,6 +233,261 @@ string togliVirgolette(string s)
   return r;
 }
 
+struct EwbArrayEntry
+{ string key;
+  string value;
+};
+
+static vector<EwbArrayEntry> ewbArrayDecode(string value)
+{ vector<EwbArrayEntry> entries;
+  if (value=="") return entries;
+  if ((unsigned char)value[0]!=0x1e) raiseerr("Array expected");
+  if (value.size()==1) return entries;
+  if (value[1]==' ' || value.back()==' ') raiseerr("Array format");
+
+  size_t begin=1;
+  while (begin<value.size())
+  { size_t end=value.find(' ',begin);
+    if (end==string::npos) end=value.size();
+    if (end==begin) raiseerr("Array format");
+    string token=value.substr(begin,end-begin);
+    size_t colon=token.find(':');
+    if (colon==string::npos || token.find(':',colon+1)!=string::npos)
+      raiseerr("Array format");
+
+    EwbArrayEntry entry;
+    entry.key=hexDecode(token.substr(0,colon));
+    entry.value=hexDecode(token.substr(colon+1));
+    for (size_t i=0; i<entries.size();)
+    { if (entries[i].key==entry.key) entries.erase(entries.begin()+i);
+      else i++;
+    }
+    entries.push_back(entry);
+    if (end==value.size()) break;
+    begin=end+1;
+  }
+  return entries;
+}
+
+static string ewbArrayEncode(const vector<EwbArrayEntry> &entries)
+{ string result;
+  result+=(char)0x1e;
+  for (size_t i=0; i<entries.size(); i++)
+  { if (i) result+=" ";
+    result+=hexEncode(entries[i].key);
+    result+=":";
+    result+=hexEncode(entries[i].value);
+  }
+  return result;
+}
+
+static bool ewbNumericKey(string key,int *number)
+{ if (key=="0")
+  { *number=0;
+    return true;
+  }
+  if (key=="" || key[0]=='0') return false;
+  long long value=0;
+  for (size_t i=0; i<key.size(); i++)
+  { if (key[i]<'0' || key[i]>'9') return false;
+    value=value*10+key[i]-'0';
+    if (value>numeric_limits<int>::max()) return false;
+  }
+  *number=(int)value;
+  return true;
+}
+
+bool ewbIsArray(string value)
+{ return value!="" && (unsigned char)value[0]==0x1e;
+}
+
+int ewbNumKey(string value)
+{ return (int)ewbArrayDecode(value).size();
+}
+
+int ewbNumEl(string value)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  int count=0;
+  for (size_t i=0; i<entries.size(); i++)
+  { int number;
+    if (ewbNumericKey(entries[i].key,&number)) count++;
+  }
+  return count;
+}
+
+string ewbArrayPush(string *value, string element)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(*value);
+  unsigned long long next=0;
+  for (size_t i=0; i<entries.size(); i++)
+  { int number;
+    if (!ewbNumericKey(entries[i].key,&number)) continue;
+    unsigned long long key=(unsigned long long)number;
+    if (key>=next) next=key+1;
+  }
+  vector<string> path(1,to_string(next));
+  *value=ewbSetPath(*value,element,path);
+  return element;
+}
+
+string ewbSplit(string separator, string value)
+{ string result="";
+  if (ewbIsArray(value))
+  { vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+    for (size_t i=0; i<entries.size(); i++)
+    { string item=entries[i].value;
+      int number;
+      if (!ewbNumericKey(entries[i].key,&number))
+      { string pair="";
+        vector<string> first(1,"0");
+        vector<string> second(1,"1");
+        pair=ewbSetPath(pair,entries[i].key,first);
+        pair=ewbSetPath(pair,entries[i].value,second);
+        item=pair;
+      }
+      ewbArrayPush(&result,item);
+    }
+    return result;
+  }
+
+  if (value=="") return string(1,(char)0x1e);
+  if (separator=="")
+  { for (size_t i=0; i<value.size(); i++)
+      ewbArrayPush(&result,value.substr(i,1));
+    return result;
+  }
+
+  size_t begin=0;
+  for (;;)
+  { size_t end=value.find(separator,begin);
+    if (end==string::npos)
+    { ewbArrayPush(&result,value.substr(begin));
+      break;
+    }
+    ewbArrayPush(&result,value.substr(begin,end-begin));
+    begin=end+separator.size();
+  }
+  return result;
+}
+
+string ewbJoin(string separator, string value)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  bool structured=false;
+  for (size_t i=0; i<entries.size(); i++)
+  { if (ewbIsArray(entries[i].value))
+    { vector<EwbArrayEntry> pair=ewbArrayDecode(entries[i].value);
+      if (pair.size()==2 && pair[0].key=="0" && pair[1].key=="1")
+        structured=true;
+    }
+  }
+
+  if (structured)
+  { string result="";
+    for (size_t i=0; i<entries.size(); i++)
+    { string item=entries[i].value;
+      if (ewbIsArray(item))
+      { vector<EwbArrayEntry> pair=ewbArrayDecode(item);
+        if (pair.size()==2 && pair[0].key=="0" && pair[1].key=="1")
+        { vector<string> path(1,pair[0].value);
+          result=ewbSetPath(result,pair[1].value,path);
+          continue;
+        }
+      }
+      ewbArrayPush(&result,item);
+    }
+    return result;
+  }
+
+  string result="";
+  for (size_t i=0; i<entries.size(); i++)
+  { if (i) result+=separator;
+    result+=entries[i].value;
+  }
+  return result;
+}
+
+string ewbKeyAt(string value,int position)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  if (position<0 || position>=(int)entries.size()) return "";
+  return entries[position].key;
+}
+
+string ewbHasKey(string value,string key)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  for (size_t i=0; i<entries.size(); i++)
+    if (entries[i].key==key) return "1";
+  return "0";
+}
+
+string ewbGetElement(string value,string key)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  for (size_t i=0; i<entries.size(); i++)
+    if (entries[i].key==key) return entries[i].value;
+  return "";
+}
+
+static string ewbSetElement(string value,string key,string element)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(value);
+  for (size_t i=0; i<entries.size(); i++)
+  { if (entries[i].key==key)
+    { entries[i].value=element;
+      return ewbArrayEncode(entries);
+    }
+  }
+  EwbArrayEntry entry;
+  entry.key=key;
+  entry.value=element;
+  entries.push_back(entry);
+  return ewbArrayEncode(entries);
+}
+
+string ewbSetPath(string value,string element,vector<string> path)
+{ if (path.empty()) return element;
+  string child=ewbGetElement(value,path[0]);
+  vector<string> remaining(path.begin()+1,path.end());
+  child=ewbSetPath(child,element,remaining);
+  return ewbSetElement(value,path[0],child);
+}
+
+string ewbGetPath(string value,vector<string> path)
+{ if (path.empty()) return value;
+  string child=ewbGetElement(value,path[0]);
+  if (child=="" && ewbHasKey(value,path[0])=="0") return "";
+  vector<string> remaining(path.begin()+1,path.end());
+  return ewbGetPath(child,remaining);
+}
+
+string ewbDeleteKey(string *value,string key)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(*value);
+  string removed="";
+  for (size_t i=0; i<entries.size(); i++)
+  { if (entries[i].key==key)
+    { removed=entries[i].value;
+      entries.erase(entries.begin()+i);
+      *value=ewbArrayEncode(entries);
+      return removed;
+    }
+  }
+  return "";
+}
+
+string ewbArrayPop(string *value)
+{ vector<EwbArrayEntry> entries=ewbArrayDecode(*value);
+  int best=-1;
+  int best_number=-1;
+  for (size_t i=0; i<entries.size(); i++)
+  { int number;
+    if (ewbNumericKey(entries[i].key,&number) && number>best_number)
+    { best=(int)i;
+      best_number=number;
+    }
+  }
+  if (best<0) return "";
+  string removed=entries[best].value;
+  entries.erase(entries.begin()+best);
+  *value=ewbArrayEncode(entries);
+  return removed;
+}
+
 // Legge una stringa binaria quotata e delega gli escape a togliVirgolette().
 string readBinaryString(const unsigned char *program, size_t len, size_t *pos)
 { string r;

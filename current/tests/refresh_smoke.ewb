@@ -1,0 +1,5 @@
+target prova(testo) {
+  print(testo);
+};
+refresh prova("ciao"),1000;
+run prova("una volta");

@@ -1,0 +1,11 @@
+dataset ewb={};
+var X="";
+retract("smoke","");
+assert("smoke","parent(mario,luca).");
+assert("smoke","parent(luca,anna).");
+assert("smoke","ancestor(A,B):=parent(A,B).");
+assert("smoke","ancestor(A,B):=parent(A,C),ancestor(C,B).");
+goal("smoke","ancestor(mario,X)") {
+  print(X);
+};
+retract("smoke","");

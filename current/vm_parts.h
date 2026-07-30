@@ -46,6 +46,19 @@ int validCronString(string s);
 void create_base_tables(string url, string user, string password);
 vector<string> split(string s, char sep);
 string join(vector<string> v, string sep);
+bool ewbIsArray(string value);
+string ewbSetPath(string value, string element, vector<string> path);
+string ewbGetPath(string value, vector<string> path);
+string ewbGetElement(string value, string key);
+string ewbKeyAt(string value, int position);
+string ewbHasKey(string value, string key);
+string ewbDeleteKey(string *value, string key);
+string ewbArrayPop(string *value);
+int ewbNumKey(string value);
+int ewbNumEl(string value);
+string ewbSplit(string separator, string value);
+string ewbJoin(string separator, string value);
+string ewbArrayPush(string *value, string element);
 
 // Qui accesso a SQL. Cercheremo di fare query semplici.
 tipodb      sql_connect(string uri, string user, string pass, string db);

@@ -1,0 +1,7 @@
+var a="";
+var v="";
+a[0]="A";
+a[1]="B";
+foreach(v,a) {
+  print(v);
+};

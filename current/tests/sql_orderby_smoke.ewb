@@ -1,0 +1,3 @@
+dataset persone={nome,cognome};
+persone._orderby=nome,cognome>2;
+print(persone._orderby);

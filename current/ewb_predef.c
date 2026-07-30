@@ -8,9 +8,18 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <map>
+#include <poll.h>
 #include <random>
 #include <sstream>
 #include <thread>
+#include <cerrno>
+#include <cstring>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 /*
  * Primitive richiamate dal dispatch della VM.
@@ -78,47 +87,56 @@ static string p_html(string value)
 
 static vector<string> p_array_values(string value)
 { vector<string> result;
-  vector<string> elements=split(value,' ');
-  for (size_t i=0; i<elements.size(); i++)
-  { size_t separator=elements[i].find(':');
-    if (separator==string::npos) continue;
-    result.push_back(hexDecode(elements[i].substr(separator+1)));
+  int count=ewbNumKey(value);
+  for (int i=0; i<count; i++)
+  { string key=ewbKeyAt(value,i);
+    result.push_back(ewbGetElement(value,key));
   }
   return result;
 }
 
 static void p_addform(string *accumulator)
 { string name,type,value,label;
+  POP(label);
   POP(value);
   POP(type);
   POP(name);
-  label=name;
-  if (type=="submit") label="";
 
   string field="";
   if (type=="text" || type=="password" || type=="hidden" || type=="file")
-  { field="<input name=\"" + p_html(name) + "\" type=\"" + type + "\"";
+  { field="<input id=\"" + p_html(name) +
+          "\" class=\"field\" name=\"" + p_html(name) +
+          "\" type=\"" + type + "\"";
     if (type!="file") field += " value=\"" + p_html(value) + "\"";
     field += ">";
   }
   else if (type=="textarea")
-  { field="<textarea name=\"" + p_html(name) + "\">" +
+  { field="<textarea id=\"" + p_html(name) +
+          "\" class=\"field\" name=\"" + p_html(name) + "\">" +
           p_html(value) + "</textarea>";
   }
   else if (type=="checkbox")
-  { field="<input name=\"" + p_html(name) +
+  { field="<input id=\"" + p_html(name) +
+          "\" class=\"field\" name=\"" + p_html(name) +
           "\" type=\"checkbox\" value=\"1\"";
     if (value!="0" && value!="") field += " checked";
     field += ">";
   }
   else if (type=="info")
-  { field="<b>" + p_html(value) + "</b>";
+  { field="<b id=\"" + p_html(name) +
+          "\" class=\"field\">" + p_html(value) + "</b>";
+  }
+  else if (type=="submit")
+  { field="<input id=\"" + p_html(name) +
+          "\" class=\"field\" name=\"" + p_html(name) +
+          "\" type=\"submit\" value=\"" + p_html(label) + "\">";
   }
   else if (type=="option" || type=="options" || type=="radio" ||
-           type=="checks" || type=="links" || type=="submit")
+           type=="checks" || type=="links")
   { vector<string> values=p_array_values(value);
     if (type=="option" || type=="options")
-    { field="<select name=\"" + p_html(name) + "\"";
+    { field="<select id=\"" + p_html(name) +
+            "\" class=\"field\" name=\"" + p_html(name) + "\"";
       if (type=="options") field += " multiple";
       field += ">";
     }
@@ -137,7 +155,7 @@ static void p_addform(string *accumulator)
       else if (type=="radio" || type=="checks")
       { string input_type="radio";
         if (type=="checks") input_type="checkbox";
-        field += "<input name=\"" + p_html(name) + "\" type=\"" +
+        field += "<input class=\"field\" name=\"" + p_html(name) + "\" type=\"" +
                  input_type + "\" value=\"" + p_html(item) + "\"";
         if (selected) field += " checked";
         field += ">" + p_html(item);
@@ -153,10 +171,6 @@ static void p_addform(string *accumulator)
         field += "<a href=\"" + p_html(destination) + "\">" +
                  p_html(text) + "</a>";
       }
-      else if (type=="submit")
-      { field += "<input name=\"" + p_html(name) +
-                 "\" type=\"submit\" value=\"" + p_html(item) + "\">";
-      }
     }
     if (type=="option" || type=="options") field += "</select>";
   }
@@ -165,9 +179,9 @@ static void p_addform(string *accumulator)
     return;
   }
 
-  if (type!="hidden" && label!="")
-  { field="<label for=\"" + p_html(name) + "\">" + p_html(label) +
-          "</label>" + field;
+  if (type!="hidden" && type!="submit" && label!="")
+  { field="<label id=\"label" + p_html(name) +
+          "\" class=\"label\">" + p_html(label) + "</label>" + field;
   }
   *accumulator=field+"\n";
 }
@@ -363,7 +377,7 @@ static void p_index(string *accumulator)
 static void p_numel(string *accumulator)
 { string value;
   POP(value);
-  *accumulator=ewbInt((int)p_array_values(value).size());
+  *accumulator=ewbInt(ewbNumEl(value));
 }
 
 static void p_arraypop(string *accumulator)
@@ -374,23 +388,7 @@ static void p_arraypop(string *accumulator)
   { raiseerr("Unknown array: "+name);
     return;
   }
-
-  vector<string> elements=split(stack[position],' ');
-  while (elements.size()>0 && elements.back()=="") elements.pop_back();
-  if (elements.size()==0)
-  { *accumulator="";
-    return;
-  }
-
-  string element=elements.back();
-  size_t separator=element.find(':');
-  if (separator==string::npos)
-  { raiseerr("Invalid EWB array");
-    return;
-  }
-  *accumulator=hexDecode(element.substr(separator+1));
-  elements.pop_back();
-  stack[position]=join(elements," ");
+  *accumulator=ewbArrayPop(&stack[position]);
 }
 
 static void p_time(string *accumulator)
@@ -435,6 +433,224 @@ static void p_sleep(string *accumulator)
   }
   this_thread::sleep_for(chrono::milliseconds((long long)parsed));
   *accumulator="";
+}
+
+static map<string,int> p_sockets;
+static unsigned long long p_next_socket=1;
+
+static string p_socket_handle(int descriptor)
+{ string handle;
+  handle+=(char)0x1d;
+  handle+="socket:";
+  handle+=to_string(p_next_socket++);
+  p_sockets[handle]=descriptor;
+  return handle;
+}
+
+static int p_socket_descriptor(string handle)
+{ map<string,int>::iterator found=p_sockets.find(handle);
+  if (found==p_sockets.end()) return -1;
+  return found->second;
+}
+
+static bool p_live_resource(string value)
+{ return p_sockets.find(value)!=p_sockets.end();
+}
+
+static void p_close_resources(void)
+{ for (map<string,int>::iterator i=p_sockets.begin(); i!=p_sockets.end(); i++)
+    close(i->second);
+  p_sockets.clear();
+}
+
+static void p_socket_open(string *accumulator)
+{ string host,port;
+  POP(port);
+  POP(host);
+  struct addrinfo hints;
+  struct addrinfo *addresses=NULL;
+  memset(&hints,0,sizeof(hints));
+  hints.ai_family=AF_INET;
+  hints.ai_socktype=SOCK_STREAM;
+  if (getaddrinfo(host.c_str(),port.c_str(),&hints,&addresses)!=0)
+  { *accumulator="";
+    return;
+  }
+  int descriptor=-1;
+  for (struct addrinfo *address=addresses; address; address=address->ai_next)
+  { descriptor=socket(address->ai_family,address->ai_socktype,address->ai_protocol);
+    if (descriptor<0) continue;
+    if (connect(descriptor,address->ai_addr,address->ai_addrlen)==0) break;
+    close(descriptor);
+    descriptor=-1;
+  }
+  freeaddrinfo(addresses);
+  if (descriptor<0) *accumulator="";
+  else *accumulator=p_socket_handle(descriptor);
+}
+
+static void p_server_open(string *accumulator)
+{ string port;
+  POP(port);
+  struct addrinfo hints;
+  struct addrinfo *addresses=NULL;
+  memset(&hints,0,sizeof(hints));
+  hints.ai_family=AF_INET;
+  hints.ai_socktype=SOCK_STREAM;
+  hints.ai_flags=AI_PASSIVE;
+  if (getaddrinfo(NULL,port.c_str(),&hints,&addresses)!=0)
+  { *accumulator="";
+    return;
+  }
+  int descriptor=-1;
+  for (struct addrinfo *address=addresses; address; address=address->ai_next)
+  { descriptor=socket(address->ai_family,address->ai_socktype,address->ai_protocol);
+    if (descriptor<0) continue;
+    int reuse=1;
+    setsockopt(descriptor,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
+    if (bind(descriptor,address->ai_addr,address->ai_addrlen)==0 &&
+        listen(descriptor,5)==0) break;
+    close(descriptor);
+    descriptor=-1;
+  }
+  freeaddrinfo(addresses);
+  if (descriptor<0) *accumulator="";
+  else *accumulator=p_socket_handle(descriptor);
+}
+
+static void p_socket_accept(string *accumulator)
+{ string handle;
+  POP(handle);
+  int descriptor=p_socket_descriptor(handle);
+  if (descriptor<0)
+  { *accumulator="";
+    return;
+  }
+  int client=accept(descriptor,NULL,NULL);
+  if (client<0) *accumulator="";
+  else *accumulator=p_socket_handle(client);
+}
+
+static void p_socket_read(string *accumulator)
+{ string handle;
+  POP(handle);
+  int descriptor=p_socket_descriptor(handle);
+  if (descriptor<0)
+  { *accumulator="";
+    return;
+  }
+  string result;
+  char byte;
+  while (1)
+  { ssize_t count=read(descriptor,&byte,1);
+    if (count==1)
+    { result+=byte;
+      if (byte=='\n') break;
+      continue;
+    }
+    if (count<0 && errno==EINTR) continue;
+    break;
+  }
+  *accumulator=result;
+}
+
+static void p_socket_write(string *accumulator)
+{ string handle,data;
+  POP(data);
+  POP(handle);
+  int descriptor=p_socket_descriptor(handle);
+  if (descriptor<0)
+  { *accumulator="";
+    return;
+  }
+  size_t done=0;
+  while (done<data.size())
+  { ssize_t count=write(descriptor,data.data()+done,data.size()-done);
+    if (count>0)
+    { done+=(size_t)count;
+      continue;
+    }
+    if (count<0 && errno==EINTR) continue;
+    *accumulator="";
+    return;
+  }
+  *accumulator="1";
+}
+
+static void p_socket_close(string *accumulator)
+{ string handle;
+  POP(handle);
+  map<string,int>::iterator found=p_sockets.find(handle);
+  if (found==p_sockets.end())
+  { *accumulator="";
+    return;
+  }
+  int result=close(found->second);
+  p_sockets.erase(found);
+  if (result==0) *accumulator="1";
+  else *accumulator="";
+}
+
+static void p_exec(string *accumulator)
+{ string command;
+  POP(command);
+  int output_pipe[2];
+  int error_pipe[2];
+  if (pipe(output_pipe)<0 || pipe(error_pipe)<0) raiseerr("EXEC pipe");
+  pid_t child=fork();
+  if (child<0) raiseerr("EXEC fork");
+  if (child==0)
+  { dup2(output_pipe[1],STDOUT_FILENO);
+    dup2(error_pipe[1],STDERR_FILENO);
+    close(output_pipe[0]);
+    close(output_pipe[1]);
+    close(error_pipe[0]);
+    close(error_pipe[1]);
+    execl("/bin/sh","sh","-c",command.c_str(),(char*)NULL);
+    _exit(127);
+  }
+  close(output_pipe[1]);
+  close(error_pipe[1]);
+  string output;
+  string error;
+  struct pollfd descriptors[2];
+  descriptors[0].fd=output_pipe[0];
+  descriptors[0].events=POLLIN;
+  descriptors[1].fd=error_pipe[0];
+  descriptors[1].events=POLLIN;
+  int open_count=2;
+  while (open_count)
+  { if (poll(descriptors,2,-1)<0)
+    { if (errno==EINTR) continue;
+      break;
+    }
+    for (int i=0; i<2; i++)
+    { if (descriptors[i].fd<0) continue;
+      if (!(descriptors[i].revents&(POLLIN|POLLHUP|POLLERR))) continue;
+      char buffer[4096];
+      ssize_t count=read(descriptors[i].fd,buffer,sizeof(buffer));
+      if (count>0)
+      { if (i==0) output.append(buffer,(size_t)count);
+        else error.append(buffer,(size_t)count);
+      } else
+      { close(descriptors[i].fd);
+        descriptors[i].fd=-1;
+        open_count--;
+      }
+    }
+  }
+  int status;
+  while (waitpid(child,&status,0)<0 && errno==EINTR) {}
+  int position=findvar("_err");
+  if (position<0)
+  { if (ST>=MAXVAR || SP>=MAXSTACK) raiseerr("EXEC _err");
+    symtname[ST]="_err";
+    symtpos[ST]=SP;
+    ST++;
+    stack[SP]=error;
+    SP++;
+  } else stack[position]=error;
+  *accumulator=output;
 }
 
 #else
@@ -735,7 +951,7 @@ static void p_change(void)
 }
 
 static void p_split(void)
-{ /* Combinazione, nessun opcode SPLIT dedicato.
+{ /* Opcode SPLIT.
        [separatore,testo] -> A = struttura EWB indicizzata da 0
      Il compilatore genera un ciclo basato su INDEX, MID e LEN; ogni segmento
      viene aggiunto alla struttura risultante con SETPATH.
@@ -745,7 +961,7 @@ static void p_split(void)
 }
 
 static void p_join(void)
-{ /* Combinazione, nessun opcode JOIN dedicato.
+{ /* Opcode JOIN.
        [separatore,lista] -> A = elementi concatenati
      Il compilatore usa NUMEL e scorre gli indici con GETPATH, concatenando il
      separatore soltanto fra due elementi mediante CONCAT.
@@ -753,19 +969,14 @@ static void p_join(void)
 }
 
 static void p_push(void)
-{ /* Forma speciale del compilatore; nessun opcode PUSHARRAY dedicato se
-     esiste NUMEL. Il primo argomento deve essere una variabile assegnabile:
+{ /* Forma speciale del compilatore. ARRAYPUSH calcola max(chiavi
+     numeriche)+1; NUMEL da solo non basta sugli array radi. Il primo
+     argomento deve essere una variabile assegnabile:
 
-       PUSH "nome_lista"     ; lvalue conservato per SETPATH
        PUSH "nome_lista"
-       PUSH 0
-       GETPATH               ; A = valore corrente della lista
-       PUSHA
-       NUMEL                 ; A = prossimo indice
-       PUSHA
        <valuta elemento>
        PUSHA
-       SETPATH 1
+       ARRAYPUSH
 
      Il compilatore deve conservare nome_lista: passare soltanto il suo valore
      non basta per aggiornare la variabile.

@@ -107,7 +107,28 @@ typedef enum
   OP_SREAD,
   OP_SWRITE,
   OP_DREAD,
-  OP_DWRITE
+  OP_DWRITE,
+  OP_JNCONTEXT,
+  OP_SQLQUOTE,
+  OP_SQLNUMBER,
+  /*
+   * Append new opcodes here. EWB bytecode stores their numeric value, so
+   * inserting entries above this point would renumber existing programs.
+   */
+  OP_NUMKEY,
+  OP_KEYAT,
+  OP_GETELEM,
+  OP_HASKEY,
+  OP_DELKEY,
+  OP_EXEC,
+  OP_SCLOSE,
+  OP_ASSERT,
+  OP_RETRACT,
+  OP_GOAL,
+  OP_REFRESHTARGET,
+  OP_SPLIT,
+  OP_JOIN,
+  OP_ARRAYPUSH
 } EWBOpcode;
 
 typedef struct
@@ -143,8 +164,8 @@ static const VmInstr vm_instr_table[] =
   {"sneq",        OP_SNEQ,        ARG_NONE},
   {"sge",         OP_SGE,         ARG_NONE},
   {"sle",         OP_SLE,         ARG_NONE},
-  {"jz",          OP_JZ,          ARG_NONE},
-  {"jnz",         OP_JNZ,         ARG_NONE},
+  {"jz",          OP_JZ,          ARG_INT},
+  {"jnz",         OP_JNZ,         ARG_INT},
   {"call",        OP_CALL,        ARG_INT},
   {"ret",         OP_RET,         ARG_NONE},
   {"mova",        OP_MOVA,        ARG_STRING},
@@ -158,9 +179,9 @@ static const VmInstr vm_instr_table[] =
   {"startform",   OP_STARTFORM,   ARG_NONE},
   {"starttarget", OP_STARTTARGET, ARG_NONE},
   {"addform",     OP_ADDFORM,     ARG_NONE},
-  {"endform",     OP_ENDFORM,     ARG_NONE},
+  {"endform",     OP_ENDFORM,     ARG_INT},
   {"stop",        OP_STOP,        ARG_NONE},
-  {"runtarget",   OP_RUNTARGET,   ARG_NONE},
+  {"runtarget",   OP_RUNTARGET,   ARG_INT},
   {"crontask",    OP_CRONTASK,    ARG_INT},
   {"task",        OP_TASK,        ARG_NONE},
   {"target",      OP_TARGET,      ARG_NONE},
@@ -207,6 +228,23 @@ static const VmInstr vm_instr_table[] =
   {"swrite",      OP_SWRITE,      ARG_NONE},
   {"dread",       OP_DREAD,       ARG_NONE},
   {"dwrite",      OP_DWRITE,      ARG_NONE},
+  {"jncontext",   OP_JNCONTEXT,    ARG_INT},
+  {"sqlquote",    OP_SQLQUOTE,     ARG_NONE},
+  {"sqlnumber",   OP_SQLNUMBER,    ARG_NONE},
+  {"numkey",      OP_NUMKEY,       ARG_NONE},
+  {"keyat",       OP_KEYAT,        ARG_NONE},
+  {"getelem",     OP_GETELEM,      ARG_NONE},
+  {"haskey",      OP_HASKEY,       ARG_NONE},
+  {"delkey",      OP_DELKEY,       ARG_NONE},
+  {"exec",        OP_EXEC,         ARG_NONE},
+  {"sclose",       OP_SCLOSE,       ARG_NONE},
+  {"assert",       OP_ASSERT,       ARG_NONE},
+  {"retract",      OP_RETRACT,      ARG_NONE},
+  {"goal",         OP_GOAL,         ARG_NONE},
+  {"refreshtarget", OP_REFRESHTARGET, ARG_INT},
+  {"split",        OP_SPLIT,        ARG_NONE},
+  {"join",         OP_JOIN,         ARG_NONE},
+  {"arraypush",    OP_ARRAYPUSH,    ARG_NONE},
   {0,             OPCODE_INVALID, ARG_NONE}
 };
 

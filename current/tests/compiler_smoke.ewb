@@ -1,0 +1,6 @@
+var a=1;
+sub incrementa(x) {
+  return x+1;
+};
+a=incrementa(a);
+print(a);

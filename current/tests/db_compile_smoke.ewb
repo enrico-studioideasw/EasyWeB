@@ -1,0 +1,7 @@
+dataset persone={nome,cognome};
+persone.nome="Ada";
+persone.cognome="Lovelace";
+add(persone);
+exists(persone);
+lock(persone);
+unlock(persone);
