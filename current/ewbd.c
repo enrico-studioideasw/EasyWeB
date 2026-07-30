@@ -437,6 +437,7 @@ static const char *mime_type(const char *path)
   if (!strcmp(ext,".html") || !strcmp(ext,".htm")) return "text/html; charset=utf-8";
   if (!strcmp(ext,".css")) return "text/css; charset=utf-8";
   if (!strcmp(ext,".js")) return "application/javascript; charset=utf-8";
+  if (!strcmp(ext,".json")) return "application/json; charset=utf-8";
   if (!strcmp(ext,".png")) return "image/png";
   if (!strcmp(ext,".jpg") || !strcmp(ext,".jpeg")) return "image/jpeg";
   if (!strcmp(ext,".gif")) return "image/gif";
@@ -453,6 +454,7 @@ static int is_static_path(const char *path)
   if (!ext) return 0;
   return !strcmp(ext,".html") || !strcmp(ext,".htm") ||
          !strcmp(ext,".css")  || !strcmp(ext,".js")  ||
+         !strcmp(ext,".json") ||
          !strcmp(ext,".png")  || !strcmp(ext,".jpg") ||
          !strcmp(ext,".jpeg") || !strcmp(ext,".gif") ||
          !strcmp(ext,".webp") || !strcmp(ext,".svg") ||
