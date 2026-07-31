@@ -754,7 +754,10 @@ static int compile_composed(const char *name)
     { if (!strncmp(variables[i],variable,prefix_length) &&
           variables[i][prefix_length]=='.' &&
           variables[i][prefix_length+1]!='_')
+      { const char *field=variables[i]+prefix_length+1;
+        if (!strcmp(name,"add") && !strcmp(field,"id")) continue;
         fields[field_count++]=i;
+      }
     }
 
     snprintf(line,sizeof(line),"PUSH \"%s\"",variable);
@@ -805,7 +808,13 @@ static int compile_composed(const char *name)
     }
     out("PUSHA");
     out("QUERY");
-    if (!strcmp(name,"exists"))
+    if (!strcmp(name,"add"))
+    { snprintf(line,sizeof(line),"PUSH \"%s.id\"",variable);
+      out(line);
+      out("PUSHA");
+      out("SETPATH 0");
+    }
+    else
     { out("PUSHA");
       out("PUSH \"\"");
       out("SNEQ");

@@ -641,7 +641,8 @@ per accesso ai database - connessione e credenziali appartengono al dataset;
   // apertura e riuso sono lazy, senza una predefinita LOGIN.
   add(variabile[.variabile])
   exists(variabile[.variabile])
-  // ADD inserisce i valori correnti dei campi e restituisce l'id creato.
+  // ADD inserisce i valori correnti dei campi tranne id, assegna la chiave
+  // generata a dataset.id e restituisce lo stesso id in A.
   // EXISTS verifica almeno un record compatibile e restituisce "1" o "0".
   lock(variabile[.variabile])
   unlock(variabile[.variabile])

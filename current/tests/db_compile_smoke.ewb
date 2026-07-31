@@ -1,7 +1,8 @@
 dataset persone={nome,cognome};
 persone.nome="Ada";
 persone.cognome="Lovelace";
-add(persone);
+var nuovo_id=add(persone);
+print(nuovo_id==persone.id);
 exists(persone);
 lock(persone);
 unlock(persone);
