@@ -14,6 +14,8 @@ Risultati testuali attesi:
 - `dataset_id_smoke.ewb`: `||`
 - `db_compile_smoke.ewb`, se eseguito con DB: `1` e `persone.id` uguale al
   risultato di `add(persone)`.
+- `consecutive_in_smoke.ewb`, se eseguito con DB: `AA`; verifica che QBYID non
+  alteri i metadati del context fra due cicli IN consecutivi.
 - `goal_db_smoke.ewb`: `lucaanna`
 
 `form_smoke`, `form_resume_smoke` e `refresh_smoke` servono a ispezionare

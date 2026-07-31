@@ -608,7 +608,8 @@ int resume(int xPC,int xSP)
       for (int i=ST-1; i>=0; i--)
       { if (symtname[i].compare(0,context.length()+1,context+".")==0)
         { string field=symtname[i].substr(context.length()+1);
-          if (field!="_status") fields.push_back(field);
+          if (field.empty() || field[0]=='_') continue;
+          fields.push_back(field);
         }
       }
       A=qlist(url,user,password,context,fields,filter,orderby);
@@ -626,7 +627,7 @@ int resume(int xPC,int xSP)
       for (int i=ST-1; i>=0; i--)
       { if (symtname[i].compare(0,context.length()+1,context+".")==0)
         { string field=symtname[i].substr(context.length()+1);
-          if (field=="_status") continue;
+          if (field.empty() || field[0]=='_') continue;
           fields.push_back(field);
           positions.push_back(symtpos[i]);
         }
@@ -650,7 +651,8 @@ int resume(int xPC,int xSP)
       for (int i=ST-1; i>=0; i--)
       { if (symtname[i].compare(0,context.length()+1,context+".")==0)
         { string field=symtname[i].substr(context.length()+1);
-          if (field!="_status") fields.push_back(field);
+          if (field.empty() || field[0]=='_') continue;
+          fields.push_back(field);
         }
       }
       A=run_query(url,user,password,context,fields,query,orderby);

@@ -1,0 +1,10 @@
+dataset in_context_smoke={valore};
+in_context_smoke.valore="A";
+add(in_context_smoke);
+in(in_context_smoke,valore=="A") {
+  print(in_context_smoke.valore);
+};
+in(in_context_smoke,valore=="A") {
+  print(in_context_smoke.valore);
+};
+delete(in_context_smoke,valore=="A");

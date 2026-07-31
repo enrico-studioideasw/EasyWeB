@@ -21,6 +21,9 @@ QLIST decide una volta l'insieme e restituisce una lista serializzata di id.
 La lista e la posizione corrente restano nel frame dell'IN() sullo stack.
 QBYID rilegge per chiave il record corrente e valorizza direttamente le
 variabili del context.
+Le variabili context._* sono metadati di collegamento/esecuzione: QBYID non le
+legge dalla tabella e non puo' quindi alterare la connessione dei cicli
+successivi.
 
 Il filtro serve soltanto a QLIST. QBYID non lo riceve e non lo riapplica:
 l'appartenenza all'insieme e' gia' rappresentata dalla lista salvata.

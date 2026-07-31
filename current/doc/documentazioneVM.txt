@@ -233,8 +233,9 @@ dalla symbol table. Non usano credenziali DEFAULT. Le primitive interne di VM,
 come task e cron, usano esplicitamente il context chiamato ewb.
 
 Tutte le variabili context.campo dichiarate nello stack definiscono i campi del
-dataset. Sono inclusi anche i nomi che iniziano con underscore; la sola
-eccezione e' _status, riservato alla VM e non persistito.
+dataset, tranne i nomi che iniziano con underscore: _url, _user, _password,
+_status e _orderby sono metadati del context e non vengono persistiti ne'
+sovrascritti da QBYID.
 Ogni dataset contiene inoltre context.id, dichiarato implicitamente dal
 compilatore e valorizzato da QBYID con la chiave primaria del record corrente.
 
