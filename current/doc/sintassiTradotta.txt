@@ -76,9 +76,14 @@ campodataset = singlevar ["=" campidataset]
   ** PUSH "stopped"
   ** ADDSYMTABLE "name._orderby"
   ** PUSH ""
+  ** ADDSYMTABLE "name.id"
+  ** PUSH ""
   ** per ogni campo semplice, nell'ordine di dichiarazione:
   **   ADDSYMTABLE "name.campo"
   **   PUSH ""
+// id e' implicito in ogni dataset e contiene la chiave primaria del record
+// corrente. Un eventuale id nell'elenco esplicito dei campi viene ignorato
+// durante l'emissione per non generare due celle con lo stesso nome.
 // Un campo che contiene un dataset annidato non genera name.campo. Nel dataset
 // esterno genera invece il riferimento name.id_campo, inizialmente vuoto:
   ** ADDSYMTABLE "name.id_campo"
@@ -97,6 +102,7 @@ campodataset = singlevar ["=" campidataset]
   ** ADDSYMTABLE "aaa._password"; PUSH "ewb"
   ** ADDSYMTABLE "aaa._status";   PUSH "stopped"
   ** ADDSYMTABLE "aaa._orderby";  PUSH ""
+  ** ADDSYMTABLE "aaa.id";        PUSH ""
   ** ADDSYMTABLE "aaa.bbb";       PUSH ""
   ** ADDSYMTABLE "aaa.id_ccc";    PUSH ""
 // e soltanto dopo:
@@ -106,9 +112,11 @@ campodataset = singlevar ["=" campidataset]
   ** ADDSYMTABLE "ccc._password"; PUSH "ewb"
   ** ADDSYMTABLE "ccc._status";   PUSH "stopped"
   ** ADDSYMTABLE "ccc._orderby";  PUSH ""
+  ** ADDSYMTABLE "ccc.id";        PUSH ""
   ** ADDSYMTABLE "ccc.prova";     PUSH ""
-// Le cinque predefinite sono, nell'ordine: _url, _user, _password, _status,
-// _orderby. _status non e' un campo SQL: la VM lo esclude sempre dallo schema.
+// Le sei predefinite sono, nell'ordine: _url, _user, _password, _status,
+// _orderby, id. _status non e' un campo SQL: la VM lo esclude sempre dallo
+// schema; id corrisponde alla chiave primaria creata dal backend.
 // Il vecchio parser inizializzava ncampi a 5 ma collocava _orderby in campi[5]
 // ed emetteva soltanto gli indici minori di ncampi: questo errore non deve
 // eliminare nuovamente la quinta predefinita.

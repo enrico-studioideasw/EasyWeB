@@ -19,6 +19,10 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
   'ampliata automaticamente quando serve.
   'context non e' un'entita' distinta: e' il dataset selezionato dal ciclo
   'in durante l'iterazione corrente.
+  'ogni dataset dichiara implicitamente il campo id, inizialmente vuoto. Il
+  'backend lo valorizza con la chiave primaria del record durante in(...).
+  'non occorre elencare id tra i campi; se presente viene ignorato come
+  'duplicato della dichiarazione implicita.
 
 
   taskdecl= task name([varname {,varname} ])  "{" [codice] "}"

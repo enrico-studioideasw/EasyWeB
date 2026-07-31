@@ -11,6 +11,7 @@ Risultati testuali attesi:
 - `array_functions_smoke.ewb`: `A-BAxBMarioG`
 - `composed_smoke.ewb`: `3`
 - `sql_orderby_smoke.ewb`: `nome, (cognome > 2)`
+- `dataset_id_smoke.ewb`: `||`
 - `goal_db_smoke.ewb`: `lucaanna`
 
 `form_smoke`, `form_resume_smoke` e `refresh_smoke` servono a ispezionare

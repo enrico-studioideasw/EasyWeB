@@ -347,9 +347,9 @@ static void remember_variable(const char *name)
 
 static void emit_dataset(DatasetSpec *dataset)
 { static const char *predefined[]=
-    {"_url","_user","_password","_status","_orderby"};
+    {"_url","_user","_password","_status","_orderby","id"};
   static const char *defaults[]=
-    {"mysql://ewb","ewb","ewb","stopped",""};
+    {"mysql://ewb","ewb","ewb","stopped","",""};
   char fullname[2*MAXVARLEN];
   char line[3*MAXVARLEN];
   int i;
@@ -360,7 +360,7 @@ static void emit_dataset(DatasetSpec *dataset)
   snprintf(line,sizeof(line),"PUSH \"%s\"",dataset->name);
   out(line);
 
-  for (i=0; i<5; i++)
+  for (i=0; i<6; i++)
   { snprintf(fullname,sizeof(fullname),"%s.%s",dataset->name,predefined[i]);
     remember_variable(fullname);
     snprintf(line,sizeof(line),"ADDSYMTABLE \"%s\"",fullname);
@@ -369,7 +369,8 @@ static void emit_dataset(DatasetSpec *dataset)
     out(line);
   }
   for (i=0; i<dataset->field_count; i++)
-  { snprintf(fullname,sizeof(fullname),"%s.%s",dataset->name,dataset->fields[i]);
+  { if (strcmp(dataset->fields[i],"id")==0) continue;
+    snprintf(fullname,sizeof(fullname),"%s.%s",dataset->name,dataset->fields[i]);
     remember_variable(fullname);
     snprintf(line,sizeof(line),"ADDSYMTABLE \"%s\"",fullname);
     out(line);

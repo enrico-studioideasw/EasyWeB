@@ -1,0 +1,6 @@
+dataset persone={nome};
+print(persone.id);
+print("|");
+dataset compatibile={id,nome};
+print(compatibile.id);
+print("|");

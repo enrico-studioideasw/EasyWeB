@@ -235,6 +235,8 @@ come task e cron, usano esplicitamente il context chiamato ewb.
 Tutte le variabili context.campo dichiarate nello stack definiscono i campi del
 dataset. Sono inclusi anche i nomi che iniziano con underscore; la sola
 eccezione e' _status, riservato alla VM e non persistito.
+Ogni dataset contiene inoltre context.id, dichiarato implicitamente dal
+compilatore e valorizzato da QBYID con la chiave primaria del record corrente.
 
 Schema dinamico
 ---------------
