@@ -69,6 +69,7 @@ ptr targets[MAXOBJ];   int ntargets=0;
 int infunction=0;    //Sono o meno dentro una funzione o dentro un task/target.. Stesso comportamento. 
 int current_arity=0;
 int current_type=0;
+int current_base_variables=0;
 int labelcount=0;    //Non sono in grado di assegnare subito l'indirizzo a alcune variabili.
 int label_position[MAXOBJ];
 unsigned char label_defined[MAXOBJ];
@@ -1331,9 +1332,14 @@ fundecl(unsigned char type)
   infunction=1;
   current_arity=arity;
   current_type=type;
+  current_base_variables=base_variables;
   body_start=PC;
   blocco();
   body_empty=PC==body_start;
+  snprintf(line,sizeof(line),"DELSYMTABLE %i",nvars-base_variables-arity);
+  out(line);
+  snprintf(line,sizeof(line),"DECSP %i",nvars-base_variables-arity);
+  out(line);
   if (type==1) out("ENDTASK");
   if (type==2) out("ENDTARGET");
   snprintf(line,sizeof(line),"DELSYMTABLE %i",arity);
@@ -1344,6 +1350,7 @@ fundecl(unsigned char type)
   infunction=0;
   current_arity=0;
   current_type=0;
+  current_base_variables=0;
   nvars=base_variables;
   setLabel(end_label);
 
@@ -2063,9 +2070,15 @@ vardecl()
 
 returnblock()
 { char line[100];
+  int local_variables;
   if (!infunction) err("RETURN outside function");
   cpos+=6;
   calcexp();
+  local_variables=nvars-current_base_variables-current_arity;
+  snprintf(line,sizeof(line),"DELSYMTABLE %i",local_variables);
+  out(line);
+  snprintf(line,sizeof(line),"DECSP %i",local_variables);
+  out(line);
   if (current_type==1) out("ENDTASK");
   if (current_type==2) out("ENDTARGET");
   snprintf(line,sizeof(line),"DELSYMTABLE %i",current_arity);

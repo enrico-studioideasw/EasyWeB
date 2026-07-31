@@ -1,6 +1,7 @@
 var a=1;
 sub incrementa(x) {
-  return x+1;
+  var risultato=x+1;
+  return risultato;
 };
 a=incrementa(a);
 print(a);

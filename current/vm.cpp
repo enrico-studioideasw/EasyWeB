@@ -848,7 +848,7 @@ static void loadStack(const char *encoded_stack, int stackpos)
     encoded=encoded.substr(separator+1);
   }
   vector<string> v=split(encoded, ' ');
-  for (int i=0; i<(int)v.size(); i++) if (v[i]!="") { A=hexDecode(v[i]); PUSH(A); };
+  for (int i=0; i<(int)v.size(); i++) { A=hexDecode(v[i]); PUSH(A); };
   if (stackpos==0)
   { stack[0]="<!doctype html><html><body><div id=_main><></div></body></html>";
     SP=1;
