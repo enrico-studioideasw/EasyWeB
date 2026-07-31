@@ -1,6 +1,7 @@
 #include "db_interface.h"
 #include "cron_db.h"
 #include "sql_write_parser.h"
+#include "vm_parts.h"
 
 //Database mysql
 #define EWB_DB_WITH_MYSQL 1
@@ -376,18 +377,17 @@ static string mysql_first_record(MYSQL *db)
 { return join_record(mysql_first_row(db));
 }
 
-static string mysql_list_ids(MYSQL *db)
+static vector<string> mysql_list_ids(MYSQL *db)
 { MYSQL_RES *res=mysql_store_result(db);
-  if (!res) return "";
+  vector<string> out;
+  if (!res) return out;
 
-  string out;
   MYSQL_ROW row;
   unsigned long *len;
   while ((row=mysql_fetch_row(res)))
   { len=mysql_fetch_lengths(res);
-    if (out!="") out+="\n";
-    if (row[0]) out+=string(row[0],len[0]);
-    else out+="";
+    if (row[0]) out.push_back(string(row[0],len[0]));
+    else out.push_back("");
   }
 
   mysql_free_result(res);
@@ -801,15 +801,21 @@ static string pg_first_record(PGresult *res)
 { return join_record(pg_first_row(res));
 }
 
-static string pg_list_ids(PGresult *res)
-{ string out;
+static vector<string> pg_list_ids(PGresult *res)
+{ vector<string> out;
   for (int i=0; i<PQntuples(res); i++)
-  { if (i) out+="\n";
-    if (!PQgetisnull(res,i,0)) out+=PQgetvalue(res,i,0);
+  { if (!PQgetisnull(res,i,0)) out.push_back(PQgetvalue(res,i,0));
+    else out.push_back("");
   }
   return out;
 }
 #endif
+
+static string id_list_array(const vector<string> &ids)
+{ string result(1,(char)0x1e);
+  for (size_t i=0; i<ids.size(); i++) ewbArrayPush(&result,ids[i]);
+  return result;
+}
 
 struct OpenDb
 { string engine;
@@ -997,8 +1003,7 @@ string qlist(string url, string user, string password, string table,
     { string e=mysql_error_string(db);
       raiseerr(e);
     }
-    string r=mysql_list_ids(db);
-    return r;
+    return id_list_array(mysql_list_ids(db));
 #else
     raiseerr("MySQL support not compiled");
 #endif
@@ -1015,7 +1020,7 @@ string qlist(string url, string user, string password, string table,
       PQclear(res);
       raiseerr("Postgres "+e);
     }
-    string r=pg_list_ids(res);
+    string r=id_list_array(pg_list_ids(res));
     PQclear(res);
     return r;
 #else

@@ -45,7 +45,7 @@ $(BUILD)/prolog_engine.o: prolog_engine.cpp prolog_engine.h | $(BUILD)
 $(BUILD)/vm.o: vm.cpp vm.h vm_parts.h db_interface.h ewb_predef.c | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c vm.cpp -o $(BUILD)/vm.o
 
-$(BUILD)/db_interface.o: db_interface.cpp db_interface.h sql_write_parser.h | $(BUILD)
+$(BUILD)/db_interface.o: db_interface.cpp db_interface.h sql_write_parser.h vm_parts.h | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c db_interface.cpp -o $(BUILD)/db_interface.o
 
 $(BUILD)/sql_write_parser.o: sql_write_parser.cpp sql_write_parser.h | $(BUILD)
