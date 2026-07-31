@@ -133,6 +133,9 @@ targetdecl= target name "(" [varname {,varname}] ")" "{" [codice] "}"
   ** all'entry point: TARGET
   ** alla fine: ENDTARGET; RET
   // La chiamata del target implica riempire un form e saltarci.
+  // TARGET registra lo stato ma non applica il lock globale per nome dei task:
+  // browser diversi possono eseguire lo stesso target. STOP durante ASK o
+  // SHOWFORM riporta _targets a stopped prima di sospendere la VM.
   ** i parametri sono valutati e passati per valore, come per una funzione
 
 

@@ -599,6 +599,13 @@ void create_base_tables(string url, string user, string password)
     "starttime bigint"
     ")", "");
 
+  run_query(url,user,password,"_targets",fields,
+    "create table if not exists _targets ("
+    "name varchar(" + maxs + ") primary key, "
+    "status varchar(" + maxs + "), "
+    "starttime bigint"
+    ")", "");
+
   run_query(url,user,password,"_threads",fields,
     "create table if not exists _threads ("
     "name varchar(" + maxs + ") primary key, "

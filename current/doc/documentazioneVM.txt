@@ -178,7 +178,13 @@ endform
   Nessuna di queste istruzioni scrive direttamente l'output.
 
 stop
-  Termina la VM.
+  Termina la VM. Se ASK/SHOWFORM sospende un target, riporta prima la relativa
+  riga di _targets a stopped: una continuazione mai inviata non mantiene un
+  lock permanente.
+
+POST .evm in ewbd
+  Usa lo stesso contratto di ewb_cgi: verifica __signature sullo stato
+  __stackpos/__entrypoint/__stack e inoltra alla VM campi e file del form.
 
 Target e task
 -------------
@@ -195,19 +201,22 @@ crontask n
   Se cronstring e' vuota cancella il task da _crontab; altrimenti convalida la
   sintassi cron e registra task, programma, stack, parametri e pianificazione.
 
-task, target
+task
   POP(varname).
-  Impediscono la sovrapposizione usando una update atomica sulla tabella
-  _tasks o _targets:
+  Impedisce la sovrapposizione usando una update atomica su _tasks:
 
-    update _tasks/_targets
+    update _tasks
     set status='running', starttime=...
     where name=varname and status<>'running'
 
   Se l'update ritorna 0 prova la insert iniziale.
-  Se anche la insert ritorna 0, il task/target e' considerato gia' in esecuzione
-  e la VM termina.
-  La VM ripusha varname per predisporre la successiva endtask/endtarget.
+  Se anche la insert ritorna 0, il task e' considerato gia' in esecuzione e la
+  VM termina.
+
+target
+  POP(varname). Registra running in _targets ma non blocca altre invocazioni
+  con lo stesso nome: target omonimi possono appartenere a browser e utenti
+  differenti. La VM ripusha varname per predisporre endtarget.
 
 endtask, endtarget
   POP(varname).

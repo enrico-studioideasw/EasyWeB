@@ -22,6 +22,8 @@ Risultati testuali attesi:
 HTML, stato sospeso e JavaScript. `db_compile_smoke` verifica la traduzione
 SQL e il contratto dell'id restituito da ADD; se eseguito apre e chiude
 esplicitamente la transazione.
+`target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
+che un target sospeso da ASK non resti nello stato `running`.
 
 `goal_smoke` richiede che il gruppo `family` sia già popolato; la variante
 `goal_db_smoke` prepara e ripulisce autonomamente il gruppo `smoke`.

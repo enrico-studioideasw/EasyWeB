@@ -343,7 +343,9 @@ Per i tasks
     'il nome del target identifica il cron: una nuova dichiarazione dello
     'stesso target sostituisce pianificazione e parametri precedenti.
     refresh nometarget(parametri), interval  //millisecondi positivi; parametri per valore
-    'se alla scadenza il task e' running, la nuova esecuzione non parte.
+    'il client evita refresh sovrapposti della stessa istanza. Target omonimi
+    'di browser diversi non si bloccano fra loro; il lock globale resta solo
+    'per i task. Una ask sospesa riporta il target a stopped.
     run nometarget(parametri)  //un solo invio AJAX asincrono e prosegue
     stato del task: in(_tasks.runtime, name='miotask' && stato=="ready") { ... }
     'gli stati pubblici sono ready, running ed error. Error indica un errore

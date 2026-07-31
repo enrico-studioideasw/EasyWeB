@@ -699,6 +699,24 @@ static int count_stack_items(const char *stack)
   return count;
 }
 
+static void state_signature(const char *stackpos, const char *entrypoint,
+                            const char *stack, char out[9])
+{
+  uint32_t hash=2166136261u;
+  const char *parts[5]={stackpos," ",entrypoint," ",stack};
+  int i;
+  for (i=0;i<5;i++)
+  {
+    const unsigned char *p=(const unsigned char*)(parts[i] ? parts[i] : "");
+    while (*p)
+    {
+      hash^=*p++;
+      hash*=16777619u;
+    }
+  }
+  snprintf(out,9,"%08X",hash);
+}
+
 static int run_evm_program_to_fd(int out_fd, const char *clean_path, int entrypoint, int stackpos, const char *stack)
 {
   char full[8192];
@@ -794,7 +812,27 @@ static int serve_evm_program(int client_fd, const char *request_path, ewb_form *
   { if (form->entrypoint) entrypoint=atoi(form->entrypoint);
     if (form->stackpos) stackpos=atoi(form->stackpos);
     if (form->stack) stack=form->stack;
+    if (form->stack || form->entrypoint || form->stackpos)
+    { char expected[9];
+      state_signature(form->stackpos,form->entrypoint,stack,expected);
+      if (!form->signature || strcmp(form->signature,expected))
+      { http_error(client_fd,400,"Bad EWB signature");
+        return -1;
+      }
+    }
+
+    ewb_form_clear();
+    for (int i=0;i<form->nfields;i++)
+    { if (!strncmp(form->fields[i].name,"__",2)) continue;
+      ewb_form_add_field(form->fields[i].name,form->fields[i].value,
+                         form->fields[i].size);
+    }
+    for (int i=0;i<form->nfiles;i++)
+      ewb_form_add_file(form->files[i].name,form->files[i].filename,
+                        form->files[i].content_type,form->files[i].tmp_path,
+                        form->files[i].size);
   }
+  else ewb_form_clear();
 
   snprintf(header,sizeof(header),
            "HTTP/1.0 200 OK\r\n"

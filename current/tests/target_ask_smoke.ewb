@@ -1,0 +1,6 @@
+dataset ewb={};
+target prova() {
+  var nome="Mario";
+  ask nome:text("Nome");
+};
+run prova();

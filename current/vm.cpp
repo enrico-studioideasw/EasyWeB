@@ -43,6 +43,7 @@ int RUNNING=1;
 string PROGRAM_URL="";
 static bool error_handler_running=false;
 static int error_handler_return=-1;
+static string active_target_name="";
 
 struct PendingFormValue
 { string name;
@@ -106,6 +107,23 @@ int findvar(string varname)
   }; 
   return -1; //Non trovata 
 };
+
+static void stop_active_target(void)
+{ if (active_target_name=="") return;
+  int url_position=findvar("ewb._url");
+  int user_position=findvar("ewb._user");
+  int password_position=findvar("ewb._password");
+  if (url_position>=0 && user_position>=0 && password_position>=0)
+  { string url=stack[url_position];
+    string user=stack[user_position];
+    string password=stack[password_position];
+    create_base_tables(url,user,password);
+    run_query(url,user,password,
+      "update _targets set status='stopped', starttime=" +
+      to_string(time(NULL)) + " where name='" + active_target_name + "'", "");
+  }
+  active_target_name="";
+}
 
 static int errorHandler(void)
 { for (int i=ST-1; i>=0; i--)
@@ -450,6 +468,7 @@ int resume(int xPC,int xSP)
       { db_rollback_all();
         raiseerr("STOP with open transaction");
       }
+      stop_active_target();
       p_close_resources();
       db_close_all();
       RUNNING=0;
@@ -577,13 +596,15 @@ int resume(int xPC,int xSP)
       string user=stack[findvar("ewb._user")];
       string password=stack[findvar("ewb._password")];
       create_base_tables(url,user,password);
+      string guard=OP==OP_TASK ? " and status<>'running'" : "";
       x=run_query(url,user,password,
-        "update _" + tasktype + "s set status='running', starttime=" + to_string(time(NULL)) + " where name='" + varname + "' and status<>'running'", "");
+        "update _" + tasktype + "s set status='running', starttime=" + to_string(time(NULL)) + " where name='" + varname + "'" + guard, "");
       if  (ewbIntValue(x)==0) 
       { x=run_query(url,user,password,
         "insert into _" + tasktype + "s (name, status, starttime) values ('" + varname + "', 'running', " + to_string(time(NULL)) + ")", "");
       };
-      if  (ewbIntValue(x)==0) RUNNING=0; //niente sovrapposizione
+      if  (ewbIntValue(x)==0 && OP==OP_TASK) RUNNING=0; //niente sovrapposizione per i task
+      if (OP==OP_TARGET) active_target_name=varname;
       PUSH(varname); //Cosi è gia pronto per la ENDTASK
     } else if (OP==OP_ENDTASK || OP==OP_ENDTARGET)    //Punto di inizio di una procedura asincrona.
     { POP(varname);
@@ -595,6 +616,7 @@ int resume(int xPC,int xSP)
       create_base_tables(url,user,password);
       run_query(url,user,password,
         "update _" + tasktype + "s set status='stopped', starttime=" + to_string(time(NULL)) + " where name='" + varname + "'", "");
+      if (OP==OP_ENDTARGET) active_target_name="";
     } else if (OP==OP_QLIST)  //vedi cicloInEDatabase.txt in doc/
     { string context, filter;
       POP(filter);
@@ -716,7 +738,8 @@ int resume(int xPC,int xSP)
     { db_rollback_all();
       int handler=errorHandler();
       if (error_handler_running || handler<0)
-      { err(e);
+      { stop_active_target();
+        err(e);
         continue;
       }
       error_handler_running=true;
@@ -794,6 +817,7 @@ static void loadProgramBinary(const unsigned char *program, size_t len)
 // Se il primo byte e' 0x00 usa il formato binario, altrimenti il testo.
 static void loadProgram(const char *program, size_t len)
 { RUNNING=1;
+  active_target_name="";
   error_handler_running=false;
   error_handler_return=-1;
   if (!program) err("No program");
