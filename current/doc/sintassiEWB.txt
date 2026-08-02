@@ -62,11 +62,11 @@ codice=[ commento | datasetdecl | taskdecl | targetdecl | inblock | ifblock  | w
   calcexp= assign\= inexp | inexp         //    (no ll1 ! attento) 
   assign=variabile  [ "[" pos "]" ]     //Notare che ci sono gli array multidimensionali
   inexp=exp  cfr inexp | exp
-  cfr = == | != | <= | >= | > | < | eq | neq | gt | ge | lt | le
+  cfr = == | != | <= | >= | > | < | eq | ne | gt | ge | lt | le
   'gli operatori simbolici confrontano numeri e fanno raise se uno degli
   'operandi non e' interamente numerico; quelli alfabetici confrontano testo
   'byte per byte.
-  'eq e neq possono confrontare due array marcati in forma canonica; l'ordine
+  'eq e ne possono confrontare due array marcati in forma canonica; l'ordine
   'fa parte della struttura. Confronti misti e lt/le/gt/ge sugli array raise.
   exp=e . exp | e
   e = t+e | t-e | t

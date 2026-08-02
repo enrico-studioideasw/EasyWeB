@@ -74,8 +74,19 @@ install-service: install
 $(BUILD)/test_hash: tests/test_hash.cpp $(BUILD)/ewb_hash.o
 	$(CXX) $(CXXFLAGS) tests/test_hash.cpp $(BUILD)/ewb_hash.o -o $(BUILD)/test_hash
 
-test: all $(BUILD)/test_hash
+$(BUILD)/ewb_run_file: tests/ewb_run_file.cpp $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/cron_parser.o $(BUILD)/ewb_hash.o
+	$(CXX) $(CXXFLAGS) tests/ewb_run_file.cpp $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/cron_parser.o $(BUILD)/ewb_hash.o -o $(BUILD)/ewb_run_file -lmysqlclient -lpq $(VM_LIBS)
+
+test: all $(BUILD)/test_hash $(BUILD)/ewb_run_file
 	$(BUILD)/test_hash
+	$(BUILD)/ewb tests/compiler_smoke.ewb $(BUILD)/compiler_compact.evm >/dev/null
+	$(BUILD)/ewb -S tests/compiler_smoke.ewb $(BUILD)/compiler_source.evm >/dev/null
+	test "$$(od -An -t u1 -N2 $(BUILD)/compiler_compact.evm)" = "   0   1"
+	test "$$(head -c 1 $(BUILD)/compiler_source.evm)" != ""
+	test "$$(wc -c < $(BUILD)/compiler_compact.evm)" -lt "$$(wc -c < $(BUILD)/compiler_source.evm)"
+	test "$$($(BUILD)/ewb_run_file $(BUILD)/compiler_compact.evm)" = "2"
+	test "$$($(BUILD)/ewb_run_file $(BUILD)/compiler_source.evm)" = "2"
+	test "$$(REQUEST_METHOD=GET QUERY_STRING= $(BUILD)/ewb_cgi $(BUILD)/compiler_compact.evm)" = "$$(REQUEST_METHOD=GET QUERY_STRING= $(BUILD)/ewb_cgi $(BUILD)/compiler_source.evm)"
 
 clean:
 	rm -rf $(BUILD)

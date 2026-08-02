@@ -62,7 +62,7 @@ Stato attuale:
 - cluster per esecuzione parallela -> pronti 2 servers su tre, tests in corso  
 - supporto CGI apache  -> pronto  
 - web server dedicato per massimizzare le prestazioni -> pronto  
-- VM che esegue codice .evm testuale o pseudo-assembler -> pronta ma richiederà qualche estensione  
+- VM che esegue codice `.evm` binario compatto o pseudo-assembler testuale -> pronta ma richiederà qualche estensione
 - Compilatore ewb -> sviluppo parziale: struttura e primitive principali presenti, non ancora completo né pronto per uso generale  
 - Supporto ewIA per programmazione assistita -> pronto  
 - librerie di funzioni predefinite  -> ancora mancanti  
@@ -72,3 +72,18 @@ Il repository documenta anche checkpoint intermedi intenzionali: il codice può
 compilare pur contenendo sottosistemi ancora incompleti. Questi checkpoint
 servono a conservare e condividere la crescita del progetto; non equivalgono a
 release stabili o complete.
+
+Compilazione EWB
+----------------
+
+Il compilatore produce normalmente un `.evm` binario compatto:
+
+    current/build/ewb programma.ewb programma.evm
+
+Per ottenere il vecchio pseudo-assembler testuale, utile per ispezione e debug,
+si usa `-S` (source):
+
+    current/build/ewb -S programma.ewb programma.evm
+
+La VM riconosce automaticamente il formato: `00 01` identifica il binario v1;
+ogni altro primo byte seleziona il formato testuale. Entrambi restano eseguibili.

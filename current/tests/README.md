@@ -37,6 +37,9 @@ la serializzazione dello stack usata da ASK senza un formato parallelo.
 
 `test_hash.cpp`, eseguito da `make test`, verifica gli stessi sei vettori in
 modo automatico. I caratteri non ASCII sono passati come byte UTF-8 esatti.
+`make test` compila inoltre `compiler_smoke.ewb` sia nel formato binario
+predefinito sia con `-S`, verifica magic e riduzione di dimensione ed esegue
+entrambi i file con la stessa VM aspettandosi `2`.
 
 `goal_smoke` richiede che il gruppo `family` sia già popolato; la variante
 `goal_db_smoke` prepara e ripulisce autonomamente il gruppo `smoke`.

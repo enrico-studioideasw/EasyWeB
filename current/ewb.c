@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #include "vm.h"
 #include "opcodes.h"
@@ -77,6 +78,7 @@ int PC=0;
 int sql_mode=0;   //Non c'e' annidamento quindi posso mettere un flag qui.
 char sql_context[MAXVARLEN]="";
 int add_debug=0;
+int source_output=0;
 
 char code[MAXOUTPUTSIZE];
 char res[MAXOUTPUTSIZE];
@@ -109,11 +111,38 @@ void out(const char* dt)
     }
   }
   int length=(int)strlen(expanded);
-  if (respos+length+2>=MAXOUTPUTSIZE) err("Output overflow");
-  strcpy(&res[respos],expanded);
-  respos=respos+strlen(expanded);
-  res[respos]='\n';
-  respos++;
+  if (source_output)
+  { if (respos+length+2>=MAXOUTPUTSIZE) err("Output overflow");
+    strcpy(&res[respos],expanded);
+    respos+=length;
+    res[respos++]='\n';
+  }
+  else
+  { char opname[64];
+    int op_length=0;
+    int instr;
+    const char *argument;
+    while (expanded[op_length] && expanded[op_length]!=' ' &&
+           expanded[op_length]!='\t' && expanded[op_length]!='\r' &&
+           expanded[op_length]!='\n')
+    { if (op_length>=(int)sizeof(opname)-1) err("Opcode too long");
+      opname[op_length]=(char)tolower((unsigned char)expanded[op_length]);
+      op_length++;
+    }
+    opname[op_length]=0;
+    instr=find_vm_instr(opname);
+    if (instr<0) err("Unknown output opcode");
+    argument=expanded+op_length;
+    while (*argument==' ' || *argument=='\t') argument++;
+    length=(int)strlen(argument);
+    while (length>0 && (argument[length-1]=='\r' || argument[length-1]=='\n')) length--;
+    if (respos+length+2>=MAXOUTPUTSIZE) err("Output overflow");
+    res[respos++]=(unsigned char)vm_instr_table[instr].opcode;
+    if (length)
+    { memcpy(&res[respos],argument,length);
+      respos+=length;
+    }
+  }
   res[respos]=0;
   PC++; //Program counter conta le righe di assembler. 
 }; 
@@ -2154,13 +2183,21 @@ programma()
 };
 
 int main(int argc, char** argv)
-{ if ((argc != 3) && (argc != 4)) //per ora rigido: inputfile, outputfile
-  { printf ("Uso %s [-d] inputfile.ewb outputfile.evm\n", argv[0]); 
+{ int arg=1;
+  while (arg<argc && argv[arg][0]=='-')
+  { if (!strcmp(argv[arg],"-d")) add_debug=1;
+    else if (!strcmp(argv[arg],"-S")) source_output=1;
+    else
+    { printf ("Uso %s [-d] [-S] inputfile.ewb outputfile.evm\n",argv[0]);
+      exit(-1);
+    }
+    arg++;
+  }
+  if (argc-arg != 2)
+  { printf ("Uso %s [-d] [-S] inputfile.ewb outputfile.evm\n", argv[0]);
     exit(-1); 
   };
-  int dpos=0; 
-  if (!strcmp(argv[1], "-d")) { dpos++; add_debug=1; };
-  int f=open(argv[1+dpos], O_RDONLY); 
+  int f=open(argv[arg], O_RDONLY);
   if (f>=0)
   { int i=(int)read(f,code,MAXOUTPUTSIZE-1);
     if (i<0) err("Read error");
@@ -2170,7 +2207,14 @@ int main(int argc, char** argv)
     cpos=0; 
     programma();
     printf("\nOutput %i lines\n", PC);  
-    f=open(argv[2+dpos],O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if (!source_output)
+    { if (respos+2>=MAXOUTPUTSIZE) err("Output overflow");
+      memmove(res+2,res,respos);
+      res[0]=0;
+      res[1]=1;
+      respos+=2;
+    }
+    f=open(argv[arg+1],O_WRONLY|O_CREAT|O_TRUNC,0644);
     if (f<0) err("Output open error");
     if (write(f,res,respos)!=respos) err("Output write error");
     close(f);   

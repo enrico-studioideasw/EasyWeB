@@ -6,6 +6,19 @@ Le istruzioni lavorano principalmente sullo stack e sull'accumulatore A.
 SP e' lo stack pointer e parte da 0; PC e' il program counter.
 GETPATH e SETPATH permettono di conservare strutture dati dentro le stringhe.
 
+Formati .evm
+------------
+
+Il compilatore genera per default il formato binario compatto v1. Il file
+comincia con i byte 0x00, 0x01; seguono opcode a un byte e gli eventuali
+argomenti immediati. Le stringhe restano quotate con gli escape EWB e gli
+interi restano cifre ASCII, terminate dall'opcode successivo.
+
+L'opzione `ewb -S sorgente.ewb destinazione.evm` genera invece il vecchio
+pseudo-assembler testuale, una istruzione per riga. `-S` significa source ed e'
+pensato per lettura, confronto e debug. La VM sceglie automaticamente il loader:
+magic 0x00,0x01 per il binario v1, qualsiasi altro primo byte per il testo.
+
 Parole chiave
 -------------
 

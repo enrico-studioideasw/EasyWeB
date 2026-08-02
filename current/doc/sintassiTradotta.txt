@@ -329,7 +329,7 @@ assign=variabile  { "[" calcexp "]" ]     //Array multidimensionali
 // senza attivare sql_mode. Serve a cancellare un ordinamento gia' impostato;
 // non deve diventare il literal SQL ''.
 inexp=exp  cfr inexp | exp
-cfr = == | != | <= | >= | > | < | eq | neq | gt | ge | lt | le
+cfr = == | != | <= | >= | > | < | eq | ne | gt | ge | lt | le
   ** simbolici: GT, LT, EQ, NEQ, GE, LE; operando non numerico -> RAISE
   ** alfabetici: SGT, SLT, SEQ, SNEQ, SGE, SLE; confronto byte per byte
   // Traduzione normale:

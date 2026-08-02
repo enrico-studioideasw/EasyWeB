@@ -6,8 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char *read_file(const char *path)
+static char *read_file(const char *path,size_t *len_out)
 { FILE *f=fopen(path,"rb");
+  *len_out=0;
   if (!f) return NULL;
 
   if (fseek(f,0,SEEK_END))
@@ -35,6 +36,7 @@ static char *read_file(const char *path)
   size_t r=fread(buf,1,(size_t)n,f);
   fclose(f);
   buf[r]=0;
+  *len_out=r;
   return buf;
 };
 
@@ -95,6 +97,7 @@ static void state_signature(const char *stackpos, const char *entrypoint,
 int main(int argc, char **argv)
 { ewb_form form;
   char *program=NULL;
+  size_t program_len=0;
   char *body=NULL;
   size_t body_len=0;
   const char *ctype=getenv("CONTENT_TYPE");
@@ -113,7 +116,7 @@ int main(int argc, char **argv)
     return 1;
   };
 
-  program=read_file(path);
+  program=read_file(path,&program_len);
   if (!program)
   { printf("Cannot read EWB program\n");
     return 1;
@@ -171,7 +174,7 @@ int main(int argc, char **argv)
                       form.files[i].size);
   };
 
-  rc=ewb_run_text(program,path,entrypoint,stackpos,stack);
+  rc=ewb_run_buffer(program,program_len,path,entrypoint,stackpos,stack);
 
   ewb_form_free(&form);
   free(program);
