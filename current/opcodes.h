@@ -128,7 +128,9 @@ typedef enum
   OP_REFRESHTARGET,
   OP_SPLIT,
   OP_JOIN,
-  OP_ARRAYPUSH
+  OP_ARRAYPUSH,
+  OP_MD5,
+  OP_SHA256
 } EWBOpcode;
 
 typedef struct
@@ -245,6 +247,8 @@ static const VmInstr vm_instr_table[] =
   {"split",        OP_SPLIT,        ARG_NONE},
   {"join",         OP_JOIN,         ARG_NONE},
   {"arraypush",    OP_ARRAYPUSH,    ARG_NONE},
+  {"md5",          OP_MD5,          ARG_NONE},
+  {"sha256",       OP_SHA256,       ARG_NONE},
   {0,             OPCODE_INVALID, ARG_NONE}
 };
 

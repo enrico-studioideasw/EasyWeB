@@ -10,6 +10,8 @@ Risultati testuali attesi:
 - `foreach_smoke.ewb`: `AB`
 - `array_functions_smoke.ewb`: `A-BAxBMarioG`
 - `composed_smoke.ewb`: `3`
+- `hash_smoke.ewb`: i digest MD5 e SHA-256 di `""`, `"abc"` e
+  `"caffè ☕"`, concatenati nell'ordine del file
 - `sql_orderby_smoke.ewb`: `nome, (cognome > 2)`
 - `dataset_id_smoke.ewb`: `||`
 - `db_compile_smoke.ewb`, se eseguito con DB: `1` e `persone.id` uguale al
@@ -24,6 +26,9 @@ SQL e il contratto dell'id restituito da ADD; se eseguito apre e chiude
 esplicitamente la transazione.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
 che un target sospeso da ASK non resti nello stato `running`.
+
+`test_hash.cpp`, eseguito da `make test`, verifica gli stessi sei vettori in
+modo automatico. I caratteri non ASCII sono passati come byte UTF-8 esatti.
 
 `goal_smoke` richiede che il gruppo `family` sia già popolato; la variante
 `goal_db_smoke` prepara e ripulisce autonomamente il gruppo `smoke`.

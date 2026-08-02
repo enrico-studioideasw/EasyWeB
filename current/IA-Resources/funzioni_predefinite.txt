@@ -16,6 +16,8 @@ Numeri:
   cos valore
   sin valore
   hex valore
+  md5(valore)
+  sha256(valore)
   sqr valore
   random
 

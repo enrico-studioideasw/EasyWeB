@@ -594,6 +594,8 @@ static const Predefined predefined[]=
   {"index",2,2,"INDEX",NULL},
   {"split",2,2,"SPLIT",NULL},
   {"join",2,2,"JOIN",NULL},
+  {"md5",1,1,"MD5",NULL},
+  {"sha256",1,1,"SHA256",NULL},
   {"pop",1,1,"ARRAYPOP",NULL},
   {"numel",1,1,"NUMEL",NULL},
   {"numkey",1,1,"NUMKEY",NULL},

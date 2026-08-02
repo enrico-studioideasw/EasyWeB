@@ -18,6 +18,7 @@
 #include <cctype>
 #include <algorithm>
 #include "opcodes.h"
+#include "ewb_hash.h"
 using namespace std;
 
 void raiseerr(string e);
@@ -374,6 +375,12 @@ int resume(int xPC,int xSP)
       int position=findvar(varname);
       if (position<0) raiseerr("Unknown array: "+varname);
       A=ewbArrayPush(&stack[position],x);
+    } else if (OP==OP_MD5)
+    { POP(x);
+      A=ewbMd5(x);
+    } else if (OP==OP_SHA256)
+    { POP(x);
+      A=ewbSha256(x);
     } else if (OP==OP_TIME)
     { p_time(&A);
     } else if (OP==OP_DATE)

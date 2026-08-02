@@ -558,6 +558,12 @@ funzioni predefinite
   ** valuta variable; PUSHA; SIND
   hex(variable)  //signed 32 bit, hex maiuscolo senza prefisso
   ** valuta variable; PUSHA; TOHEX
+  md5(variable)  //digest dei byte EWB esatti, 32 cifre esadecimali minuscole
+  ** valuta variable; PUSHA; MD5
+  sha256(variable) //digest dei byte EWB esatti, 64 cifre esadecimali minuscole
+  ** valuta variable; PUSHA; SHA256
+  // Non viene aggiunto alcun salt: per salare si compone esplicitamente
+  // l'argomento, per esempio sha256(salt & password).
                  //positivi minimi; negativi complemento a due, 8 cifre
                  //frazione o fuori intervallo: RAISE
   sqr(variable)   //radice quadrata reale; argomento negativo: RAISE

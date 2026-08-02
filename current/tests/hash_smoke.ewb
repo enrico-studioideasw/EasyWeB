@@ -1,0 +1,6 @@
+print(md5(""));
+print(sha256(""));
+print(md5("abc"));
+print(sha256("abc"));
+print(md5("caffè ☕"));
+print(sha256("caffè ☕"));
