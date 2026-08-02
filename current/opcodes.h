@@ -130,7 +130,12 @@ typedef enum
   OP_JOIN,
   OP_ARRAYPUSH,
   OP_MD5,
-  OP_SHA256
+  OP_SHA256,
+  OP_GDCREATE,
+  OP_GDLOAD,
+  OP_GDCROP,
+  OP_GDFILL,
+  OP_GDSAVE
 } EWBOpcode;
 
 typedef struct
@@ -207,6 +212,11 @@ static const VmInstr vm_instr_table[] =
   {"fload",       OP_FLOAD,       ARG_NONE},
   {"fsave",       OP_FSAVE,       ARG_NONE},
   {"freaddir",    OP_FREADDIR,    ARG_NONE},
+  {"gdcreate",    OP_GDCREATE,    ARG_NONE},
+  {"gdload",      OP_GDLOAD,      ARG_NONE},
+  {"gdcrop",      OP_GDCROP,      ARG_NONE},
+  {"gdfill",      OP_GDFILL,      ARG_NONE},
+  {"gdsave",      OP_GDSAVE,      ARG_NONE},
   {"toint",       OP_TOINT,       ARG_NONE},
   {"sind",        OP_SIND,        ARG_NONE},
   {"tohex",       OP_TOHEX,       ARG_NONE},

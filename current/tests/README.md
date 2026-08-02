@@ -26,6 +26,14 @@ SQL e il contratto dell'id restituito da ADD; se eseguito apre e chiude
 esplicitamente la transazione.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
 che un target sospeso da ASK non resti nello stato `running`.
+`upload_path_smoke` verifica il contratto multipart condiviso da CGI ed EWBD:
+al rientro il campo contiene i byte, mentre `_file` espone nome originale,
+MIME type, dimensione e percorso temporaneo leggibile fino allo STOP.
+`gd_smoke.ewb` salva un RGBA trasparente, esegue fill e crop, salva e ricarica
+un PNG; il primo file deve essere 4x3 trasparente e il risultato 2x2 con pixel
+RGBA rosso opaco. Lo
+stesso contenitore, essendo una stringa binaria senza risorse vive, attraversa
+la serializzazione dello stack usata da ASK senza un formato parallelo.
 
 `test_hash.cpp`, eseguito da `make test`, verifica gli stessi sei vettori in
 modo automatico. I caratteri non ASCII sono passati come byte UTF-8 esatti.

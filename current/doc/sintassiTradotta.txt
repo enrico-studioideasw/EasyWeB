@@ -516,8 +516,10 @@ funzioni predefinite
   input()           legge una riga da stdin; nel frontend web torna ""
   ** INPUT
 
-  load(filename)  //restituisce tutti i byte del file
-  ** valuta filename; PUSHA; FLOAD
+  load(source)  //restituisce i byte di un file o del body HTTP/HTTPS
+  ** valuta source; PUSHA; FLOAD
+  // URL: al massimo 5 redirect, timeout 30 secondi, body massimo 10 MiB;
+  // schema, rete, status non 2xx e limite non validi provocano RAISE.
   save(filename, valore)  //sovrascrive in binario e torna i byte scritti
   ** valuta filename; PUSHA; valuta valore; PUSHA; FSAVE
   // LOAD e SAVE trattano scalari e array marcati come dati opachi; errori
@@ -526,6 +528,18 @@ funzioni predefinite
   ** valuta dirname; PUSHA; FREADDIR
                     //ordinati lessicograficamente per byte; include i
                     //nomi nascosti, ma esclude "." e ".."
+  gd_create(x,y)  //contenitore PNG RGBA trasparente, opaco e serializzabile
+  ** valuta x,y; PUSHA dopo ciascuno; GDCREATE
+  gd_load(source) //PNG da file o HTTP/HTTPS, tramite lo stesso loader di LOAD
+  ** valuta source; PUSHA; GDLOAD
+  gd_crop(img,x1,y1,x2,y2) //x2/y2 esclusi; torna un nuovo contenitore
+  ** valuta i cinque argomenti; PUSHA dopo ciascuno; GDCROP
+  gd_fill(img,x,y,color) //flood fill opaco; color e' array (r,g,b), 0..255
+  ** valuta i quattro argomenti; PUSHA dopo ciascuno; GDFILL
+  gd_save(img,filename) //scrive PNG e torna il numero di byte
+  ** valuta img,filename; PUSHA dopo ciascuno; GDSAVE
+  // Immagini massime 10000x10000 e 10 MiB RGBA. Formato, dimensioni,
+  // coordinate, colore, lettura e scrittura non validi provocano RAISE.
   exec(comando)
   ** valuta comando; EXEC
   ** A riceve stdout; la predefinita _err riceve stderr
@@ -770,8 +784,9 @@ per accesso all' interfaccia web
   // Lo stringone firmato conserva sia valori dello stack sia nomi/posizioni
   // della symbol table. Il vecchio formato con i soli valori resta leggibile.
   // Prima di riprendere, il frontend applica i campi ricevuti alle rispettive
-  // celle; omonimi multipli diventano un array EWB. Per un file assegna il
-  // contenuto alla variabile e filename, content_type e size a _nomecampo.
+  // celle; omonimi multipli diventano un array EWB. Per un file assegna i byte
+  // alla variabile e filename, content_type, size e tmp_name a _nomecampo.
+  // Il temporaneo resta valido fino allo STOP della ripresa.
   // Senza espressione l'etichetta e' il nome; per submit e' il testo.
   // La label e' testo a sinistra del campo. Per un campo "nome":
   //   label: id="labelnome", class="label"
@@ -794,9 +809,11 @@ per accesso all' interfaccia web
   // iniziale e viene rimosso dal valore inviato.
   // Il prefisso \* indica invece un asterisco iniziale letterale.
   // Testo mostrato e valore inviato coincidono.
-  // FILE valorizza direttamente la variabile con il contenuto completo
-  // dell'upload; limite e memoria sono responsabilita' del runtime.
-  // Un campo aaa genera anche _aaa[filename], _aaa[content_type] e _aaa[size].
+  // FILE valorizza la variabile con i byte dell'upload. Il percorso temporaneo
+  // e' in _aaa[tmp_name] e va copiato prima dello STOP per conservarlo; limite
+  // e pulizia sono responsabilita' del runtime.
+  // Un campo aaa genera anche _aaa[filename], _aaa[content_type], _aaa[size]
+  // e _aaa[tmp_name].
   // LINKS usa testo->destinazione; senza -> usa la stringa per entrambi.
   // La sequenza \-> rappresenta un -> letterale.
   // INFO mostra soltanto il valore e non genera un campo inviato dal form.

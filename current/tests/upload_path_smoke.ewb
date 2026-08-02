@@ -1,0 +1,4 @@
+var upload="";
+var _upload="";
+ask upload:file;
+print(upload . "|" . load(getelem(_upload,"tmp_name")) . "|" . getelem(_upload,"filename") . "|" . getelem(_upload,"content_type") . "|" . getelem(_upload,"size") . "|" . getelem(_upload,"tmp_name"));

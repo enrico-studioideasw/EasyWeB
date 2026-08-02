@@ -316,6 +316,16 @@ int resume(int xPC,int xSP)
     { p_save(&A);
     } else if (OP==OP_FREADDIR)
     { p_loaddir(&A);
+    } else if (OP==OP_GDCREATE)
+    { p_gd_create(&A);
+    } else if (OP==OP_GDLOAD)
+    { p_gd_load(&A);
+    } else if (OP==OP_GDCROP)
+    { p_gd_crop(&A);
+    } else if (OP==OP_GDFILL)
+    { p_gd_fill(&A);
+    } else if (OP==OP_GDSAVE)
+    { p_gd_save(&A);
     } else if (OP==OP_TOINT)
     { p_int(&A);
     } else if (OP==OP_SIND)
@@ -904,6 +914,8 @@ static void loadStack(const char *encoded_stack, int stackpos)
       stack[position]=ewbSetPath(stack[position],pending_form_files[i].content_type,path);
       path[0]="size";
       stack[position]=ewbSetPath(stack[position],to_string(pending_form_files[i].size),path);
+      path[0]="tmp_name";
+      stack[position]=ewbSetPath(stack[position],pending_form_files[i].path,path);
     }
   }
   pending_form_values.clear();

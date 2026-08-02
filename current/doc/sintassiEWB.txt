@@ -111,13 +111,22 @@ funzioni predefinite
   'accettano anche array marcati come dati opachi.
   input()           legge una riga da stdin; nel frontend web torna ""
 
-  load(filename)  'restituisce tutti i byte del file.
+  load(source)  'restituisce tutti i byte di un file o del body HTTP/HTTPS.
+  'per URL segue al massimo 5 redirect, timeout 30 secondi e limita il body
+  'a 10 MiB; schema, rete, status non 2xx o limite non validi provocano raise.
   save(filename, valore)  'sovrascrive in binario e torna i byte scritti.
   'load e save trattano scalari e array marcati come dati opachi; gli errori
   'di apertura, lettura o scrittura provocano raise.
   loaddir(dirname)  'array marcato 0..n-1 dei soli nomi delle entry, ordinati
                     'lessicograficamente per byte; include i nomi nascosti,
                     'ma esclude i nomi "." e "..".
+  gd_create(x,y)  'immagine RGBA trasparente, contenitore opaco serializzabile.
+  gd_load(source) 'carica un PNG da file o HTTP/HTTPS.
+  gd_crop(img,x1,y1,x2,y2) 'x2/y2 esclusi; torna un nuovo contenitore.
+  gd_fill(img,x,y,color) 'flood fill opaco; color e' array (r,g,b), 0..255.
+  gd_save(img,filename) 'salva PNG e restituisce i byte scritti.
+  'dimensioni massime 10000x10000 e 10 MiB RGBA; formato, coordinate,
+  'dimensioni, colore, lettura o scrittura non validi provocano raise.
   exec(comando)                         //esegue tramite shell e torna stdout
   '_err e' una variabile predefinita che riceve lo stderr dell'ultima exec.
   'stdout e _err conservano tutti i byte, inclusi i newline finali.
@@ -245,9 +254,11 @@ per accesso all' interfaccia web
   'il prefisso \* rappresenta invece un asterisco iniziale letterale.
   'testo mostrato e valore inviato coincidono.
   'un campo file carica direttamente nella variabile il contenuto completo;
+  'il temporaneo resta valido fino allo STOP della ripresa e va copiato prima
+  'per conservarlo;
   'limite e consumo di memoria sono responsabilita' del runtime.
   'se il campo si chiama aaa, genera anche la variabile _aaa con:
-  '  _aaa[filename], _aaa[content_type], _aaa[size].
+  '  _aaa[filename], _aaa[content_type], _aaa[size], _aaa[tmp_name].
   'links usa testo->destinazione; senza -> usa la stessa stringa per entrambi.
   'la sequenza \-> rappresenta un -> letterale.
   'info mostra soltanto il valore e non genera un campo inviato dal form.

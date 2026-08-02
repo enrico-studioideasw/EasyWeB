@@ -2,6 +2,7 @@ CC=gcc
 CXX=g++
 CFLAGS=-std=c11 -Wall -Wextra -O2
 CXXFLAGS=-std=c++11 -Wall -Wextra -O2
+VM_LIBS=-lcurl -lpng
 BUILD=build
 INSTALL_BIN=/usr/local/bin
 SERVICE_DIR=/etc/systemd/system
@@ -19,7 +20,7 @@ $(BUILD)/ewbd.o: ewbd.c cgi_parser.h cron_db.h cron_parser.h vm.h | $(BUILD)
 	$(CC) $(CFLAGS) -c ewbd.c -o $(BUILD)/ewbd.o
 
 $(BUILD)/ewbd: $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o
-	$(CXX) $(CXXFLAGS) $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o -o $(BUILD)/ewbd -lmysqlclient -lpq
+	$(CXX) $(CXXFLAGS) $(BUILD)/ewbd.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o -o $(BUILD)/ewbd -lmysqlclient -lpq $(VM_LIBS)
 
 $(BUILD)/cgi_parser.o: cgi_parser.c cgi_parser.h | $(BUILD)
 	$(CC) $(CFLAGS) -c cgi_parser.c -o $(BUILD)/cgi_parser.o
@@ -55,7 +56,7 @@ $(BUILD)/sql_write_parser.o: sql_write_parser.cpp sql_write_parser.h | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c sql_write_parser.cpp -o $(BUILD)/sql_write_parser.o
 
 $(BUILD)/ewb_cgi: $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o
-	$(CXX) $(CXXFLAGS) $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o -o $(BUILD)/ewb_cgi -lmysqlclient -lpq
+	$(CXX) $(CXXFLAGS) $(BUILD)/ewb_cgi.o $(BUILD)/cgi_parser.o $(BUILD)/cron_parser.o $(BUILD)/vm.o $(BUILD)/vm_parts.o $(BUILD)/prolog_engine.o $(BUILD)/db_interface.o $(BUILD)/sql_write_parser.o $(BUILD)/ewb_hash.o -o $(BUILD)/ewb_cgi -lmysqlclient -lpq $(VM_LIBS)
 
 install: all
 	install -m 0755 $(BUILD)/ewbd $(INSTALL_BIN)/ewbd

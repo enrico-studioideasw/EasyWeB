@@ -15,7 +15,9 @@
 #include <thread>
 #include <cerrno>
 #include <cstring>
+#include <curl/curl.h>
 #include <netdb.h>
+#include <png.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -211,14 +213,223 @@ static void p_show(string *accumulator)
 }
 
 static void p_load(string *accumulator)
-{ string filename;
-  POP(filename);
-  ifstream in(filename.c_str(),ios::in|ios::binary);
-  if (!in) { raiseerr("Cannot open file: "+filename); return; }
-  ostringstream contents;
-  contents << in.rdbuf();
-  if (in.bad()) { raiseerr("Cannot read file: "+filename); return; }
-  *accumulator=contents.str();
+;
+
+static const size_t P_REMOTE_LIMIT=10u*1024u*1024u;
+static const char P_IMAGE_MAGIC[]="EWBPNG1";
+
+struct PImage
+{ uint32_t width;
+  uint32_t height;
+  string pixels;
+};
+
+static size_t p_curl_write(char *data,size_t size,size_t count,void *opaque)
+{ string *body=(string *)opaque;
+  size_t bytes=size*count;
+  if (bytes>P_REMOTE_LIMIT-body->size()) return 0;
+  body->append(data,bytes);
+  return bytes;
+}
+
+static string p_read_source(const string &source)
+{ if (source.compare(0,7,"http://") && source.compare(0,8,"https://"))
+  { if (source.find("://")!=string::npos)
+    { raiseerr("Unsupported source scheme"); return ""; }
+    ifstream in(source.c_str(),ios::in|ios::binary);
+    if (!in) { raiseerr("Cannot open file: "+source); return ""; }
+    ostringstream contents;
+    contents << in.rdbuf();
+    if (in.bad()) { raiseerr("Cannot read file: "+source); return ""; }
+    return contents.str();
+  }
+
+  static bool curl_ready=false;
+  if (!curl_ready)
+  { if (curl_global_init(CURL_GLOBAL_DEFAULT)!=CURLE_OK)
+    { raiseerr("Cannot initialize HTTP loader"); return ""; }
+    curl_ready=true;
+  }
+  CURL *curl=curl_easy_init();
+  if (!curl) { raiseerr("Cannot initialize HTTP request"); return ""; }
+  string body;
+  curl_easy_setopt(curl,CURLOPT_URL,source.c_str());
+  curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,1L);
+  curl_easy_setopt(curl,CURLOPT_MAXREDIRS,5L);
+  curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,10L);
+  curl_easy_setopt(curl,CURLOPT_TIMEOUT,30L);
+  curl_easy_setopt(curl,CURLOPT_NOSIGNAL,1L);
+  curl_easy_setopt(curl,CURLOPT_USERAGENT,"EWB/2026");
+  curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,p_curl_write);
+  curl_easy_setopt(curl,CURLOPT_WRITEDATA,&body);
+  CURLcode result=curl_easy_perform(curl);
+  long status=0;
+  curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
+  curl_easy_cleanup(curl);
+  if (result!=CURLE_OK)
+  { if (body.size()>=P_REMOTE_LIMIT) raiseerr("Remote body exceeds 10 MiB");
+    else raiseerr("HTTP load failed: "+source);
+    return "";
+  }
+  if (status<200 || status>=300)
+  { raiseerr("HTTP status "+to_string(status)+": "+source); return ""; }
+  return body;
+}
+
+static void p_load(string *accumulator)
+{ string source;
+  POP(source);
+  *accumulator=p_read_source(source);
+}
+
+static void p_put_u32(string *value,uint32_t number)
+{ for (int shift=24; shift>=0; shift-=8)
+    value->push_back((char)((number>>shift)&255));
+}
+
+static uint32_t p_get_u32(const string &value,size_t offset)
+{ return ((uint32_t)(unsigned char)value[offset]<<24) |
+         ((uint32_t)(unsigned char)value[offset+1]<<16) |
+         ((uint32_t)(unsigned char)value[offset+2]<<8) |
+         (uint32_t)(unsigned char)value[offset+3];
+}
+
+static string p_pack_image(const PImage &image)
+{ string result(P_IMAGE_MAGIC,sizeof(P_IMAGE_MAGIC)-1);
+  p_put_u32(&result,image.width);
+  p_put_u32(&result,image.height);
+  result += image.pixels;
+  return result;
+}
+
+static PImage p_unpack_image(const string &value)
+{ PImage image={0,0,""};
+  const size_t header=(sizeof(P_IMAGE_MAGIC)-1)+8;
+  if (value.size()<header || value.compare(0,sizeof(P_IMAGE_MAGIC)-1,P_IMAGE_MAGIC))
+  { raiseerr("Invalid GD image"); return image; }
+  image.width=p_get_u32(value,sizeof(P_IMAGE_MAGIC)-1);
+  image.height=p_get_u32(value,sizeof(P_IMAGE_MAGIC)-1+4);
+  if (!image.width || !image.height || image.width>10000 || image.height>10000 ||
+      (uint64_t)image.width*image.height*4!=value.size()-header)
+  { raiseerr("Invalid GD image"); return image; }
+  image.pixels=value.substr(header);
+  return image;
+}
+
+static PImage p_decode_png(const string &png)
+{ png_image descriptor;
+  memset(&descriptor,0,sizeof(descriptor));
+  descriptor.version=PNG_IMAGE_VERSION;
+  if (!png_image_begin_read_from_memory(&descriptor,png.data(),png.size()))
+  { raiseerr("Invalid PNG"); return PImage{0,0,""}; }
+  if (!descriptor.width || !descriptor.height || descriptor.width>10000 ||
+      descriptor.height>10000 ||
+      (uint64_t)descriptor.width*descriptor.height*4>P_REMOTE_LIMIT)
+  { png_image_free(&descriptor); raiseerr("PNG dimensions"); return PImage{0,0,""}; }
+  descriptor.format=PNG_FORMAT_RGBA;
+  PImage image={descriptor.width,descriptor.height,""};
+  image.pixels.resize(PNG_IMAGE_SIZE(descriptor));
+  if (!png_image_finish_read(&descriptor,NULL,&image.pixels[0],0,NULL))
+  { png_image_free(&descriptor); raiseerr("Cannot decode PNG"); return PImage{0,0,""}; }
+  png_image_free(&descriptor);
+  return image;
+}
+
+static string p_encode_png(const PImage &image)
+{ png_image descriptor;
+  memset(&descriptor,0,sizeof(descriptor));
+  descriptor.version=PNG_IMAGE_VERSION;
+  descriptor.width=image.width;
+  descriptor.height=image.height;
+  descriptor.format=PNG_FORMAT_RGBA;
+  size_t size=0;
+  if (!png_image_write_to_memory(&descriptor,NULL,&size,0,image.pixels.data(),0,NULL))
+  { raiseerr("Cannot encode PNG"); return ""; }
+  string result(size,'\0');
+  if (!png_image_write_to_memory(&descriptor,&result[0],&size,0,image.pixels.data(),0,NULL))
+  { raiseerr("Cannot encode PNG"); return ""; }
+  result.resize(size);
+  return result;
+}
+
+static void p_gd_create(string *accumulator)
+{ string height_value,width_value;
+  POP(height_value); POP(width_value);
+  int width=ewbIntValue(width_value),height=ewbIntValue(height_value);
+  if (width<=0 || height<=0 || width>10000 || height>10000 ||
+      (uint64_t)width*height*4>P_REMOTE_LIMIT)
+  { raiseerr("GD dimensions"); return; }
+  PImage image={(uint32_t)width,(uint32_t)height,
+               string((size_t)width*height*4,'\0')};
+  *accumulator=p_pack_image(image);
+}
+
+static void p_gd_load(string *accumulator)
+{ string source; POP(source);
+  *accumulator=p_pack_image(p_decode_png(p_read_source(source)));
+}
+
+static void p_gd_crop(string *accumulator)
+{ string y2v,x2v,y1v,x1v,packed;
+  POP(y2v); POP(x2v); POP(y1v); POP(x1v); POP(packed);
+  PImage source=p_unpack_image(packed);
+  int x1=ewbIntValue(x1v),y1=ewbIntValue(y1v);
+  int x2=ewbIntValue(x2v),y2=ewbIntValue(y2v);
+  if (x1<0 || y1<0 || x2<=x1 || y2<=y1 ||
+      x2>(int)source.width || y2>(int)source.height)
+  { raiseerr("GD crop coordinates"); return; }
+  PImage target={(uint32_t)(x2-x1),(uint32_t)(y2-y1),
+                string((size_t)(x2-x1)*(y2-y1)*4,'\0')};
+  for (int y=y1; y<y2; y++)
+    memcpy(&target.pixels[(size_t)(y-y1)*target.width*4],
+           &source.pixels[((size_t)y*source.width+x1)*4],target.width*4);
+  *accumulator=p_pack_image(target);
+}
+
+static void p_gd_fill(string *accumulator)
+{ string color,yv,xv,packed;
+  POP(color); POP(yv); POP(xv); POP(packed);
+  PImage image=p_unpack_image(packed);
+  int x=ewbIntValue(xv),y=ewbIntValue(yv);
+  if (x<0 || y<0 || x>=(int)image.width || y>=(int)image.height)
+  { raiseerr("GD fill coordinates"); return; }
+  int components[3];
+  if (ewbNumKey(color)!=3) { raiseerr("GD color"); return; }
+  for (int i=0;i<3;i++)
+  { components[i]=ewbIntValue(ewbGetElement(color,ewbKeyAt(color,i)));
+    if (components[i]<0 || components[i]>255) { raiseerr("GD color"); return; }
+  }
+  size_t start=((size_t)y*image.width+x)*4;
+  unsigned char old[4]; memcpy(old,&image.pixels[start],4);
+  unsigned char replacement[4]={(unsigned char)components[0],
+                                (unsigned char)components[1],
+                                (unsigned char)components[2],255};
+  if (!memcmp(old,replacement,4)) { *accumulator=packed; return; }
+  vector<size_t> pending(1,(size_t)y*image.width+x);
+  image.pixels[start]=replacement[0]; image.pixels[start+1]=replacement[1];
+  image.pixels[start+2]=replacement[2]; image.pixels[start+3]=replacement[3];
+  while (!pending.empty())
+  { size_t point=pending.back(); pending.pop_back();
+    size_t px=point%image.width,py=point/image.width;
+    size_t neighbors[4]={point-1,point+1,point-image.width,point+image.width};
+    bool valid[4]={px>0,px+1<image.width,py>0,py+1<image.height};
+    for (int i=0;i<4;i++) if (valid[i])
+    { size_t offset=neighbors[i]*4;
+      if (!memcmp(&image.pixels[offset],old,4))
+      { memcpy(&image.pixels[offset],replacement,4); pending.push_back(neighbors[i]); }
+    }
+  }
+  *accumulator=p_pack_image(image);
+}
+
+static void p_gd_save(string *accumulator)
+{ string filename,packed; POP(filename); POP(packed);
+  string png=p_encode_png(p_unpack_image(packed));
+  ofstream out(filename.c_str(),ios::out|ios::binary|ios::trunc);
+  if (!out) { raiseerr("Cannot open file: "+filename); return; }
+  out.write(png.data(),(streamsize)png.size());
+  if (!out) { raiseerr("Cannot write file: "+filename); return; }
+  *accumulator=ewbInt((int)png.size());
 }
 
 static void p_save(string *accumulator)
