@@ -87,6 +87,13 @@ test: all $(BUILD)/test_hash $(BUILD)/ewb_run_file
 	test "$$($(BUILD)/ewb_run_file $(BUILD)/compiler_compact.evm)" = "2"
 	test "$$($(BUILD)/ewb_run_file $(BUILD)/compiler_source.evm)" = "2"
 	test "$$(REQUEST_METHOD=GET QUERY_STRING= $(BUILD)/ewb_cgi $(BUILD)/compiler_compact.evm)" = "$$(REQUEST_METHOD=GET QUERY_STRING= $(BUILD)/ewb_cgi $(BUILD)/compiler_source.evm)"
+	$(BUILD)/ewb tests/form_smoke.ewb $(BUILD)/form_smoke.evm >/dev/null
+	$(BUILD)/ewb_run_file $(BUILD)/form_smoke.evm > $(BUILD)/form_smoke.html
+	test "$$(grep -c 'type="hidden" name=__stack ' $(BUILD)/form_smoke.html)" -eq 1
+	test "$$(grep -c 'type="hidden" name=__entrypoint ' $(BUILD)/form_smoke.html)" -eq 1
+	test "$$(grep -c 'type="hidden" name=__stackpos ' $(BUILD)/form_smoke.html)" -eq 1
+	test "$$(grep -c 'type="hidden" name=__signature ' $(BUILD)/form_smoke.html)" -eq 1
+	! grep -q '<textarea name=__stack' $(BUILD)/form_smoke.html
 
 clean:
 	rm -rf $(BUILD)

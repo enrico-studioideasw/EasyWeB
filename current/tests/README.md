@@ -24,6 +24,8 @@ Risultati testuali attesi:
 HTML, stato sospeso e JavaScript. `db_compile_smoke` verifica la traduzione
 SQL e il contratto dell'id restituito da ADD; se eseguito apre e chiude
 esplicitamente la transazione.
+I quattro campi tecnici `__stack`, `__entrypoint`, `__stackpos` e
+`__signature` devono essere sempre input `hidden`, anche nei form dei target.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
 che un target sospeso da ASK non resti nello stato `running`.
 `upload_path_smoke` verifica il contratto multipart condiviso da CGI ed EWBD:

@@ -185,7 +185,7 @@ addform
   numeric viene scritto come input type=number.
 
 endform
-  Imposta A ai campi interni seguiti dalla chiusura del form:
+  Imposta A ai campi interni hidden seguiti dalla chiusura del form:
   __stack, __entrypoint, __stackpos, __signature.
   STARTFORM, i frammenti ADDFORM ed ENDFORM vengono accodati con CONCAT.
   Nessuna di queste istruzioni scrive direttamente l'output.

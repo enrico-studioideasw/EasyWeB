@@ -291,10 +291,10 @@ int resume(int xPC,int xSP)
       string stacktext=escapeStack();
       int saved_stack_position=SP;
       PUSH(form);
-      A="<textarea name=__stack id=__stack>" + stacktext + "</textarea>\n" +
-        "<input name=__entrypoint id=__entrypoint value=\"" + ewbInt(continuation) + "\">\n" +
-        "<input name=__stackpos id=__stackpos value=\"" + ewbInt(saved_stack_position) + "\">\n" +
-        "<input name=__signature id=__signature value=\"" + signature(ewbInt(saved_stack_position) + " " + ewbInt(continuation) + " " + stacktext) + "\">\n</form>\n";
+      A="<input type=\"hidden\" name=__stack id=__stack value=\"" + p_html(stacktext) + "\">\n" +
+        "<input type=\"hidden\" name=__entrypoint id=__entrypoint value=\"" + ewbInt(continuation) + "\">\n" +
+        "<input type=\"hidden\" name=__stackpos id=__stackpos value=\"" + ewbInt(saved_stack_position) + "\">\n" +
+        "<input type=\"hidden\" name=__signature id=__signature value=\"" + signature(ewbInt(saved_stack_position) + " " + ewbInt(continuation) + " " + stacktext) + "\">\n</form>\n";
     } else if (OP==OP_DBLOCK)
     { p_lock(&A);
     } else if (OP==OP_DBUNLOCK)
@@ -515,10 +515,10 @@ int resume(int xPC,int xSP)
       string form_id="form"+to_string(IDF);
       cout << "<form style=\"display:none\" id=\"" << form_id
            << "\" method=\"post\" enctype=\"multipart/form-data\">"
-           << "<textarea name=__stack id=__stack>" << stacktext << "</textarea>\n"
-           << "<input name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
-           << "<input name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
-           << "<input name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
+           << "<input type=\"hidden\" name=__stack id=__stack value=\"" << p_html(stacktext) << "\">\n"
+           << "<input type=\"hidden\" name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
+           << "<input type=\"hidden\" name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
+           << "<input type=\"hidden\" name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
            << "</form>\n";
       cout << "<script>(async function(){const f=document.getElementById('"
            << form_id << "');const r=await fetch(f.action||location.href,"
@@ -557,10 +557,10 @@ int resume(int xPC,int xSP)
       string form_id="form"+to_string(IDF);
       cout << "<form style=\"display:none\" id=\"" << form_id
            << "\" method=\"post\" enctype=\"multipart/form-data\">"
-           << "<textarea name=__stack id=__stack>" << stacktext << "</textarea>\n"
-           << "<input name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
-           << "<input name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
-           << "<input name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
+           << "<input type=\"hidden\" name=__stack id=__stack value=\"" << p_html(stacktext) << "\">\n"
+           << "<input type=\"hidden\" name=__entrypoint id=__entrypoint value=\"" << entrypoint << "\">\n"
+           << "<input type=\"hidden\" name=__stackpos id=__stackpos value=\"" << target_stack_position << "\">\n"
+           << "<input type=\"hidden\" name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
            << "</form>\n";
       cout << "<script>(function(){let f=document.getElementById('"
            << form_id << "');let busy=false;async function tick(){if(busy)return;"
