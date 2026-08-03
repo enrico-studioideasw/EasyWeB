@@ -1504,7 +1504,10 @@ int main(int argc, char **argv)
 
     for (int i=0; i<g_num_resp; i++)
       if (!g_resp[i].busy) can_accept=1;
-    if (g_num_resp<g_max_resp) can_accept=1;
+    /* Grow before accept(): a responder forked afterwards would inherit the
+       newly accepted client socket and keep the connection open. */
+    if (!can_accept && g_num_resp<g_max_resp)
+      if (spawn_responder()>=0) can_accept=1;
 
     if (can_accept)
     { FD_SET(listen_fd,&rfds);

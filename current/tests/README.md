@@ -30,6 +30,8 @@ I quattro campi tecnici `__stack`, `__entrypoint`, `__stackpos` e
 che un target sospeso da ASK non resti nello stato `running`.
 `ewbd_static_http_smoke.py` verifica che GET serva il corpo statico e che HEAD
 restituisca gli stessi metadati, incluso `Content-Length`, senza inviare il corpo.
+`ewbd_cgi_pool_smoke.py` occupa un responder con un CGI lento e verifica che il
+pool avvii un secondo responder capace di servire subito un file statico.
 `ewbd_three_instance_smoke.py` avvia contemporaneamente la stessa build su tre
 porte e tre root temporanee distinte; verifica che ogni istanza serva soltanto
 il proprio contenuto e conservi il contratto GET/HEAD. Non simula rete, Caddy o
