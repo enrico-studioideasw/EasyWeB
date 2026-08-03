@@ -889,7 +889,8 @@ static int serve_cgi_program(int client_fd, const char *request_path,
   input=tmpfile();
   if (!input ||
       (post_body_len && fwrite(post_body,1,post_body_len,input)!=post_body_len) ||
-      fflush(input)<0 || fseek(input,0,SEEK_SET)<0 || pipe(output_pipe)<0)
+      fflush(input)<0 || fseek(input,0,SEEK_SET)<0 ||
+      set_cloexec(fileno(input))<0 || pipe(output_pipe)<0)
   { if (input) fclose(input);
     if (output_pipe[0]>=0) close(output_pipe[0]);
     if (output_pipe[1]>=0) close(output_pipe[1]);
@@ -1236,6 +1237,14 @@ static void responder_loop(int control_fd)
       continue;
     }
 
+    if (set_cloexec(client_fd)<0)
+    {
+      http_error(client_fd,502,"Bad Gateway");
+      close(client_fd);
+      send_status(control_fd,'I');
+      continue;
+    }
+
     struct timespec started;
     struct timespec finished;
     struct timeval read_timeout;
@@ -1272,6 +1281,7 @@ static int spawn_responder(void)
   if (pid==0)
   {
     close(sv[0]);
+    if (set_cloexec(sv[1])<0) _exit(1);
     responder_loop(sv[1]);
     exit(0);
   }
@@ -1453,6 +1463,7 @@ int main(int argc, char **argv)
   signal(SIGPIPE,SIG_IGN);
 
   int listen_fd=create_listener(port);
+  if (set_cloexec(listen_fd)<0) die("cannot protect listener from exec");
 
   for (int i=0; i<g_min_resp; i++)
     if (spawn_responder()<0) die("cannot spawn responder");
