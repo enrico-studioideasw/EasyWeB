@@ -569,7 +569,7 @@ static void http_error(int fd, int code, const char *text)
   write_all(fd,body);
 }
 
-static int serve_static_file(int client_fd, const char *request_path)
+static int serve_static_file(int client_fd, const char *request_path, int send_body)
 {
   char clean[1024];
   char full[8192];
@@ -605,6 +605,11 @@ static int serve_static_file(int client_fd, const char *request_path)
            "\r\n",
            mime_type(clean),(unsigned long)st.st_size);
   write_all(client_fd,header);
+
+  if (!send_body)
+  { close(f);
+    return 1;
+  }
 
   char buf[16384];
   for (;;)
@@ -1077,7 +1082,7 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
       return serve_evm_program(client_fd,resolved_path,NULL)<0;
     if (!strcmp(method,"GET") && is_cgi_path(resolved_path))
       return serve_cgi_program(client_fd,resolved_path,method,"",NULL,0)<0;
-    served=serve_static_file(client_fd,resolved_path);
+    served=serve_static_file(client_fd,resolved_path,!strcmp(method,"GET"));
     if (served) return served<0;
     http_error(client_fd,404,"Not Found");
     return 1;

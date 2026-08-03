@@ -80,6 +80,7 @@ $(BUILD)/ewb_run_file: tests/ewb_run_file.cpp $(BUILD)/vm.o $(BUILD)/vm_parts.o 
 test: all $(BUILD)/test_hash $(BUILD)/ewb_run_file
 	$(BUILD)/test_hash
 	python3 tests/ewbd_cgi_fd_smoke.py
+	python3 tests/ewbd_static_http_smoke.py
 	$(BUILD)/ewb tests/compiler_smoke.ewb $(BUILD)/compiler_compact.evm >/dev/null
 	$(BUILD)/ewb -S tests/compiler_smoke.ewb $(BUILD)/compiler_source.evm >/dev/null
 	test "$$(od -An -t u1 -N2 $(BUILD)/compiler_compact.evm)" = "   0   1"

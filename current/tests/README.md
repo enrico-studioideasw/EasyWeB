@@ -28,6 +28,8 @@ I quattro campi tecnici `__stack`, `__entrypoint`, `__stackpos` e
 `__signature` devono essere sempre input `hidden`, anche nei form dei target.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
 che un target sospeso da ASK non resti nello stato `running`.
+`ewbd_static_http_smoke.py` verifica che GET serva il corpo statico e che HEAD
+restituisca gli stessi metadati, incluso `Content-Length`, senza inviare il corpo.
 `upload_path_smoke` verifica il contratto multipart condiviso da CGI ed EWBD:
 al rientro il campo contiene i byte, mentre `_file` espone nome originale,
 MIME type, dimensione e percorso temporaneo leggibile fino allo STOP.
