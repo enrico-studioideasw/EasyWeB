@@ -133,6 +133,12 @@ static void p_addform(string *accumulator)
           "\" class=\"field\" name=\"" + p_html(name) +
           "\" type=\"submit\" value=\"" + p_html(label) + "\">";
   }
+  else if (type=="cr")
+  { field="<input id=\"" + p_html(name) +
+          "\" class=\"field ewb-cr\" name=\"" + p_html(name) +
+          "\" type=\"submit\" value=\"" + p_html(label) +
+          "\" tabindex=\"-1\" aria-hidden=\"true\" hidden>";
+  }
   else if (type=="option" || type=="options" || type=="radio" ||
            type=="checks" || type=="links")
   { vector<string> values=p_array_values(value);
@@ -181,11 +187,18 @@ static void p_addform(string *accumulator)
     return;
   }
 
-  if (type!="hidden" && type!="submit" && label!="")
+  if (type!="hidden" && type!="submit" && type!="cr" && label!="")
   { field="<label id=\"label" + p_html(name) +
           "\" class=\"label\">" + p_html(label) + "</label>" + field;
   }
-  *accumulator=field+"\n";
+  if (type=="cr")
+  { string form;
+    POP(form);
+    size_t opening=form.find('>');
+    if (opening==string::npos) *accumulator=field+"\n"+form;
+    else *accumulator=form.substr(0,opening+1)+field+"\n"+form.substr(opening+1);
+  }
+  else *accumulator=field+"\n";
 }
 
 static void p_show(string *accumulator)

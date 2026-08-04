@@ -1,2 +1,5 @@
 var nome="Mario";
-ask nome:text("Nome");
+var salva="";
+var annulla="";
+var invio="";
+ask nome:text("Nome"),salva:submit("Salva"),annulla:submit("Annulla"),invio:cr("Invio");

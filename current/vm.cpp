@@ -278,7 +278,8 @@ int resume(int xPC,int xSP)
       if (SP>MAXSTACK) raiseerr("Stack overflow");
     } else if (OP==OP_STARTFORM)
     { IDF++;
-      A="<form method=post id=form" + to_string(IDF) + " enctype=multipart/form-data>";
+      A="<form method=post id=form" + to_string(IDF) +
+        " enctype=multipart/form-data onkeydown=\"if(event.key==='Enter'&amp;&amp;event.target.tagName!=='TEXTAREA'){event.preventDefault();const c=this.querySelector('.ewb-cr');if(c)this.requestSubmit(c)}\">";
     } else if (OP==OP_STARTTARGET)
     { IDF++;
       A="<form style=visibility:hidden id=form" + to_string(IDF) + " method=post enctype=multipart/form-data>";

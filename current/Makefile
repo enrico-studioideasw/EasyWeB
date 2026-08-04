@@ -97,6 +97,8 @@ test: all $(BUILD)/test_hash $(BUILD)/ewb_run_file
 	test "$$(grep -c 'type="hidden" name=__entrypoint ' $(BUILD)/form_smoke.html)" -eq 1
 	test "$$(grep -c 'type="hidden" name=__stackpos ' $(BUILD)/form_smoke.html)" -eq 1
 	test "$$(grep -c 'type="hidden" name=__signature ' $(BUILD)/form_smoke.html)" -eq 1
+	test "$$(grep -c 'class="field ewb-cr" name="invio" type="submit" value="Invio"' $(BUILD)/form_smoke.html)" -eq 1
+	test "$$(python3 -c 'p=open("$(BUILD)/form_smoke.html").read(); print(p.index("class=\"field ewb-cr\"") < p.index("name=\"salva\""))')" = "True"
 	! grep -q '<textarea name=__stack' $(BUILD)/form_smoke.html
 
 clean:

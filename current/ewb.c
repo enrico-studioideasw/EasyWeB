@@ -1969,7 +1969,7 @@ int formvar(char *name) /* FORMS: DA VERIFICARE */
   return -1;
 };
 
-formfield() /* FORMS: DA VERIFICARE */
+int formfield() /* FORMS: DA VERIFICARE */
 { char name[MAXVARLEN];
   char style[MAXVARLEN];
   char buf[3*MAXVARLEN];
@@ -2018,16 +2018,20 @@ formfield() /* FORMS: DA VERIFICARE */
   }
   out("PUSHA");
   out("ADDFORM");
+  if (!strcmp(style,"cr")) return 1;
   out("PUSHA");
   out("CONCAT");
+  return 0;
 };
 
 formfields() /* FORMS: DA VERIFICARE */
-{ formfield();
+{ int cr=0;
+  cr+=formfield();
   delperc();
   while (code[cpos]==',')
   { cpos++;
-    formfield();
+    cr+=formfield();
+    if (cr>1) err("Only one cr field is allowed in a form");
     delperc();
   };
 };

@@ -243,7 +243,7 @@ per accesso all' interfaccia web
   field= variable [":" style ["(" calcexp ")"]]
   'l'espressione opzionale e' l'etichetta visibile; senza si usa il nome
   'della variabile. Per submit e' il testo del pulsante.
-  style= text, password, submit, textarea, links, option, options,
+  style= text, password, submit, cr, textarea, links, option, options,
          checkbox, checks, radio, hidden, info, file
   'option crea una select singola; options una select multipla.
   'options e checks usano un array EWB indicizzato, non valori separati da ;.
@@ -266,6 +266,12 @@ per accesso all' interfaccia web
   'firmato usato anche da task e target. Al rientro i campi aggiornano le
   'celle per nome; valori omonimi multipli diventano un array EWB.
   'hidden non e' visibile, ma invia normalmente nome e valore.
+  'cr e' il pulsante submit implicito, invisibile e opzionale. Se presente,
+  'Invio in un campo equivale alla sua pressione e assegna alla variabile
+  'l'etichetta dichiarata; se assente, Invio non sceglie alcuna azione.
+  'Ogni form puo' dichiarare al massimo un campo cr.
+  'Il runtime intercetta Invio fuori dalle textarea: senza cr non invia il
+  'form; con cr invia esattamente quel pulsante nascosto.
   ' la richiesta dipende dal valore definito delle variabili prima della ask.
   ' ho bisogno di mantenere in ambiente un insieme di variabili predefinite, che sono a
   ' crescere. Semplicemente la ask puo' portarsi dietro in post tutte le var. di ambiente.

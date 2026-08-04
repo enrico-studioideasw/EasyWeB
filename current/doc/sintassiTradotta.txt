@@ -798,7 +798,7 @@ per accesso all' interfaccia web
   //   #form1 > .label
   //   #form1 > .field
   // Compilatore e ADDFORM correnti passano ancora soltanto tre valori.
-  style= text, password, submit, textarea, links, option, options,
+  style= text, password, submit, cr, textarea, links, option, options,
          checkbox, checks, radio, hidden, info, file
   // option e' select singola; options e' select multipla.
   // options e checks usano array EWB indicizzati:
@@ -818,6 +818,12 @@ per accesso all' interfaccia web
   // La sequenza \-> rappresenta un -> letterale.
   // INFO mostra soltanto il valore e non genera un campo inviato dal form.
   // HIDDEN non e' visibile, ma invia normalmente nome e valore.
+  // CR e' un submit implicito invisibile e opzionale. Se presente, Invio in
+  // un campo equivale alla sua pressione; se assente non viene scelta alcuna
+  // azione. Il compilatore ammette un solo campo CR per form e il runtime lo
+  // colloca per primo indipendentemente dalla posizione nella lista.
+  // Il runtime intercetta Invio fuori dalle textarea: senza CR non invia il
+  // form; con CR invia esattamente quel pulsante nascosto.
 
   form  field[, field]
   showform  variable 
