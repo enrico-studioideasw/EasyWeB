@@ -47,6 +47,9 @@ la serializzazione dello stack usata da ASK senza un formato parallelo.
 
 `test_hash.cpp`, eseguito da `make test`, verifica gli stessi sei vettori in
 modo automatico. I caratteri non ASCII sono passati come byte UTF-8 esatti.
+`test_db_uri.cpp` conserva la forma storica `mysql://database[:port]` e
+verifica la forma distribuita `mysql://host[:port]/database`, inclusa la
+destinazione per-context che prevale sul fallback d'ambiente.
 `make test` compila inoltre `compiler_smoke.ewb` sia nel formato binario
 predefinito sia con `-S`, verifica magic e riduzione di dimensione ed esegue
 entrambi i file con la stessa VM aspettandosi `2`.

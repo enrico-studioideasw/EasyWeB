@@ -1,4 +1,5 @@
 #include "db_interface.h"
+#include "db_uri.h"
 #include "cron_db.h"
 #include "sql_write_parser.h"
 #include "vm_parts.h"
@@ -71,12 +72,6 @@ using namespace std;
 
 void raiseerr(string e);
 
-struct DbUri
-{ string engine;
-  string database;
-  unsigned int port;
-};
-
 static string checked_name(string name)
 { if (name=="") raiseerr("Empty DB name");
   for (size_t i=0; i<name.size(); i++)
@@ -108,36 +103,8 @@ static string lower_word(string s)
 
 static DbUri parse_context(string context)
 { DbUri u;
-  u.engine="mysql";
-  u.database="ewb";
-  u.port=3306;
-
-  size_t p=context.find("://");
-  if (p==string::npos) raiseerr("DB context URI");
-
-  u.engine=context.substr(0,p);
-  string rest=context.substr(p+3);
-
-  if (u.engine=="mysql") u.port=3306;
-  else if (u.engine=="postgres" || u.engine=="postgresql")
-  { u.engine="postgres";
-    u.port=5432;
-  }
-  else raiseerr("DB engine");
-
-  if (rest!="")
-  { size_t c=rest.rfind(':');
-    if (c==string::npos) u.database=rest;
-    else
-    { u.database=rest.substr(0,c);
-      string ps=rest.substr(c+1);
-      if (ps=="") raiseerr("DB context URI");
-      u.port=(unsigned int)atoi(ps.c_str());
-      if (!u.port) raiseerr("DB context URI");
-    }
-  }
-
-  if (u.database=="") u.database="ewb";
+  string error;
+  if (!parse_db_uri(context,&u,&error)) raiseerr(error);
   return u;
 }
 
@@ -239,7 +206,7 @@ static vector<string> mysql_first_row(MYSQL *db);
 
 static MYSQL *mysql_open(DbUri u, string user, string pass)
 { if (user=="") user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
-  string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
+  string host=db_uri_host(u,"EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
 
   MYSQL *db=mysql_init(nullptr);
   if (!db) raiseerr("MySQL init");
@@ -321,7 +288,7 @@ static void mysql_widen_columns(MYSQL *db, string table, string query)
 static MYSQL *mysql_open_noerr(DbUri u)
 { string user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
   string pass=env_or("EWB_MYSQL_PASS","EWB_DB_PASS","");
-  string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
+  string host=db_uri_host(u,"EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
 
   MYSQL *db=mysql_init(nullptr);
   if (!db) return NULL;
@@ -337,7 +304,7 @@ static MYSQL *mysql_open_noerr(DbUri u)
 static MYSQL *mysql_open_bootstrap(DbUri u)
 { string user=env_or("EWB_MYSQL_USER","EWB_DB_USER","root");
   string pass=env_or("EWB_MYSQL_PASS","EWB_DB_PASS","");
-  string host=env_or("EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
+  string host=db_uri_host(u,"EWB_MYSQL_HOST","EWB_DB_HOST","localhost");
 
   MYSQL *db=mysql_init(nullptr);
   if (!db) raiseerr("MySQL init");
@@ -671,7 +638,7 @@ extern "C" void ewb_cron_job_free(ewb_cron_job *job)
 #if EWB_DB_WITH_POSTGRES
 static PGconn *pg_open(DbUri u, string user, string pass)
 { if (user=="") user=env_or("EWB_PG_USER","EWB_DB_USER","");
-  string host=env_or("EWB_PG_HOST","EWB_DB_HOST","localhost");
+  string host=db_uri_host(u,"EWB_PG_HOST","EWB_DB_HOST","localhost");
 
   ostringstream ss;
   ss << "host=" << host << " dbname=" << u.database << " port=" << u.port;
