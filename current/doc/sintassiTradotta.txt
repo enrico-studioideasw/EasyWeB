@@ -835,9 +835,13 @@ per accesso all' interfaccia web
   '<!doctype html><html><body><div id=_main><></div></body></html>
   'ma resta ridichiarabile e sovrascrivibile.
   'vuota non mostra nulla; senza <> mostra soltanto il template.
-  'Ogni target genera nella pagina principale:
+  'Ogni istanza di target si associa, in ordine di resa, a un contenitore:
   '<div id=_nomeTarget></div>
-  'per esempio il target prova usa <div id=_prova></div>.
+  'per esempio il target prova usa <div id=_prova></div>. Il nome logico puo'
+  'ripetersi: il runtime assegna nel browser un'identita' opaca a ciascuna
+  'istanza e conserva l'associazione con il suo form e la sua continuazione.
+  'Anche se due risposte arrivano in ordine inverso, ciascuna sostituisce
+  'atomicamente soltanto il contenitore che ha originato il proprio invio.
   'Il prefisso _ riserva gli id strutturali generati da EWB e non consuma
   'gli id naturali che l'utente puo' assegnare ai campi o ad altri elementi.
   'La chiamata AJAX del target popola il relativo div; _main resta il

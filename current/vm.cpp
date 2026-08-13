@@ -522,12 +522,15 @@ int resume(int xPC,int xSP)
            << "<input type=\"hidden\" name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
            << "</form>\n";
       cout << "<script>(async function(){const f=document.getElementById('"
+           << form_id << "');const c=[...document.querySelectorAll('[id=\"_"
+           << p_html(target_name)
+           << "\"]')].find(e=>!e.hasAttribute('data-ewb-target-instance'));"
+           << "if(!c)return;c.setAttribute('data-ewb-target-instance','"
            << form_id << "');const r=await fetch(f.action||location.href,"
            << "{method:'POST',body:new FormData(f)});const t=await r.text();"
            << "const d=new DOMParser().parseFromString(t,'text/html');"
            << "const n=d.getElementById('_" << p_html(target_name)
-           << "'),c=document.getElementById('_" << p_html(target_name)
-           << "');if(r.ok&&n&&c)c.replaceChildren(...n.childNodes);})();</script>\n";
+           << "');if(r.ok&&n)c.replaceChildren(...n.childNodes);})();</script>\n";
       A="";
     } else if (OP==OP_REFRESHTARGET)
     { string interval, arity_text, target_name;
@@ -564,12 +567,15 @@ int resume(int xPC,int xSP)
            << "<input type=\"hidden\" name=__signature id=__signature value=\"" << signature(signed_state) << "\">\n"
            << "</form>\n";
       cout << "<script>(function(){let f=document.getElementById('"
+           << form_id << "');const c=[...document.querySelectorAll('[id=\"_"
+           << p_html(target_name)
+           << "\"]')].find(e=>!e.hasAttribute('data-ewb-target-instance'));"
+           << "if(!c)return;c.setAttribute('data-ewb-target-instance','"
            << form_id << "');let busy=false;async function tick(){if(busy)return;"
            << "busy=true;try{const r=await fetch(f.action||location.href,"
            << "{method:'POST',body:new FormData(f)});const t=await r.text();"
            << "const d=new DOMParser().parseFromString(t,'text/html');"
            << "const n=d.getElementById('_" << p_html(target_name)
-           << "'),c=document.getElementById('_" << p_html(target_name)
            << "'),nf=d.getElementById('" << form_id << "');"
            << "if(r.ok&&n&&c){c.replaceChildren(...n.childNodes);"
            << "if(nf){f.replaceWith(nf);f=nf;}}}finally{busy=false;}}tick();"

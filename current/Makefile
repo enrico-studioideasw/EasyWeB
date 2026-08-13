@@ -107,6 +107,12 @@ test: all $(BUILD)/test_hash $(BUILD)/test_db_uri $(BUILD)/ewb_run_file
 	test "$$(grep -c 'class="field ewb-cr" name="invio" type="submit" value="Invio"' $(BUILD)/form_smoke.html)" -eq 1
 	test "$$(python3 -c 'p=open("$(BUILD)/form_smoke.html").read(); print(p.index("class=\"field ewb-cr\"") < p.index("name=\"salva\""))')" = "True"
 	! grep -q '<textarea name=__stack' $(BUILD)/form_smoke.html
+	$(BUILD)/ewb tests/target_instance_smoke.ewb $(BUILD)/target_instance_smoke.evm >/dev/null
+	$(BUILD)/ewb_run_file $(BUILD)/target_instance_smoke.evm > $(BUILD)/target_instance_smoke.html
+	test "$$(grep -c 'querySelectorAll' $(BUILD)/target_instance_smoke.html)" -eq 2
+	test "$$(grep -c 'form1.*data-ewb-target-instance.*form1' $(BUILD)/target_instance_smoke.html)" -eq 1
+	test "$$(grep -c 'form2.*data-ewb-target-instance.*form2' $(BUILD)/target_instance_smoke.html)" -eq 1
+	node tests/target_instance_smoke.js $(BUILD)/target_instance_smoke.html
 
 clean:
 	rm -rf $(BUILD)

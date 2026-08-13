@@ -1,0 +1,5 @@
+target pannello(testo) {
+  print(testo);
+};
+run pannello("A");
+run pannello("B");
