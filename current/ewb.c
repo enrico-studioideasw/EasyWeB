@@ -86,6 +86,8 @@ int respos=0;
 extern char currline[];
 extern int nline;
 
+#define DEFAULT_TEMPLATE_MARKER "*EWB_DEFAULT_TEMPLATE*"
+
 void out(const char* dt)
 { char expanded[MAXLINE];
   int label;
@@ -172,6 +174,41 @@ void setLabel(int label)
     memcpy(found,value,new_length);
     respos+=new_length-old_length;
     found=strstr(found+new_length,marker);
+  }
+}
+
+static void finalize_default_template(void)
+{ static char page[MAXOUTPUTSIZE];
+  char *marker=strstr(res,DEFAULT_TEMPLATE_MARKER);
+  int pagepos;
+  int i;
+  if (!marker) err("Missing default template marker");
+  strcpy(page,"<!doctype html><html><body><div id=_main><></div>");
+  pagepos=(int)strlen(page);
+  for (i=0; i<ntargets; i++)
+  { int j;
+    int first=1;
+    for (j=0; j<i; j++)
+      if (!strcmp(targets[j].name,targets[i].name)) first=0;
+    if (first)
+    { int written=snprintf(page+pagepos,sizeof(page)-pagepos,
+                           "<div id=_%s></div>",targets[i].name);
+      if (written<0 || written>=(int)sizeof(page)-pagepos)
+        err("Default template too long");
+      pagepos+=written;
+    }
+  }
+  if (pagepos+(int)strlen("</body></html>")+1>=(int)sizeof(page))
+    err("Default template too long");
+  strcpy(page+pagepos,"</body></html>");
+  pagepos=(int)strlen(page);
+  { int old_length=(int)strlen(DEFAULT_TEMPLATE_MARKER);
+    int tail=respos-(int)(marker-res)-old_length;
+    if (respos-old_length+pagepos>=MAXOUTPUTSIZE) err("Output overflow");
+    memmove(marker+pagepos,marker+old_length,tail);
+    memcpy(marker,page,pagepos);
+    respos+=pagepos-old_length;
+    res[respos]=0;
   }
 }
 
@@ -2177,13 +2214,19 @@ blocco()
   } else codice();  
 }
 programma()
-{ while (code[cpos]!=0) 
+{ remember_variable("_template");
+  out("PUSH \"_template\"");
+  out("MOVA \"" DEFAULT_TEMPLATE_MARKER "\"");
+  out("PUSHA");
+  out("SETPATH 0");
+  while (code[cpos]!=0)
   { codice();
     delperc(); 
     if (code[cpos]!=';') err("Missing ;");
     cpos++;  
     delperc();
   };
+  finalize_default_template();
 };
 
 int main(int argc, char** argv)

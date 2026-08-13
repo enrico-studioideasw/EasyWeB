@@ -1,0 +1,3 @@
+target pannello() {};
+_template = "<article><></article>";
+show("manuale");

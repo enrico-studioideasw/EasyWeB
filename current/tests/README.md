@@ -28,10 +28,11 @@ I quattro campi tecnici `__stack`, `__entrypoint`, `__stackpos` e
 `__signature` devono essere sempre input `hidden`, anche nei form dei target.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
 che un target sospeso da ASK non resti nello stato `running`.
-`target_instance_smoke` compila due invii allo stesso target, esegue il
-JavaScript generato su due contenitori omonimi e consegna prima la risposta B,
-poi A: ogni risposta deve cambiare soltanto la propria istanza, senza scambiare
-DOM o form.
+`target_instance_smoke` verifica che il template predefinito contenga un solo
+contenitore per ogni nome logico di target, anche con dichiarazioni omonime e
+con target dichiarati dopo il flusso principale.
+`template_override_smoke` verifica che un'assegnazione esplicita a `_template`
+sostituisca il default sintetizzato.
 `ewbd_static_http_smoke.py` verifica che GET serva il corpo statico e che HEAD
 restituisca gli stessi metadati, incluso `Content-Length`, senza inviare il corpo.
 `ewbd_cgi_pool_smoke.py` occupa un responder con un CGI lento e verifica che il

@@ -109,10 +109,11 @@ test: all $(BUILD)/test_hash $(BUILD)/test_db_uri $(BUILD)/ewb_run_file
 	! grep -q '<textarea name=__stack' $(BUILD)/form_smoke.html
 	$(BUILD)/ewb tests/target_instance_smoke.ewb $(BUILD)/target_instance_smoke.evm >/dev/null
 	$(BUILD)/ewb_run_file $(BUILD)/target_instance_smoke.evm > $(BUILD)/target_instance_smoke.html
-	test "$$(grep -c 'querySelectorAll' $(BUILD)/target_instance_smoke.html)" -eq 2
-	test "$$(grep -c 'form1.*data-ewb-target-instance.*form1' $(BUILD)/target_instance_smoke.html)" -eq 1
-	test "$$(grep -c 'form2.*data-ewb-target-instance.*form2' $(BUILD)/target_instance_smoke.html)" -eq 1
-	node tests/target_instance_smoke.js $(BUILD)/target_instance_smoke.html
+	test "$$(grep -o 'id=_pannello' $(BUILD)/target_instance_smoke.html | wc -l)" -eq 1
+	test "$$(grep -o 'id=_laterale' $(BUILD)/target_instance_smoke.html | wc -l)" -eq 1
+	test "$$(python3 -c 'p=open("$(BUILD)/target_instance_smoke.html").read(); print(p.index("id=_main") < p.index("id=_pannello") < p.index("id=_laterale"))')" = "True"
+	$(BUILD)/ewb tests/template_override_smoke.ewb $(BUILD)/template_override_smoke.evm >/dev/null
+	test "$$($(BUILD)/ewb_run_file $(BUILD)/template_override_smoke.evm)" = "<article>manuale</article>"
 
 clean:
 	rm -rf $(BUILD)

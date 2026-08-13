@@ -1,5 +1,4 @@
-target pannello(testo) {
-  print(testo);
-};
-run pannello("A");
-run pannello("B");
+target pannello() {};
+show("main");
+target laterale() {};
+target pannello() { print("ultima"); };

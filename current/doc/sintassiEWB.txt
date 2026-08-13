@@ -282,7 +282,10 @@ per accesso all' interfaccia web
   'serve a creare pagine con piu' forms, ciascuno dei quali porta ad un risultato diverso.
   show variabile
   'sostituisce ogni <> nel valore corrente di _template con il testo.
-  '_template ha un valore iniziale ma puo' essere ridichiarata o sovrascritta.
+  '_template e' predefinita. Se non viene sovrascritta, il compilatore crea
+  'il default con _main e un solo contenitore per ogni nome logico di target,
+  'indipendentemente dalla posizione o ripetizione della dichiarazione.
+  'L'ordine segue il primo incontro nel sorgente e non ha valore semantico.
   'se e' vuota non mostra nulla; senza <> mostra soltanto il template.
   'askto non fa parte di EWB2026: le comunicazioni esterne usano primitive
   'dedicate, senza imitare un secondo responder EWB.
