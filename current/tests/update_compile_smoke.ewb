@@ -1,0 +1,5 @@
+dataset persone={nome,cognome};
+var soglia=10;
+persone.nome="Ada";
+persone.cognome="Lovelace";
+var aggiornati=update(persone,persone.id>soglia);

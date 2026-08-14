@@ -737,7 +737,7 @@ static int compile_composed(const char *name)
 
   if (strcmp(name,"abs") && strcmp(name,"cos") && strcmp(name,"change") &&
       strcmp(name,"push") && strcmp(name,"delkey") &&
-      strcmp(name,"add") && strcmp(name,"exists") &&
+      strcmp(name,"add") && strcmp(name,"exists") && strcmp(name,"update") &&
       strcmp(name,"lock") && strcmp(name,"unlock"))
     return 0;
   if (sql_mode) err("Predefined unsupported in SQL");
@@ -809,7 +809,7 @@ static int compile_composed(const char *name)
     return 1;
   }
 
-  if (!strcmp(name,"add") || !strcmp(name,"exists"))
+  if (!strcmp(name,"add") || !strcmp(name,"exists") || !strcmp(name,"update"))
   { int field_count=0;
     int fields[MAXOBJ];
     size_t prefix_length;
@@ -820,8 +820,13 @@ static int compile_composed(const char *name)
     strcpy(variable,currtok);
     if (variable_index(variable)<0) err("Unknown dataset");
     delperc();
-    if (code[cpos]!=')') err("Missing )");
-    cpos++;
+    if (!strcmp(name,"update"))
+    { if (code[cpos]!=',') err("UPDATE requires a filter");
+      cpos++;
+    } else
+    { if (code[cpos]!=')') err("Missing )");
+      cpos++;
+    }
 
     prefix_length=strlen(variable);
     for (int i=0; i<nvars; i++)
@@ -829,10 +834,14 @@ static int compile_composed(const char *name)
           variables[i][prefix_length]=='.' &&
           variables[i][prefix_length+1]!='_')
       { const char *field=variables[i]+prefix_length+1;
-        if (!strcmp(name,"add") && !strcmp(field,"id")) continue;
+        if ((!strcmp(name,"add") || !strcmp(name,"update")) &&
+            !strcmp(field,"id")) continue;
         fields[field_count++]=i;
       }
     }
+
+    if (!strcmp(name,"update") && !field_count)
+      err("UPDATE requires public fields");
 
     snprintf(line,sizeof(line),"PUSH \"%s\"",variable);
     out(line);
@@ -847,10 +856,11 @@ static int compile_composed(const char *name)
       }
       strncat(query,") values (",sizeof(query)-strlen(query)-1);
     }
-    else
+    else if (!strcmp(name,"exists"))
     { snprintf(query,sizeof(query),"select id from %s",variable);
       if (field_count) strncat(query," where ",sizeof(query)-strlen(query)-1);
     }
+    else snprintf(query,sizeof(query),"update %s set ",variable);
     snprintf(line,sizeof(line),"MOVA \"%s\"",query);
     out(line);
 
@@ -858,10 +868,11 @@ static int compile_composed(const char *name)
     { if (i)
       { out("PUSHA");
         if (!strcmp(name,"add")) out("PUSH \",\"");
+        else if (!strcmp(name,"update")) out("PUSH \",\"");
         else out("PUSH \" and \"");
         out("CONCAT");
       }
-      if (!strcmp(name,"exists"))
+      if (!strcmp(name,"exists") || !strcmp(name,"update"))
       { const char *field=variables[fields[i]]+prefix_length+1;
         out("PUSHA");
         snprintf(line,sizeof(line),"PUSH \"`%s`=\"",field);
@@ -880,6 +891,20 @@ static int compile_composed(const char *name)
       out("PUSH \")\"");
       out("CONCAT");
     }
+    if (!strcmp(name,"update"))
+    { out("PUSHA");
+      out("PUSH \" where \"");
+      out("CONCAT");
+      out("PUSHA");
+      sql_mode=1;
+      calcexp();
+      sql_mode=0;
+      out("PUSHA");
+      out("CONCAT");
+      delperc();
+      if (code[cpos]!=')') err("Missing )");
+      cpos++;
+    }
     out("PUSHA");
     out("QUERY");
     if (!strcmp(name,"add"))
@@ -888,7 +913,7 @@ static int compile_composed(const char *name)
       out("PUSHA");
       out("SETPATH 0");
     }
-    else
+    else if (!strcmp(name,"exists"))
     { out("PUSHA");
       out("PUSH \"\"");
       out("SNEQ");

@@ -1,0 +1,2 @@
+dataset persone={nome};
+update(persone);

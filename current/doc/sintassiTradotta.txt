@@ -764,6 +764,13 @@ deleteblock = delete "(" variabile[.variabile] "," condizione ")"
 // DELETE restituisce il numero di record eliminati, anche "0".
 // DELETE elimina record. Non esiste REMOVE del dataset: struttura e campi
 // crescono dinamicamente; la rimozione strutturale e' amministrazione SQL.
+
+update = update "(" variabile[.variabile] "," condizione ")"
+// UPDATE scrive tutti i campi pubblici correnti del dataset, escluso id.
+// Il filtro e' obbligatorio e usa la stessa traduzione SQL di DELETE.
+// Restituisce il numero reale di record modificati, inclusi "0" e valori
+// maggiori di uno. Il chiamante deve caricare un record completo quando non
+// vuole sostituire campi con valori vuoti o parziali.
 // _orderby e' un frammento SQL libero. Al frammento viene accodato una sola
 // volta ", id"; se e' vuoto, l'ordinamento e' "id".
 
