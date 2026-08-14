@@ -279,7 +279,18 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_STARTFORM)
     { IDF++;
       A="<form method=post id=form" + to_string(IDF) +
-        " enctype=multipart/form-data onkeydown=\"if(event.key==='Enter'&amp;&amp;event.target.tagName!=='TEXTAREA'){event.preventDefault();const c=this.querySelector('.ewb-cr');if(c)this.requestSubmit(c)}\">";
+        " enctype=multipart/form-data";
+      if (active_target_name!="")
+      { string target=p_html(active_target_name);
+        A+=" data-ewb-target=\"" + target + "\" onsubmit=\"event.preventDefault();"
+          "const f=this,c=f.closest('#_" + target + "'),b=new FormData(f);"
+          "if(event.submitter&amp;&amp;event.submitter.name)b.append(event.submitter.name,event.submitter.value);"
+          "(async()=>{const r=await fetch(f.action||location.href,{method:'POST',body:b});"
+          "const t=await r.text(),d=new DOMParser().parseFromString(t,'text/html'),"
+          "n=d.getElementById('_main');if(r.ok&amp;&amp;n&amp;&amp;c)c.replaceChildren(...n.childNodes)})()"
+          ".catch(e=>console.error(e));return false;\"";
+      }
+      A+=" onkeydown=\"if(event.key==='Enter'&amp;&amp;event.target.tagName!=='TEXTAREA'){event.preventDefault();const c=this.querySelector('.ewb-cr');if(c)this.requestSubmit(c)}\">";
     } else if (OP==OP_STARTTARGET)
     { IDF++;
       A="<form style=visibility:hidden id=form" + to_string(IDF) + " method=post enctype=multipart/form-data>";

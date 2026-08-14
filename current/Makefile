@@ -112,6 +112,11 @@ test: all $(BUILD)/test_hash $(BUILD)/test_db_uri $(BUILD)/ewb_run_file
 	test "$$(grep -o 'id=_pannello' $(BUILD)/target_instance_smoke.html | wc -l)" -eq 1
 	test "$$(grep -o 'id=_laterale' $(BUILD)/target_instance_smoke.html | wc -l)" -eq 1
 	test "$$(python3 -c 'p=open("$(BUILD)/target_instance_smoke.html").read(); print(p.index("id=_main") < p.index("id=_pannello") < p.index("id=_laterale"))')" = "True"
+	$(BUILD)/ewb tests/target_ask_smoke.ewb $(BUILD)/target_ask_smoke.evm >/dev/null
+	$(BUILD)/ewb_run_file $(BUILD)/target_ask_smoke.evm > $(BUILD)/target_ask_launcher.html
+	strings $(BUILD)/vm.o | grep -q 'data-ewb-target='
+	strings $(BUILD)/vm.o | grep -q "d.getElementById('_main')"
+	strings $(BUILD)/vm.o | grep -q 'event.submitter.name'
 	$(BUILD)/ewb tests/template_override_smoke.ewb $(BUILD)/template_override_smoke.evm >/dev/null
 	test "$$($(BUILD)/ewb_run_file $(BUILD)/template_override_smoke.evm)" = "<article>manuale</article>"
 

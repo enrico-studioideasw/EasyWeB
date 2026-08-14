@@ -824,6 +824,10 @@ per accesso all' interfaccia web
   // colloca per primo indipendentemente dalla posizione nella lista.
   // Il runtime intercetta Invio fuori dalle textarea: senza CR non invia il
   // form; con CR invia esattamente quel pulsante nascosto.
+  // Dentro un target ASK intercetta anche il submit: invia via AJAX lo stato
+  // firmato e il pulsante premuto, poi sostituisce soltanto il contenitore del
+  // target che possiede quel form. Non naviga via e non modifica le altre
+  // continuazioni sospese presenti nello stesso documento.
 
   form  field[, field]
   showform  variable 

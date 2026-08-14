@@ -27,7 +27,10 @@ esplicitamente la transazione.
 I quattro campi tecnici `__stack`, `__entrypoint`, `__stackpos` e
 `__signature` devono essere sempre input `hidden`, anche nei form dei target.
 `target_ask_smoke` verifica via HTTP che EWBD inoltri e autentichi il POST e
-che un target sospeso da ASK non resti nello stato `running`.
+che un target sospeso da ASK non resti nello stato `running`. Verifica inoltre
+che il form prodotto da ASK dentro un target intercetti il submit, conservi il
+pulsante premuto, riprenda la continuazione via AJAX e sostituisca soltanto il
+contenitore del target che possiede il form.
 `target_instance_smoke` verifica che il template predefinito contenga un solo
 contenitore per ogni nome logico di target, anche con dichiarazioni omonime e
 con target dichiarati dopo il flusso principale.
