@@ -553,6 +553,44 @@ static void default_index_path(const char *path, char *out, size_t outsz)
   snprintf(out,outsz,"%s",path);
 }
 
+static void default_evm_path(const char *path, char *out, size_t outsz)
+{
+  char clean[1024];
+  char full[8192];
+  const char *base;
+  const char *suffix;
+  struct stat st;
+
+  strip_query(path,clean,sizeof(clean));
+  if (unsafe_path(clean))
+  { snprintf(out,outsz,"%s",path);
+    return;
+  }
+
+  base=strrchr(clean,'/');
+  base=base ? base+1 : clean;
+  if (!base[0] || strchr(base,'.'))
+  { snprintf(out,outsz,"%s",path);
+    return;
+  }
+
+  snprintf(full,sizeof(full),"%s%s.evm",g_www_root,clean);
+  if (stat(full,&st)<0 || !S_ISREG(st.st_mode))
+  { snprintf(out,outsz,"%s",path);
+    return;
+  }
+
+  suffix=strpbrk(path,"?#");
+  if (strlen(clean)+4+(suffix ? strlen(suffix) : 0)+1>outsz)
+  { snprintf(out,outsz,"%s",path);
+    return;
+  }
+  out[0]=0;
+  strcat(out,clean);
+  strcat(out,".evm");
+  if (suffix) strcat(out,suffix);
+}
+
 static void http_error(int fd, int code, const char *text)
 {
   char buf[512];
@@ -1054,6 +1092,7 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
   int req_len=0;
   char method[16];
   char path[1024];
+  char indexed_path[1024];
   char resolved_path[1024];
   char body[4096];
   char header[512];
@@ -1073,7 +1112,8 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
 
   if (method[0]==0) strcpy(method,"?");
   if (path[0]==0) strcpy(path,"/");
-  default_index_path(path,resolved_path,sizeof(resolved_path));
+  default_index_path(path,indexed_path,sizeof(indexed_path));
+  default_evm_path(indexed_path,resolved_path,sizeof(resolved_path));
   *is_evm=is_evm_path(resolved_path);
 
   if (!strcmp(method,"GET") || !strcmp(method,"HEAD"))
