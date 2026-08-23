@@ -961,6 +961,7 @@ static int serve_cgi_program(int client_fd, const char *request_path,
     setenv("SERVER_PROTOCOL","HTTP/1.0",1);
     setenv("REQUEST_METHOD",method,1);
     setenv("SCRIPT_NAME",clean,1);
+    setenv("SCRIPT_FILENAME",canonical,1);
     setenv("QUERY_STRING",query ? query+1 : "",1);
     setenv("CONTENT_TYPE",content_type ? content_type : "",1);
     setenv("CONTENT_LENGTH",length,1);

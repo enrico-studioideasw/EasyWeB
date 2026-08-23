@@ -28,6 +28,13 @@ with tempfile.TemporaryDirectory(prefix="ewbd-cgi-fd-") as temporary:
 import os
 import time
 
+if os.environ.get('SCRIPT_NAME') != '/probe.cgi':
+    raise RuntimeError('unexpected SCRIPT_NAME')
+if os.environ.get('SCRIPT_FILENAME') != os.path.realpath(__file__):
+    raise RuntimeError('unexpected SCRIPT_FILENAME')
+if os.environ.get('QUERY_STRING') != 'contract=full':
+    raise RuntimeError('unexpected QUERY_STRING')
+
 if os.fork() == 0:
     inherited = []
     for name in os.listdir('/proc/self/fd'):
@@ -81,7 +88,7 @@ print('ok')
         for _ in range(50):
             try:
                 response = urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/probe.cgi", timeout=2
+                    f"http://127.0.0.1:{port}/probe.cgi?contract=full", timeout=2
                 ).read()
                 break
             except Exception:
