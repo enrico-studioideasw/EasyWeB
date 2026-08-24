@@ -896,6 +896,8 @@ static int path_inside_root(const char *path)
 
 static int serve_cgi_program(int client_fd, const char *request_path,
                              const char *method, const char *content_type,
+                             const char *http_cookie,
+                             const char *http_authorization,
                              const char *post_body, size_t post_body_len)
 {
   char clean[1024];
@@ -965,6 +967,8 @@ static int serve_cgi_program(int client_fd, const char *request_path,
     setenv("QUERY_STRING",query ? query+1 : "",1);
     setenv("CONTENT_TYPE",content_type ? content_type : "",1);
     setenv("CONTENT_LENGTH",length,1);
+    setenv("HTTP_COOKIE",http_cookie ? http_cookie : "",1);
+    setenv("HTTP_AUTHORIZATION",http_authorization ? http_authorization : "",1);
     execl(canonical,canonical,(char*)NULL);
     _exit(127);
   }
@@ -1097,6 +1101,8 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
   char resolved_path[1024];
   char body[4096];
   char header[512];
+  char http_cookie[EWBD_REQBUF];
+  char http_authorization[EWBD_REQBUF];
   ewb_form er;
 
   if (*loaded_generation!=generation)
@@ -1110,6 +1116,8 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
   req_len=read_http_request(client_fd,req,sizeof(req));
   if (req_len<0) return 1;
   parse_request_line(req,method,sizeof(method),path,sizeof(path));
+  header_value(req,"Cookie",http_cookie,sizeof(http_cookie));
+  header_value(req,"Authorization",http_authorization,sizeof(http_authorization));
 
   if (method[0]==0) strcpy(method,"?");
   if (path[0]==0) strcpy(path,"/");
@@ -1122,7 +1130,8 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
     if (!strcmp(method,"GET") && *is_evm)
       return serve_evm_program(client_fd,resolved_path,NULL)<0;
     if (!strcmp(method,"GET") && is_cgi_path(resolved_path))
-      return serve_cgi_program(client_fd,resolved_path,method,"",NULL,0)<0;
+      return serve_cgi_program(client_fd,resolved_path,method,"",http_cookie,
+                               http_authorization,NULL,0)<0;
     served=serve_static_file(client_fd,resolved_path,!strcmp(method,"GET"));
     if (served) return served<0;
     http_error(client_fd,404,"Not Found");
@@ -1144,6 +1153,7 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
         return 1;
       }
       int failed=serve_cgi_program(client_fd,resolved_path,method,content_type,
+                                   http_cookie,http_authorization,
                                    post_body,post_body_len)<0;
       free(post_body);
       return failed;
