@@ -1,5 +1,11 @@
-dataset persone={nome,cognome};
-var soglia=10;
-persone.nome="Ada";
-persone.cognome="Lovelace";
-var aggiornati=update(persone,persone.id>soglia);
+dataset richieste={token,destinatario,stato,persona};
+var token_ricevuto="codice-monouso";
+var email_ricevuta="b@example.test";
+richieste.token=token_ricevuto;
+richieste.destinatario=email_ricevuta;
+richieste.stato="usata";
+richieste.persona="42";
+var aggiornati=update(richieste,
+  (richieste.token eq token_ricevuto) &&
+  (richieste.destinatario eq email_ricevuta) &&
+  (richieste.stato eq "pendente"));

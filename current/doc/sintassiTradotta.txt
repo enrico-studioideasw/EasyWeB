@@ -768,9 +768,14 @@ deleteblock = delete "(" variabile[.variabile] "," condizione ")"
 update = update "(" variabile[.variabile] "," condizione ")"
 // UPDATE scrive tutti i campi pubblici correnti del dataset, escluso id.
 // Il filtro e' obbligatorio e usa la stessa traduzione SQL di DELETE.
+// Tutto il filtro, incluse eventuali condizioni unite da &&, viene composto
+// nella clausola WHERE della stessa istruzione SQL che esegue la mutazione.
 // Restituisce il numero reale di record modificati, inclusi "0" e valori
 // maggiori di uno. Il chiamante deve caricare un record completo quando non
 // vuole sostituire campi con valori vuoti o parziali.
+// Per un compare-and-set il chiamante deve proseguire soltanto se il risultato
+// e' 1: 0 significa che nessuna riga soddisfaceva piu' il filtro; un valore
+// maggiore di 1 viola l'unicita' attesa e non autorizza passi successivi.
 // _orderby e' un frammento SQL libero. Al frammento viene accodato una sola
 // volta ", id"; se e' vuoto, l'ordinamento e' "id".
 

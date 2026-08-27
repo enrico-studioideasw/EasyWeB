@@ -295,6 +295,9 @@ QUERY
   chiama run_query(). Per select/with/show mette in A il primo record
   serializzato; per insert l'id inserito dove disponibile; per update/delete il
   numero di righe modificate.
+  Un UPDATE filtrato, anche con piu' condizioni unite da AND, resta una singola
+  istruzione SQL. Nei flussi compare-and-set soltanto il risultato "1" elegge
+  il vincitore; "0" e valori maggiori di uno non autorizzano la fase seguente.
 
 Ordinamento
   QLIST e le select di QUERY sono deterministiche:
