@@ -1,11 +1,14 @@
-dataset richieste={token,destinatario,stato,persona};
+dataset richieste={token,destinatario,stato,scadenza,persona};
 var token_ricevuto="codice-monouso";
 var email_ricevuta="b@example.test";
+var adesso=1787897095;
 richieste.token=token_ricevuto;
 richieste.destinatario=email_ricevuta;
 richieste.stato="usata";
+richieste.scadenza=1787983495;
 richieste.persona="42";
 var aggiornati=update(richieste,
   (richieste.token eq token_ricevuto) &&
   (richieste.destinatario eq email_ricevuta) &&
-  (richieste.stato eq "pendente"));
+  (richieste.stato eq "pendente") &&
+  (richieste.scadenza gt adesso));

@@ -16,7 +16,8 @@ Risultati testuali attesi:
 - `dataset_id_smoke.ewb`: `||`
 - `db_compile_smoke.ewb`, se eseguito con DB: `1` e `persone.id` uguale al
   risultato di `add(persone)`.
-- `update_compile_smoke.ewb`: la query compilata contiene tutti i campi
+- `update_compile_smoke.ewb`: la query compilata contiene tutti i campi e un
+  filtro compare-and-set di quattro condizioni, inclusa la scadenza
   pubblici, non contiene `id` nel SET e conserva il filtro SQL obbligatorio.
 - `update_requires_filter.ewb`: la compilazione rifiuta UPDATE senza filtro.
 - `consecutive_in_smoke.ewb`, se eseguito con DB: `AA`; verifica che QBYID non

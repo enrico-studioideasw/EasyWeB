@@ -126,10 +126,11 @@ test: all $(BUILD)/test_hash $(BUILD)/test_db_uri $(BUILD)/ewb_run_file
 	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`token`="'
 	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`destinatario`="'
 	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`stato`="'
+	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`scadenza`="'
 	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`persona`="'
 	! strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH "`id`="'
 	strings $(BUILD)/update_compile_smoke.evm | grep -q 'PUSH " where "'
-	test "$$(strings $(BUILD)/update_compile_smoke.evm | grep -c 'PUSH " AND "')" -eq 2
+	test "$$(strings $(BUILD)/update_compile_smoke.evm | grep -c 'PUSH " AND "')" -eq 3
 	strings $(BUILD)/update_compile_smoke.evm | grep -q '^QUERY$$'
 	! strings $(BUILD)/update_compile_smoke.evm | grep -q '^SNEQ$$'
 	! $(BUILD)/ewb tests/update_requires_filter.ewb $(BUILD)/update_requires_filter.evm > $(BUILD)/update_requires_filter.log 2>&1
