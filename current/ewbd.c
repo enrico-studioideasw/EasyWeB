@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -413,9 +414,9 @@ static void parse_request_line(const char *req, char *method, size_t msz, char *
   path[psz-1]=0;
 }
 
-static void write_all(int fd, const char *s)
+static void write_all_n(int fd, const char *s, size_t length)
 {
-  size_t left=strlen(s);
+  size_t left=length;
   const char *p=s;
   while (left>0)
   {
@@ -428,6 +429,60 @@ static void write_all(int fd, const char *s)
     p+=n;
     left-=(size_t)n;
   }
+}
+
+static void write_all(int fd, const char *s)
+{
+  write_all_n(fd,s,strlen(s));
+}
+
+static int cgi_status_header(const char *line, size_t length)
+{
+  return length>=7 && !strncasecmp(line,"Status:",7);
+}
+
+static int parse_cgi_status(const char *headers, const char *headers_end,
+                            int *status_code, char *reason,
+                            size_t reason_size)
+{
+  const char *line=headers;
+  int found=0;
+  *status_code=200;
+  snprintf(reason,reason_size,"OK");
+
+  while (line<headers_end)
+  {
+    const char *next=memchr(line,'\n',(size_t)(headers_end-line));
+    const char *line_end=next ? next : headers_end;
+    size_t length=(size_t)(line_end-line);
+    if (length>0 && line[length-1]=='\r') length--;
+
+    if (cgi_status_header(line,length))
+    {
+      char value[512];
+      char *p;
+      char *number_end;
+      long code;
+      size_t value_len;
+      if (found || length<=7 || length-7>=sizeof(value)) return -1;
+      value_len=length-7;
+      memcpy(value,line+7,value_len);
+      value[value_len]=0;
+      p=value;
+      while (*p==' ' || *p=='\t') p++;
+      errno=0;
+      code=strtol(p,&number_end,10);
+      if (errno || number_end==p || code<100 || code>599) return -1;
+      if (*number_end!=' ' && *number_end!='\t' && *number_end!=0) return -1;
+      while (*number_end==' ' || *number_end=='\t') number_end++;
+      if (*number_end) snprintf(reason,reason_size,"%s",number_end);
+      else snprintf(reason,reason_size,"CGI Status");
+      *status_code=(int)code;
+      found=1;
+    }
+    line=next ? next+1 : headers_end;
+  }
+  return 0;
 }
 
 static const char *mime_type(const char *path)
@@ -1057,21 +1112,35 @@ static int serve_cgi_program(int client_fd, const char *request_path,
     return -1;
   }
 
-  write_all(client_fd,"HTTP/1.0 200 OK\r\n");
-  if (separator_len==4)
-  { *separator=0;
-    write_all(client_fd,response);
-  }
-  else
   {
-    for (char *p=response; p<separator; p++)
-      if (*p=='\n') write_all(client_fd,"\r\n");
-      else
-      { char one[2]={*p,0};
-        write_all(client_fd,one);
+    int cgi_status=200;
+    char cgi_reason[512];
+    char status_line[1024];
+    const char *line=response;
+    if (parse_cgi_status(response,separator,&cgi_status,cgi_reason,
+                         sizeof(cgi_reason))<0)
+    { free(response);
+      http_error(client_fd,502,"Bad Gateway");
+      return -1;
+    }
+    snprintf(status_line,sizeof(status_line),"HTTP/1.0 %d %s\r\n",
+             cgi_status,cgi_reason);
+    write_all(client_fd,status_line);
+
+    while (line<separator)
+    {
+      const char *next=memchr(line,'\n',(size_t)(separator-line));
+      const char *line_end=next ? next : separator;
+      size_t length=(size_t)(line_end-line);
+      if (length>0 && line[length-1]=='\r') length--;
+      if (!cgi_status_header(line,length))
+      { write_all_n(client_fd,line,length);
+        write_all(client_fd,"\r\n");
       }
+      line=next ? next+1 : separator;
+    }
   }
-  write_all(client_fd,"\r\nConnection: close\r\n\r\n");
+  write_all(client_fd,"Connection: close\r\n\r\n");
   {
     const char *body=separator+separator_len;
     size_t body_len=used-(size_t)(body-response);
