@@ -89,6 +89,7 @@ test: all $(BUILD)/test_hash $(BUILD)/test_db_uri $(BUILD)/ewb_run_file
 	python3 tests/ewbd_cgi_fd_smoke.py
 	python3 tests/ewbd_cgi_headers_smoke.py
 	python3 tests/ewbd_cgi_status_smoke.py
+	python3 tests/ewbd_cgi_timeout_smoke.py
 	python3 tests/ewbd_cgi_pool_smoke.py
 	python3 tests/ewbd_static_http_smoke.py
 	python3 tests/ewbd_evm_resolver_smoke.py

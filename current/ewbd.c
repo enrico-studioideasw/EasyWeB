@@ -47,7 +47,7 @@
 #define EWBD_MAX_POST (10*1024*1024)
 #define EWBD_CTRL_PAYLOAD_MAX 4096
 #define EWBD_CLIENT_READ_TIMEOUT_SEC 30
-#define EWBD_CGI_TIMEOUT_SEC 10
+#define EWBD_CGI_TIMEOUT_DEFAULT_SEC 120
 #define EWBD_CGI_MAX_RESPONSE (1024*1024)
 
 typedef struct control_msg
@@ -84,6 +84,7 @@ static int g_num_resp=0;
 static int g_min_resp=2;
 static int g_max_resp=16;
 static int g_generation=1;
+static int g_cgi_timeout_sec=EWBD_CGI_TIMEOUT_DEFAULT_SEC;
 static char g_www_root[4096]=".";
 static char g_stats_file[4096]="ewbd-traffic.log";
 static traffic_counters g_evm_stats;
@@ -1066,7 +1067,7 @@ static int serve_cgi_program(int client_fd, const char *request_path,
       else if (errno!=EINTR) break;
     }
     clock_gettime(CLOCK_MONOTONIC,&now);
-    if (elapsed_ns(started,now) >= (uint64_t)EWBD_CGI_TIMEOUT_SEC*1000000000ULL)
+    if (elapsed_ns(started,now) >= (uint64_t)g_cgi_timeout_sec*1000000000ULL)
     { timed_out=1;
       break;
     }
@@ -1083,7 +1084,7 @@ static int serve_cgi_program(int client_fd, const char *request_path,
       break;
     }
     clock_gettime(CLOCK_MONOTONIC,&now);
-    if (elapsed_ns(started,now) >= (uint64_t)EWBD_CGI_TIMEOUT_SEC*1000000000ULL)
+    if (elapsed_ns(started,now) >= (uint64_t)g_cgi_timeout_sec*1000000000ULL)
     { timed_out=1;
       break;
     }
@@ -1546,7 +1547,7 @@ static void usage(const char *argv0)
 {
   fprintf(stderr,
           "Usage: %s [-p port] [-m min_processes] [-M max_processes] "
-          "[--www path] [--stats-file path]\n",argv0);
+          "[--www path] [--stats-file path] [--cgi-timeout seconds]\n",argv0);
   exit(1);
 }
 
@@ -1568,6 +1569,13 @@ int main(int argc, char **argv)
     else if (!strcmp(argv[i],"--stats-file") && i+1<argc)
     { strncpy(g_stats_file,argv[++i],sizeof(g_stats_file)-1);
       g_stats_file[sizeof(g_stats_file)-1]=0;
+    }
+    else if (!strcmp(argv[i],"--cgi-timeout") && i+1<argc)
+    {
+      char *end=NULL;
+      long seconds=strtol(argv[++i],&end,10);
+      if (!end || *end || seconds<1 || seconds>86400) usage(argv[0]);
+      g_cgi_timeout_sec=(int)seconds;
     }
     else usage(argv[0]);
   }
@@ -1595,8 +1603,8 @@ int main(int argc, char **argv)
 
   g_stats_started=time(NULL);
   fprintf(stderr,
-          "ewbd listening on port %d, responders min=%d max=%d, www=%s, stats=%s\n",
-          port,g_min_resp,g_max_resp,g_www_root,g_stats_file);
+          "ewbd listening on port %d, responders min=%d max=%d, www=%s, stats=%s, cgi_timeout=%ds\n",
+          port,g_min_resp,g_max_resp,g_www_root,g_stats_file,g_cgi_timeout_sec);
 
   while (!g_stop)
   {

@@ -44,6 +44,8 @@ sostituisca il default sintetizzato.
 restituisca gli stessi metadati, incluso `Content-Length`, senza inviare il corpo.
 `ewbd_cgi_pool_smoke.py` occupa un responder con un CGI lento e verifica che il
 pool avvii un secondo responder capace di servire subito un file statico.
+`ewbd_cgi_timeout_smoke.py` verifica che `--cgi-timeout` interrompa una CGI
+oltre il limite e consenta alla stessa CGI di completarsi con un limite maggiore.
 `ewbd_three_instance_smoke.py` avvia contemporaneamente la stessa build su tre
 porte e tre root temporanee distinte; verifica che ogni istanza serva soltanto
 il proprio contenuto e conservi il contratto GET/HEAD. Non simula rete, Caddy o
