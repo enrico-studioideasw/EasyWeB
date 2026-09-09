@@ -87,3 +87,11 @@ si usa `-S` (source):
 
 La VM riconosce automaticamente il formato: `00 01` identifica il binario v1;
 ogni altro primo byte seleziona il formato testuale. Entrambi restano eseguibili.
+
+Installazione dei nodi del cluster
+----------------------------------
+
+La procedura per replicare l'ambiente EWB su un nodo secondario è descritta in
+[`current/doc/installazione_nodo_cluster.md`](current/doc/installazione_nodo_cluster.md).
+L'installer operativo si trova in `current/tools/install-ewb-node` ed è
+specifico per l'attuale topologia del cluster di Civolle.

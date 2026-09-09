@@ -1,0 +1,228 @@
+#!/bin/sh
+set -eu
+
+# Defaults for the Civolle EWB cluster. They may be overridden in the
+# environment when the same layout is reproduced elsewhere.
+source_host=${EWB_SOURCE_HOST:-192.168.2.51}
+source_network=${EWB_SOURCE_NETWORK:-192.168.2}
+ssh_key=${EWB_SSH_KEY:-/root/.ssh/cluster_backup_ed25519}
+www=${EWB_WWW:-/home/noc/EWB2026/current/www}
+shared=${EWB_SHARED:-/home/noc/EWB2026/shared-state}
+target=${1:-}
+
+usage()
+{
+    echo "Uso: install-ewb-node ${source_network}.N" >&2
+    exit 2
+}
+
+case "$target" in
+    "$source_network".*) target_suffix=${target##*.} ;;
+    *) usage ;;
+esac
+case "$target_suffix" in
+    ''|*[!0-9]*) usage ;;
+esac
+[ "$target_suffix" -ge 1 ] 2>/dev/null &&
+    [ "$target_suffix" -le 254 ] 2>/dev/null || usage
+[ "$target" != "$source_host" ] || {
+    echo "Rifiuto il nodo sorgente $source_host come destinazione." >&2
+    exit 2
+}
+
+[ "$(id -u)" -eq 0 ] || {
+    echo "Questo comando deve essere eseguito come root." >&2
+    exit 1
+}
+[ "$(hostname -I | tr ' ' '\n' | grep -Fx "$source_host" || true)" = "$source_host" ] || {
+    echo "Questo comando va eseguito sul nodo sorgente ($source_host)." >&2
+    exit 1
+}
+[ -r "$ssh_key" ] || { echo "Chiave SSH assente: $ssh_key" >&2; exit 1; }
+[ -x /usr/local/bin/ewbd ] || { echo "Runtime ewbd sorgente assente." >&2; exit 1; }
+[ -x /usr/local/bin/php-cgi-ewbd ] || { echo "Wrapper PHP sorgente assente." >&2; exit 1; }
+[ -d "$www" ] || { echo "Document root sorgente assente." >&2; exit 1; }
+[ -d "$shared" ] || { echo "Stato condiviso sorgente assente." >&2; exit 1; }
+[ -f /etc/caddy/Caddyfile ] || { echo "Caddyfile sorgente assente." >&2; exit 1; }
+[ -d /var/lib/caddy/.local/share/caddy ] || {
+    echo "Archivio certificati Caddy sorgente assente." >&2
+    exit 1
+}
+
+run_remote()
+{
+    ssh -i "$ssh_key" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+        "root@$target" "$@"
+}
+
+echo "[1/6] Preflight e backup configurazioni su $target"
+source_noc_ids=$(id -u noc):$(id -g noc)
+target_noc_ids=$(run_remote 'set -eu
+    test "$(id -u)" -eq 0
+    test -r /etc/os-release
+    . /etc/os-release
+    test "$ID" = debian
+    id -u noc
+    id -g noc
+' | paste -sd: -)
+[ "$target_noc_ids" = "$source_noc_ids" ] || {
+    echo "UID/GID di noc non coerenti: sorgente $source_noc_ids, nodo $target_noc_ids." >&2
+    exit 1
+}
+run_remote 'set -eu
+    stamp=$(date +%Y%m%d-%H%M%S)
+    archive=/root/ewb-node-before-install-$stamp.tar.gz
+    files=""
+    for path in \
+        /etc/fstab \
+        /etc/caddy \
+        /etc/famtree-php \
+        /etc/forum-one.php \
+        /etc/systemd/system/ewbd.service \
+        /usr/local/bin/ewbd \
+        /usr/local/bin/php-cgi-ewbd
+    do
+        [ ! -e "$path" ] && [ ! -L "$path" ] || files="$files ${path#/}"
+    done
+    if [ -n "$files" ]; then
+        # The list contains only the fixed paths above.
+        tar -C / -czf "$archive" $files
+        echo "Backup: $archive"
+    else
+        : > "$archive.empty"
+        echo "Nessuna configurazione preesistente; marcatore: $archive.empty"
+    fi
+'
+
+echo "[2/6] Installazione dipendenze Debian"
+run_remote 'set -eu
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        nfs-common caddy php-cgi php-mysql php-mbstring php-gd php-zip \
+        libmariadb3 libpq5 libpng16-16 curl ca-certificates >/dev/null
+'
+
+echo "[3/6] Configurazione mount NFS RW"
+run_remote "set -eu
+    systemctl stop ewbd.service 2>/dev/null || true
+    systemctl stop caddy.service 2>/dev/null || true
+    install -d -m 755 -o noc -g noc /home/noc/EWB2026/current
+    install -d -m 755 -o noc -g noc '$www' '$shared'
+    if [ ! -e /home/noc/EWB2026/current/ewbd-traffic.log ]; then
+        install -m 644 -o noc -g noc /dev/null /home/noc/EWB2026/current/ewbd-traffic.log
+    fi
+    cp -a /etc/fstab /etc/fstab.before-ewb-node
+    sed -i '\|$source_host:$www|d; \|$source_host:$shared|d' /etc/fstab
+    printf '%s\n' \
+      '$source_host:$www $www nfs4 rw,_netdev,nofail,x-systemd.mount-timeout=10s 0 0' \
+      '$source_host:$shared $shared nfs4 rw,_netdev,nofail,x-systemd.mount-timeout=10s 0 0' \
+      >> /etc/fstab
+    systemctl daemon-reload
+    mountpoint -q '$www' || mount '$www'
+    mountpoint -q '$shared' || mount '$shared'
+"
+
+echo "[4/6] Copia runtime e configurazione"
+tar -C / -cpf - \
+    usr/local/bin/ewbd \
+    usr/local/bin/php-cgi-ewbd \
+    etc/famtree-php \
+    etc/caddy/Caddyfile \
+    var/lib/caddy/.local/share/caddy \
+    | run_remote 'set -eu
+        tar -C / -xpf -
+        chown -R caddy:caddy /var/lib/caddy/.local
+    '
+
+echo "[5/6] Symlink dello stato e servizi"
+run_remote "set -eu
+    php_version=\$(php-cgi -r 'echo PHP_MAJOR_VERSION, \".\", PHP_MINOR_VERSION;')
+    php_conf_dir=/etc/php/\$php_version/cgi/conf.d
+    test -d \"\$php_conf_dir\"
+    printf '%s\n' 'cgi.force_redirect=0' > \"\$php_conf_dir/99-ewbd.ini\"
+
+    replace_with_symlink()
+    {
+        local_path=\$1
+        shared_path=\$2
+        if [ -L \"\$local_path\" ]; then
+            rm \"\$local_path\"
+        elif [ -e \"\$local_path\" ]; then
+            backup=\"\$local_path.local-before-nfs\"
+            [ ! -e \"\$backup\" ] || backup=\"\$backup.\$(date +%Y%m%d-%H%M%S)\"
+            mv \"\$local_path\" \"\$backup\"
+        fi
+        test -e \"\$shared_path\"
+        ln -s \"\$shared_path\" \"\$local_path\"
+    }
+
+    replace_with_symlink /var/lib/php/sessions '$shared/php-sessions'
+    replace_with_symlink /var/lib/famtree-php '$shared/famtree-php'
+    replace_with_symlink /etc/forum-one.php '$shared/config/forum-one.php'
+
+    cat > /etc/systemd/system/ewbd.service <<'EOF'
+[Unit]
+Description=EWB daemon
+After=network.target remote-fs.target
+RequiresMountsFor=/home/noc/EWB2026/current/www /home/noc/EWB2026/shared-state
+
+[Service]
+Type=simple
+User=noc
+WorkingDirectory=/home/noc/EWB2026/current
+ExecStart=/usr/local/bin/ewbd -p 80 -m 2 -M 16 --www /home/noc/EWB2026/current/www
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now ewbd.service caddy.service >/dev/null
+"
+
+echo "[6/6] Collaudo"
+run_remote "set -eu
+    findmnt -no OPTIONS '$www' | tr ',' '\n' | grep -Fx rw >/dev/null
+    findmnt -no OPTIONS '$shared' | tr ',' '\n' | grep -Fx rw >/dev/null
+    test -L /var/lib/php/sessions
+    test -L /var/lib/famtree-php
+    test -L /etc/forum-one.php
+    count=0
+    while [ \"\$(systemctl is-active ewbd.service)\" != active ] ||
+          ! curl --silent --max-time 2 http://127.0.0.1/ >/dev/null
+    do
+        count=\$((count + 1))
+        [ \$count -lt 15 ] || {
+            systemctl --no-pager --full status ewbd.service
+            exit 1
+        }
+        sleep 1
+    done
+    test \"\$(systemctl is-active caddy.service)\" = active
+    curl --fail --silent --show-error --max-time 5 http://127.0.0.1/ >/dev/null
+    probe_dir=\$(mktemp -d)
+    trap 'rm -rf \"\$probe_dir\"' EXIT HUP INT TERM
+    curl --fail --insecure --silent --show-error --max-time 10 \
+        --resolve civolle.it:443:127.0.0.1 -c \"\$probe_dir/cookies\" \
+        https://civolle.it/famtree/ > \"\$probe_dir/form\"
+    csrf=\$(sed -n 's/.*name=\"csrf\" value=\"\\([^\"]*\\)\".*/\\1/p' \"\$probe_dir/form\" | head -n 1)
+    submission=\$(sed -n 's/.*name=\"submission_token\" value=\"\\([^\"]*\\)\".*/\\1/p' \"\$probe_dir/form\" | head -n 1)
+    test -n \"\$csrf\"
+    test -n \"\$submission\"
+    curl --fail --insecure --silent --show-error --max-time 10 \
+        --resolve civolle.it:443:127.0.0.1 -b \"\$probe_dir/cookies\" \
+        --data-urlencode \"csrf=\$csrf\" \
+        --data-urlencode \"submission_token=\$submission\" \
+        --data-urlencode 'action=login' \
+        --data-urlencode 'email=ewb-node-probe@example.invalid' \
+        --data-urlencode 'password=not-a-real-password' \
+        https://civolle.it/famtree/ > \"\$probe_dir/login\"
+    grep -Eq 'Credenziali|Password|Accedi|non valid|errat' \"\$probe_dir/login\"
+    curl --fail --silent --show-error --max-time 10 \
+        http://127.0.0.1/forum-one/ >/dev/null
+    echo \"Nodo EWB pronto: \$(hostname) ($target)\"
+"
