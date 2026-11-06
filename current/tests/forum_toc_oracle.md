@@ -15,7 +15,7 @@ in the first arm would make the second arm start from a different transition.
 Database credentials belong to the node/test configuration and never to an
 EWB program, request, fixture committed to Git, or expected output.
 
-## Cells
+## Parity cells
 
 | Authentication | Topic | Expected HTTP result | Expected database transition |
 |---|---|---|---|
@@ -28,6 +28,19 @@ For the valid/existing cell, compare CGI and native response status, headers
 selected by the contract, and body bytes. Do not compare the exact database
 timestamp between arms: verify the transition `absent -> present` and bound
 `read_at` by the observation interval of its own request.
+
+## Route provenance for every native cell
+
+The parity result does not prove which backend produced it. A CGI replay can
+return the same login or error page and leave both read tables unchanged.
+Therefore run every row of the table once more with the native route selected
+and the CGI fallback replaced by a marker fixture. The marker increments an
+independent invocation counter before returning any response.
+
+For all four native cells the CGI invocation counter must remain zero. This
+assertion is separate from response parity and database effects: it proves
+route provenance even when the expected result is a non-mutating login or
+error page.
 
 ## No replay after a native side effect
 
@@ -44,15 +57,16 @@ The request passes only if:
 4. `contribution_reads` remains unchanged.
 
 The final `topic_reads` row alone cannot prove absence of replay because two
-upserts can collapse to the same row. The independent CGI counter is the
-replay oracle.
+upserts can collapse to the same row. Likewise, unchanged read tables cannot
+prove that an invalid or missing request stayed native. The independent CGI
+invocation counter is the route and replay oracle in every native cell.
 
 ## Gate
 
 Do not route production traffic to the native slice until all four parity
-cells and the post-upsert fault cell pass from fresh fixtures. A native
-attempt is terminal for that request; CGI is a separately selected fallback,
-not an error recovery replay.
+cells, all four native route-provenance cells, and the post-upsert fault cell
+pass from fresh fixtures. A native attempt is terminal for that request; CGI
+is a separately selected fallback, not an error recovery replay.
 
 In plain language: both implementations must start from the same untouched
-visit state, and a failure after recording the visit must never call CGI.
+visit state, and every native outcome must prove that CGI was never called.
