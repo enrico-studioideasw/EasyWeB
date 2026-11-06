@@ -53,6 +53,12 @@ isolamento fra macchine fisiche.
 `ewbd_request_smoke.py` verifica che un programma EWB nativo possa leggere
 metodo, path, query string, cookie e Authorization dalla richiesta corrente,
 senza confonderli con campi form o stato serializzato.
+`forum_toc_oracle.md` congela il banco di equivalenza per la prima fetta
+Forum-one nativa. Include la transizione su `topic_reads`, l'invarianza di
+`contribution_reads` e il guasto dopo l'upsert che deve lasciare a zero il
+contatore indipendente del backend CGI. Il banco diventera' eseguibile insieme
+al programma e alla route nativi; fino ad allora impedisce di confondere una
+pagina senza form con una lettura priva di effetti.
 `upload_path_smoke` verifica il contratto multipart condiviso da CGI ed EWBD:
 al rientro il campo contiene i byte, mentre `_file` espone nome originale,
 MIME type, dimensione e percorso temporaneo leggibile fino allo STOP.
