@@ -13,6 +13,8 @@ void ewb_form_clear(void);
 void ewb_form_add_field(const char *name, const char *value, size_t size);
 void ewb_form_add_file(const char *name, const char *filename,
                        const char *content_type, const char *path, size_t size);
+void ewb_request_clear(void);
+void ewb_request_add_field(const char *name, const char *value, size_t size);
 
 #ifdef __cplusplus
 }

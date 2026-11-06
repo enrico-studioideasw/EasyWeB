@@ -47,6 +47,7 @@ Database/context:
   delete (variabile, condizione)
 
 Web:
+  request("method|path|query|cookie|authorization")
   ask campo,campo
   askto url,campo,campo
   form campo,campo

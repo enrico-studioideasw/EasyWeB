@@ -135,7 +135,8 @@ typedef enum
   OP_GDLOAD,
   OP_GDCROP,
   OP_GDFILL,
-  OP_GDSAVE
+  OP_GDSAVE,
+  OP_REQUEST
 } EWBOpcode;
 
 typedef struct
@@ -259,6 +260,7 @@ static const VmInstr vm_instr_table[] =
   {"arraypush",    OP_ARRAYPUSH,    ARG_NONE},
   {"md5",          OP_MD5,          ARG_NONE},
   {"sha256",       OP_SHA256,       ARG_NONE},
+  {"request",      OP_REQUEST,      ARG_NONE},
   {0,             OPCODE_INVALID, ARG_NONE}
 };
 

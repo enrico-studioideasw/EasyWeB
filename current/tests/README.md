@@ -50,6 +50,9 @@ oltre il limite e consenta alla stessa CGI di completarsi con un limite maggiore
 porte e tre root temporanee distinte; verifica che ogni istanza serva soltanto
 il proprio contenuto e conservi il contratto GET/HEAD. Non simula rete, Caddy o
 isolamento fra macchine fisiche.
+`ewbd_request_smoke.py` verifica che un programma EWB nativo possa leggere
+metodo, path, query string, cookie e Authorization dalla richiesta corrente,
+senza confonderli con campi form o stato serializzato.
 `upload_path_smoke` verifica il contratto multipart condiviso da CGI ed EWBD:
 al rientro il campo contiene i byte, mentre `_file` espone nome originale,
 MIME type, dimensione e percorso temporaneo leggibile fino allo STOP.

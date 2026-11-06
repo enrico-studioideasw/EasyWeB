@@ -874,6 +874,7 @@ static void handle_cron_task(const char *task, int generation, int *loaded_gener
   devnull=open("/dev/null",O_WRONLY);
   if (devnull>=0)
   {
+    ewb_request_clear();
     run_evm_program_to_fd(devnull,job.program_url,entrypoint,stackpos,stack);
     close(devnull);
   }
@@ -1188,6 +1189,17 @@ static int handle_client(int client_fd, int generation, int *loaded_generation,
   parse_request_line(req,method,sizeof(method),path,sizeof(path));
   header_value(req,"Cookie",http_cookie,sizeof(http_cookie));
   header_value(req,"Authorization",http_authorization,sizeof(http_authorization));
+
+  {
+    const char *query=strchr(path,'?');
+    ewb_request_clear();
+    ewb_request_add_field("method",method,strlen(method));
+    ewb_request_add_field("path",path,query ? (size_t)(query-path) : strlen(path));
+    ewb_request_add_field("query",query ? query+1 : "",query ? strlen(query+1) : 0);
+    ewb_request_add_field("cookie",http_cookie,strlen(http_cookie));
+    ewb_request_add_field("authorization",http_authorization,
+                          strlen(http_authorization));
+  }
 
   if (method[0]==0) strcpy(method,"?");
   if (path[0]==0) strcpy(path,"/");

@@ -174,6 +174,21 @@ int main(int argc, char **argv)
                       form.files[i].size);
   };
 
+  ewb_request_clear();
+  ewb_request_add_field("method",method ? method : "",
+                        method ? strlen(method) : 0);
+  {
+    const char *path=getenv("SCRIPT_NAME");
+    const char *query=getenv("QUERY_STRING");
+    const char *cookie=getenv("HTTP_COOKIE");
+    const char *authorization=getenv("HTTP_AUTHORIZATION");
+    ewb_request_add_field("path",path ? path : "",path ? strlen(path) : 0);
+    ewb_request_add_field("query",query ? query : "",query ? strlen(query) : 0);
+    ewb_request_add_field("cookie",cookie ? cookie : "",cookie ? strlen(cookie) : 0);
+    ewb_request_add_field("authorization",authorization ? authorization : "",
+                          authorization ? strlen(authorization) : 0);
+  }
+
   rc=ewb_run_buffer(program,program_len,path,entrypoint,stackpos,stack);
 
   ewb_form_free(&form);

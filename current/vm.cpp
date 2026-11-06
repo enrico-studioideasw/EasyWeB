@@ -59,6 +59,7 @@ struct PendingFormFile
 };
 static vector<PendingFormValue> pending_form_values;
 static vector<PendingFormFile> pending_form_files;
+static vector<PendingFormValue> request_values;
 
 #include "vm_parts.h"
 #include "db_interface.h"
@@ -403,6 +404,14 @@ int resume(int xPC,int xSP)
     } else if (OP==OP_SHA256)
     { POP(x);
       A=ewbSha256(x);
+    } else if (OP==OP_REQUEST)
+    { POP(x);
+      A="";
+      for (size_t i=0; i<request_values.size(); i++)
+        if (request_values[i].name==x)
+        { A=request_values[i].value;
+          break;
+        }
     } else if (OP==OP_TIME)
     { p_time(&A);
     } else if (OP==OP_DATE)
@@ -956,6 +965,18 @@ extern "C" void ewb_form_add_file(const char *name, const char *filename,
   if (path) item.path=path;
   item.size=size;
   pending_form_files.push_back(item);
+}
+
+extern "C" void ewb_request_clear(void)
+{ request_values.clear();
+}
+
+extern "C" void ewb_request_add_field(const char *name, const char *value,
+                                       size_t size)
+{ PendingFormValue item;
+  if (name) item.name=name;
+  if (value) item.value.assign(value,size);
+  request_values.push_back(item);
 }
 
 extern "C" int ewb_run_text(const char *program, const char *program_url, int entrypoint, int stackpos, const char *encoded_stack)

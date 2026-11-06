@@ -1,0 +1,1 @@
+print(request("method")."|".request("path")."|".request("query")."|".request("cookie")."|".request("authorization"));

@@ -515,6 +515,10 @@ funzioni predefinite
   // Accettano anche array marcati come dati opachi.
   input()           legge una riga da stdin; nel frontend web torna ""
   ** INPUT
+  request(nome)     //metadato della richiesta HTTP corrente
+  ** valuta nome; PUSHA; REQUEST
+  // Nomi: method, path, query, cookie, authorization. Fuori dal frontend web
+  // o per un nome sconosciuto restituisce "".
 
   load(source)  //restituisce i byte di un file o del body HTTP/HTTPS
   ** valuta source; PUSHA; FLOAD

@@ -110,6 +110,9 @@ funzioni predefinite
   eprint(valore)  'scrive i byte su stderr senza newline e torna valore.
   'accettano anche array marcati come dati opachi.
   input()           legge una riga da stdin; nel frontend web torna ""
+  request(nome)     restituisce un metadato della richiesta HTTP corrente.
+  'nomi disponibili: method, path, query, cookie, authorization. Fuori dal
+  'frontend web o per un nome sconosciuto restituisce "".
 
   load(source)  'restituisce tutti i byte di un file o del body HTTP/HTTPS.
   'per URL segue al massimo 5 redirect, timeout 30 secondi e limita il body
